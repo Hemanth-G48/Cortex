@@ -1,0 +1,117 @@
+.habit-tracker-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-primary {
+  background-color: var(--accent-blue);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.habits-table-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  background-color: var(--bg-color-secondary);
+  padding: 1px; /* border hack */
+}
+
+.habits-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.habits-table th, .habits-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+}
+
+.habits-table th {
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.habits-table td {
+  color: var(--text-primary);
+}
+
+.habit-checkbox {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--text-secondary);
+  border-radius: 4px;
+  background-color: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.habit-checkbox:checked {
+  background-color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+.habit-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  color: white;
+  font-size: 14px;
+  line-height: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.habit-progress-bg {
+  width: 100%;
+  height: 6px;
+  background-color: var(--border-color);
+  border-radius: 3px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.habit-progress-fill {
+  height: 100%;
+  background-color: var(--accent-green);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.chart-container {
+  background-color: var(--bg-color-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.chart-header {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-canvas-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}

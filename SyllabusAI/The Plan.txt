@@ -1,0 +1,47 @@
+Syllabus Ai - Development Plan
+===============================
+
+Phase 1: Foundation (Weeks 1-2) - COMPLETED
+-------------------------------------------
+- [x] Set up Git repository
+- [x] Initialize React project with TypeScript
+- [x] Initialize Node.js backend with Express
+- [x] Set up PostgreSQL database (via Sequelize)
+- [x] Create database schema and migrations (Models created)
+- [x] Implement user registration and login with JWT
+- [x] Create protected routes and basic frontend routing
+- [x] Set up environment variables
+
+Phase 2: Core Features (Weeks 3-4) - IN PROGRESS
+------------------------------------------------
+- [ ] Set up AWS S3 bucket for file storage
+- [ ] Implement file upload API (admin)
+- [ ] Create institution/course/subject hierarchy (Models exist, Controllers/API needed)
+- [ ] Build material listing API and browse page UI
+- [ ] Implement material detail page and download functionality
+- [ ] Create filter system and basic search with pagination
+- [ ] Install Tailwind CSS (Recommended in PDF)
+
+Phase 3: AI Integration (Weeks 5-6)
+-----------------------------------
+- [ ] Set up Anthropic Claude API account
+- [ ] Implement text extraction (PDF/PPT)
+- [ ] Create AI service module for summarization
+- [ ] Build summary generation endpoint and background job queue
+- [ ] Store and display summaries on the frontend with processing indicators
+
+Phase 4: Enhancement & Polish (Weeks 7-8)
+-----------------------------------------
+- [ ] Improve UI/UX design and add loading states
+- [ ] Implement advanced search filters and sorting
+- [ ] Create user dashboard and analytics (view counts, downloads)
+- [ ] Implement tags system and material recommendations
+- [ ] Mobile responsiveness and performance optimization
+- [ ] Comprehensive unit and integration testing
+
+Phase 5: Deployment (Week 9)
+----------------------------
+- [ ] Set up production database and S3 buckets
+- [ ] Deploy backend (Railway/Render) and frontend (Vercel)
+- [ ] Configure domain, SSL, and monitoring (Sentry)
+- [ ] Final security audit and load testing

@@ -1,0 +1,90 @@
+.schedule-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.schedule-header {
+  margin-bottom: 2rem;
+}
+
+/* Re-using some tab styles from assignments */
+.schedule-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 1rem;
+}
+
+.schedule-tabs .tab-btn {
+  border-radius: 8px 8px 0 0;
+  padding: 0.75rem 1.5rem;
+}
+
+.schedule-tabs .tab-btn.active {
+  background-color: var(--bg-color-secondary);
+  border-bottom: 2px solid var(--accent-blue);
+}
+
+.schedule-table-wrapper {
+  overflow-x: auto;
+  background-color: var(--bg-color-secondary);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.schedule-table th, .schedule-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.schedule-table th {
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.schedule-table td {
+  color: var(--text-primary);
+}
+
+.time-col {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.energy-tag {
+  display: inline-flex;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border: 1px solid var(--border-color);
+}
+.energy-high { color: var(--accent-green); border-color: rgba(104,171,132,0.3); background: rgba(104,171,132,0.1); }
+.energy-medium { color: var(--accent-yellow); border-color: rgba(217,184,102,0.3); background: rgba(217,184,102,0.1); }
+.energy-low { color: var(--text-secondary); border-color: rgba(255,255,255,0.1); }
+
+.category-tag {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  background: var(--bg-color);
+  color: var(--text-secondary);
+}
+.cat-break { color: var(--accent-green); background: rgba(104,171,132,0.1); }
+.cat-school { color: var(--accent-red); background: rgba(217,102,102,0.1); }
+.cat-study { color: var(--accent-blue); background: rgba(77,144,206,0.1); }

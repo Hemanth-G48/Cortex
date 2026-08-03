@@ -1,0 +1,8 @@
+export { default as Landing } from './Landing'
+export { default as Pro } from './Pro'
+export { default as Home } from './Home'
+export { default as Assignments } from './Assignments'
+export { default as Calendar } from './Calendar'
+export { default as Grades } from './Grades'
+export { default as StudyPlans } from './StudyPlans'
+export { default as Settings } from './Settings'

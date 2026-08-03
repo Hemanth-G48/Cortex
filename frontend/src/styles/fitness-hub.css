@@ -1,0 +1,870 @@
+/* ════════════════════════════════════════════════════════════
+   Fitness Hub theme styles (99-phase plan, Phases 51-56, 60-63)
+   All colors come from the [data-theme="fitness-hub"] token block
+   in theme.css (#0f1012 / blue / green / yellow / red palette).
+   Never hardcode colors.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Layout (Phases 57, 60, 63) ── */
+.fh-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .fh-layout { grid-template-columns: 1fr; }
+}
+
+.fh-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: sticky;
+  top: 1rem;
+}
+
+@media (max-width: 1024px) {
+  .fh-sidebar { position: static; }
+}
+
+.fh-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.fh-row { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.fh-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+/* ── Header (Phase 59) ── */
+.fh-header {
+  position: relative;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(1000px 200px at 15% -20%, rgba(59, 130, 246, 0.22), transparent 60%),
+    radial-gradient(800px 180px at 90% 120%, rgba(34, 197, 94, 0.14), transparent 55%),
+    linear-gradient(135deg, var(--bg-card), var(--bg-primary));
+  padding: 1.5rem 2rem;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+
+.fh-header-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fh-blue);
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.fh-header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.fh-header-sub {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.4rem;
+  max-width: 560px;
+}
+
+.fh-header-chips {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.fh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.fh-chip b { color: var(--text-primary); }
+
+/* ── Sidebar widgets (Phase 52) ── */
+.fh-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.fh-card-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* Quick actions (Phase 64) */
+.fh-qa-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.fh-qa-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s, color 0.15s;
+}
+
+.fh-qa-btn:hover {
+  border-color: var(--fh-blue);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.fh-qa-icon { font-size: 1.05rem; line-height: 1; }
+.fh-qa-label { font-size: 0.62rem; font-weight: 600; text-align: center; line-height: 1.1; }
+
+/* Navigation (Phase 65) */
+.fh-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.fh-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.fh-nav-link:hover { background: var(--bg-hover); color: var(--text-primary); }
+.fh-nav-link.active { background: var(--accent-muted); color: var(--accent); }
+.fh-nav-link .fh-nav-icon { font-size: 0.85rem; width: 1rem; text-align: center; }
+
+/* Weight goal (Phase 66) */
+.fh-weight-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.fh-weight-row b { font-size: 0.9rem; color: var(--text-primary); }
+
+.fh-weight-bar {
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.fh-weight-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--fh-blue), var(--fh-green));
+  transition: width 0.5s ease;
+}
+
+.fh-percent {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--fh-green);
+  text-align: right;
+}
+
+/* PR tracker (Phase 67) */
+.fh-pr-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.fh-pr-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fh-pr-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+
+.fh-pr-head .fh-pr-name { color: var(--text-primary); font-weight: 600; }
+.fh-pr-head .fh-pr-val { color: var(--text-secondary); font-size: 0.7rem; }
+
+.fh-pr-bar { height: 5px; border-radius: 9999px; background: var(--bg-hover); overflow: hidden; }
+.fh-pr-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--fh-yellow);
+  transition: width 0.5s ease;
+}
+
+/* Membership (Phase 68) */
+.fh-membership-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.fh-badge-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--fh-green);
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  animation: fh-pulse 2.4s ease-in-out infinite;
+}
+
+.fh-days-pay { font-size: 0.78rem; color: var(--text-secondary); }
+.fh-days-pay b { color: var(--fh-yellow); }
+
+/* Diet plan (Phase 69) */
+.fh-diet-list { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.fh-diet-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.fh-diet-item.active {
+  border-color: var(--fh-green);
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.fh-diet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-light);
+}
+
+.fh-diet-item.active .fh-diet-dot { background: var(--fh-green); box-shadow: 0 0 8px var(--fh-green); }
+
+/* ── Row 1: Weekly Split (Phases 73-79) ── */
+.fh-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.fh-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius);
+  border: none;
+  background: linear-gradient(135deg, var(--fh-green), #16a34a);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.fh-cta-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.45); }
+
+.fh-split-scroll {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+}
+
+.fh-day-card {
+  flex: 1;
+  min-width: 150px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.8rem;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.fh-day-card:hover {
+  transform: scale(1.02);
+  border-color: var(--border-light);
+  box-shadow: var(--card-shadow);
+}
+
+.fh-day-card.done { border-color: var(--fh-green); }
+
+.fh-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.fh-day-label { font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }
+
+.fh-split-badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.fh-split-badge.push { background: rgba(59, 130, 246, 0.15); color: var(--fh-blue); }
+.fh-split-badge.pull { background: rgba(234, 179, 8, 0.15); color: var(--fh-yellow); }
+.fh-split-badge.leg { background: rgba(239, 68, 68, 0.15); color: var(--fh-red); }
+.fh-split-badge.rest { background: var(--bg-hover); color: var(--text-muted); }
+
+.fh-day-exercises { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; }
+
+.fh-day-exercises li {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  padding-left: 0.75rem;
+  position: relative;
+}
+
+.fh-day-exercises li::before {
+  content: '•';
+  position: absolute;
+  left: 0.1rem;
+  color: var(--fh-blue);
+}
+
+.fh-day-done-chip {
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--fh-green);
+}
+
+/* ── Row 2: Habit heatmaps (Phases 80-86) ── */
+.fh-heat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+}
+
+@media (max-width: 1200px) { .fh-heat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .fh-heat-grid { grid-template-columns: 1fr; } }
+
+.fh-heat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.fh-heat-card:hover { transform: scale(1.02); border-color: var(--border-light); }
+
+.fh-heat-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fh-heat-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
+
+.fh-heat-goal {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+
+.fh-goal-edit {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.fh-goal-edit:hover { color: var(--fh-blue); }
+
+.fh-goal-input {
+  width: 100%;
+  font-size: 0.7rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+}
+
+.fh-heat-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.fh-heat-stats b { color: var(--text-primary); }
+
+.fh-heat-percent { color: var(--fh-green); font-weight: 700; }
+
+.fh-heat-cells {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  width: 100%;
+}
+
+.fh-heat-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  transition: transform 0.2s, background 0.15s;
+}
+
+.fh-heat-cell.filled-1 { background: rgba(59, 130, 246, 0.3); }
+.fh-heat-cell.filled-2 { background: rgba(34, 197, 94, 0.4); }
+.fh-heat-cell.filled-3 { background: rgba(234, 179, 8, 0.5); }
+.fh-heat-cell.filled-4 { background: rgba(239, 68, 68, 0.65); }
+
+.fh-heat-cell.pop { animation: fh-pop 0.4s ease; }
+
+.fh-mark-btn {
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--fh-green);
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--fh-green);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.fh-mark-btn:hover { background: var(--fh-green); color: #fff; }
+
+.fh-weak-spot {
+  font-size: 0.66rem;
+  color: var(--fh-red);
+  font-weight: 600;
+}
+
+.fh-heat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.25rem 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.fh-heat-empty .fh-empty-icon {
+  font-size: 2rem;
+  opacity: 0.55;
+}
+
+/* ── Row 3: Muscle group grid (Phases 87-91) ── */
+.fh-muscle-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 1200px) { .fh-muscle-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 768px) { .fh-muscle-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .fh-muscle-grid { grid-template-columns: 1fr; } }
+
+.fh-muscle-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: center;
+  text-align: center;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+
+.fh-muscle-card:hover {
+  transform: scale(1.02);
+  border-color: var(--fh-blue);
+  box-shadow: 0 0 18px rgba(59, 130, 246, 0.25);
+}
+
+.fh-muscle-card.upper:hover { border-color: var(--fh-blue); box-shadow: 0 0 18px rgba(59, 130, 246, 0.3); }
+.fh-muscle-card.lower:hover { border-color: var(--fh-green); box-shadow: 0 0 18px rgba(34, 197, 94, 0.3); }
+
+.fh-muscle-svg-wrap { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+
+.fh-muscle-svg { width: 100%; height: 100%; }
+
+.fh-muscle-svg .fh-muscle-highlight {
+  filter: drop-shadow(0 0 6px var(--fh-blue));
+}
+
+.fh-muscle-name { font-size: 0.78rem; font-weight: 700; color: var(--text-primary); }
+
+.fh-muscle-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.fh-body-badge {
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+.fh-body-badge.upper { background: rgba(59, 130, 246, 0.15); color: var(--fh-blue); }
+.fh-body-badge.lower { background: rgba(34, 197, 94, 0.15); color: var(--fh-green); }
+
+.fh-muscle-expanded {
+  width: 100%;
+  border-top: 1px dashed var(--border);
+  padding-top: 0.5rem;
+  text-align: left;
+}
+
+.fh-muscle-expanded .fh-expand-title {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.fh-expand-list { list-style: none; display: flex; flex-direction: column; gap: 0.25rem; }
+
+.fh-expand-list li {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.fh-expand-list .fh-set-meta { color: var(--text-muted); font-size: 0.66rem; white-space: nowrap; }
+
+/* ── Row 4: Expenses (Phases 92-93, 96) ── */
+.fh-expense-layout {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) { .fh-expense-layout { grid-template-columns: 1fr; } }
+
+.fh-expense-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 1200px) { .fh-expense-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .fh-expense-row { grid-template-columns: 1fr; } }
+
+.fh-expense-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.fh-expense-card:hover { transform: scale(1.02); border-color: var(--border-light); box-shadow: var(--card-shadow); }
+
+.fh-expense-title { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); }
+
+.fh-expense-cost { font-size: 1.15rem; font-weight: 800; color: var(--fh-green); }
+
+.fh-expense-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.fh-tag {
+  padding: 0.12rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.fh-tag.supplement { background: rgba(59, 130, 246, 0.14); color: var(--fh-blue); }
+.fh-tag.equipment { background: rgba(234, 179, 8, 0.14); color: var(--fh-yellow); }
+.fh-tag.gym { background: rgba(34, 197, 94, 0.14); color: var(--fh-green); }
+
+.fh-donut-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.fh-donut {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: conic-gradient(var(--fh-blue) 0%, var(--fh-blue) var(--d1, 0%), var(--fh-yellow) var(--d1, 0%), var(--fh-yellow) var(--d2, 0%), var(--fh-green) var(--d2, 0%), var(--fh-green) 100%);
+  position: relative;
+}
+
+.fh-donut::after {
+  content: '';
+  position: absolute;
+  inset: 26px;
+  border-radius: 50%;
+  background: var(--bg-card);
+}
+
+.fh-donut-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.fh-donut-label .fh-donut-total { font-size: 1.25rem; font-weight: 800; color: var(--text-primary); }
+.fh-donut-label .fh-donut-cap { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+.fh-donut-legend { display: flex; flex-direction: column; gap: 0.3rem; width: 100%; }
+
+.fh-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.fh-legend-dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; margin-right: 0.4rem; }
+
+.fh-legend-pct { font-weight: 700; color: var(--text-primary); }
+
+/* ── Row 5: Exercises (Phases 94-95, 97) ── */
+.fh-exercise-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+}
+
+@media (max-width: 1100px) { .fh-exercise-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .fh-exercise-grid { grid-template-columns: 1fr; } }
+
+.fh-exercise-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.fh-exercise-card:hover { transform: scale(1.02); border-color: var(--border-light); box-shadow: var(--card-shadow); }
+
+.fh-exercise-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fh-exercise-name { font-size: 0.82rem; font-weight: 700; color: var(--text-primary); }
+
+.fh-exercise-group { font-size: 0.64rem; color: var(--text-muted); }
+
+.fh-set-list { list-style: none; display: flex; flex-direction: column; gap: 0.25rem; }
+
+.fh-set-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  padding: 0.22rem 0.5rem;
+  border-radius: 6px;
+  background: var(--bg-hover);
+}
+
+.fh-set-list .fh-set-label { font-weight: 600; color: var(--text-primary); }
+.fh-set-list .fh-set-weight { color: var(--fh-blue); font-weight: 700; }
+
+.fh-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.2rem;
+}
+
+.fh-tab {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.fh-tab:hover { color: var(--text-primary); }
+.fh-tab.active { background: var(--accent); color: #fff; }
+
+/* ── Empty states (Phases 62, 86, 96) ── */
+.fh-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: rgba(28, 30, 33, 0.4);
+}
+
+.fh-empty .fh-empty-icon {
+  font-size: 2.2rem;
+  opacity: 0.5;
+  filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.35));
+}
+
+.fh-empty-title { font-weight: 600; color: var(--text-secondary); }
+
+/* ── Skeleton loading (Phase 62) ── */
+.fh-skeleton {
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-hover) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius);
+}
+
+.fh-skeleton-card { height: 110px; }
+.fh-skeleton-sidebar { height: 150px; }
+.fh-skeleton-heat { height: 180px; }
+
+/* ── Keyframes (Phase 56) ── */
+@keyframes fh-pop {
+  0% { transform: scale(0.6); opacity: 0.4; }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fh-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+}
+
+@keyframes fh-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(59, 130, 246, 0.2); }
+  50% { box-shadow: 0 0 18px rgba(59, 130, 246, 0.5); }
+}
+
+/* ── Modal (Phase 78) ── */
+.fh-modal-body { display: flex; flex-direction: column; gap: 0.7rem; }
+
+.fh-field { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.fh-field label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fh-field input,
+.fh-field select {
+  width: 100%;
+  font-size: 0.85rem;
+}

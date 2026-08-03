@@ -1,0 +1,160 @@
+/* ══════════════════════════════════════════════
+   Pixel-Art CSS Utilities
+   Sharp-edged rendering, crisp scaling, retro effects
+   ══════════════════════════════════════════════ */
+
+/* ── Pixel-perfect image rendering ── */
+
+.pixel-render {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
+}
+
+/* ── Crisp SVG / canvas rendering ── */
+
+.pixel-canvas {
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+}
+
+/* ── Pixel border — single-width ── */
+
+.pixel-border-single {
+  box-shadow:
+    inset -1px -1px 0 0 rgba(0, 0, 0, 0.35),
+    inset 1px 1px 0 0 rgba(255, 255, 255, 0.08);
+  border: 1px solid #2a2a2a;
+}
+
+/* ── Pixel border — double-width (more prominent) ── */
+
+.pixel-border-double {
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0, 0, 0, 0.35),
+    inset 2px 2px 0 0 rgba(255, 255, 255, 0.08);
+  border: 2px solid #2a2a2a;
+  border-radius: 0;
+}
+
+/* ── Pixel border — active/glowing ── */
+
+.pixel-border-glow {
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0, 0, 0, 0.35),
+    inset 2px 2px 0 0 rgba(255, 255, 255, 0.08),
+    0 0 12px rgba(255, 152, 0, 0.3);
+  border: 2px solid #ff9800;
+}
+
+/* ── Pixel border — success/green glow ── */
+
+.pixel-border-success {
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0, 0, 0, 0.35),
+    inset 2px 2px 0 0 rgba(255, 255, 255, 0.08),
+    0 0 12px rgba(76, 175, 80, 0.3);
+  border: 2px solid #4caf50;
+}
+
+/* ── Pixel button press effect ── */
+
+.pixel-btn-press:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Pixel text shadow (retro UI depth) ── */
+
+.pixel-text-shadow {
+  text-shadow:
+    1px 1px 0 rgba(0, 0, 0, 0.5),
+    2px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.pixel-text-shadow-sm {
+  text-shadow:
+    1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ── Pixel separator / divider ── */
+
+.pixel-divider {
+  height: 0;
+  border: none;
+  border-top: 2px dashed #2a2a2a;
+  margin: 12px 0;
+}
+
+.pixel-divider-solid {
+  height: 0;
+  border: none;
+  border-top: 2px solid #2a2a2a;
+  margin: 12px 0;
+}
+
+/* ── Pixel heart / health bar ── */
+
+.pixel-health-bar {
+  display: flex;
+  gap: 2px;
+}
+
+.pixel-health-segment {
+  width: 8px;
+  height: 12px;
+  background: #4caf50;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.pixel-health-segment.lost {
+  background: #2a2a2a;
+}
+
+.pixel-health-segment.danger {
+  background: #f44336;
+}
+
+/* ── Pixel sparkle / star effect ── */
+
+@keyframes pixel-sparkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.pixel-sparkle {
+  animation: pixel-sparkle 0.8s steps(2) infinite;
+}
+
+/* ── Pixel reveal (step-animated appear) ── */
+
+@keyframes pixel-reveal {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.pixel-reveal {
+  animation: pixel-reveal 0.4s steps(8) forwards;
+}
+
+/* ── Pixel fade-in ── */
+
+@keyframes pixel-fade-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pixel-fade-in {
+  animation: pixel-fade-in 0.2s steps(4) forwards;
+}

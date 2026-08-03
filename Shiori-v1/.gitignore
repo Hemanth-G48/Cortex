@@ -1,0 +1,78 @@
+# Dependencies
+node_modules/
+.npm
+
+# Environment
+.env
+.env.local
+.env.*.local
+tokens.json
+
+# Build output
+dist/
+build/
+.vite/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Misc
+.cache/
+qodana.yaml
+new_file.txt
+.vercel
+nul
+
+# Playwright test artifacts
+.playwright-mcp/
+client/package-lock.json
+
+# Temp screenshots
+demo-home*.png
+demo-final.png
+landing*.png
+login-page.png
+signup.png
+glama-*.png
+github-stars.png
+mobile-home.png
+pro-mobile.png
+
+# Session scratch files
+body-area.md
+btns.md
+flair.md
+full-form.md
+post-btn.md
+reddit-form.md
+reddit-snapshot.md
+rj.md
+wd2.md
+webdev-form.md
+
+# Repo dumps
+repomix-output.xml

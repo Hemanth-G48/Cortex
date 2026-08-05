@@ -3,3 +3,9 @@ uvicorn[standard]
 sqlalchemy
 pydantic
 pydantic-settings
+python-multipart
+bcrypt
+pypdf
+python-docx
+httpx
+numpy

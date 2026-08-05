@@ -13,6 +13,27 @@ Base = declarative_base()
 # Idempotent column migrations. `create_all` cannot ALTER existing tables, so
 # any new column added to a model must be registered here as an ALTER TABLE.
 COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
+    "courses": [
+        ("credits", "INTEGER DEFAULT 3"),
+    ],
+    "notes": [
+        ("pinned", "BOOLEAN DEFAULT 0"),
+        ("updated_at", "DATETIME"),
+    ],
+    "courses": [
+        ("google_id", "VARCHAR(100)"),
+        ("curriculum_subject_id", "INTEGER"),
+    ],
+    "assignments": [
+        ("google_id", "VARCHAR(100)"),
+        ("type", "VARCHAR(30) DEFAULT 'Homework'"),
+        ("type_color", "VARCHAR(20)"),
+        ("time_estimate", "INTEGER"),
+        ("file_url", "VARCHAR(500)"),
+    ],
+    "events": [
+        ("google_id", "VARCHAR(100)"),
+    ],
     "users": [
         ("avatar_class", "VARCHAR(50) DEFAULT 'Wizard'"),
         ("current_streak", "INTEGER DEFAULT 0"),
@@ -21,6 +42,13 @@ COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
         ("target_weight", "FLOAT"),
         ("membership_status", "VARCHAR(50) DEFAULT 'Active'"),
         ("next_payment_date", "DATE"),
+        ("username", "VARCHAR(100)"),
+        ("email", "VARCHAR(255)"),
+        ("password_hash", "VARCHAR(255)"),
+        ("role", "VARCHAR(20) DEFAULT 'student'"),
+        ("is_admin", "BOOLEAN DEFAULT 0"),
+        ("institution_id", "INTEGER"),
+        ("program_id", "INTEGER"),
     ],
     "missions": [
         ("linked_quests", "VARCHAR(500)"),

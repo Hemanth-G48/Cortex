@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -5,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Note, Goal
-from app.schemas.note import NoteCreate, NoteResponse, GoalCreate, GoalResponse
+from app.schemas.note import NoteCreate, NotePinResponse, NoteResponse, GoalCreate, GoalResponse
 
 router = APIRouter(prefix="/api", tags=["notes"])
 
@@ -13,17 +14,23 @@ router = APIRouter(prefix="/api", tags=["notes"])
 # -- Notes --
 @router.get("/notes", response_model=List[NoteResponse])
 def list_notes(db: Session = Depends(get_db)):
-    return db.query(Note).all()
+    return (
+        db.query(Note)
+        .order_by(Note.pinned.desc(), Note.created_date.desc(), Note.id.desc())
+        .all()
+    )
 
 
 @router.get("/courses/{course_id}/notes", response_model=List[NoteResponse])
 def list_course_notes(course_id: int, db: Session = Depends(get_db)):
-    return db.query(Note).filter(Note.course_id == course_id).all()
+    return db.query(Note).filter(Note.course_id == course_id).order_by(Note.pinned.desc(), Note.id.desc()).all()
 
 
 @router.post("/notes", response_model=NoteResponse)
 def create_note(data: NoteCreate, db: Session = Depends(get_db)):
-    note = Note(**data.model_dump())
+    payload = data.model_dump()
+    payload["updated_at"] = datetime.now()
+    note = Note(**payload)
     db.add(note)
     db.commit()
     db.refresh(note)
@@ -37,9 +44,21 @@ def update_note(note_id: int, data: NoteCreate, db: Session = Depends(get_db)):
         raise HTTPException(404, "Note not found")
     for key, val in data.model_dump().items():
         setattr(note, key, val)
+    note.updated_at = datetime.now()
     db.commit()
     db.refresh(note)
     return note
+
+
+@router.put("/notes/{note_id}/pin", response_model=NotePinResponse)
+def pin_note(note_id: int, db: Session = Depends(get_db)):
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(404, "Note not found")
+    note.pinned = not note.pinned
+    note.updated_at = datetime.now()
+    db.commit()
+    return NotePinResponse(id=note.id, pinned=note.pinned)
 
 
 @router.delete("/notes/{note_id}")

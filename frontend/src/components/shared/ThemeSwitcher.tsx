@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export type ThemeId = 'student-os' | 'rpg' | 'vault' | 'life-planner' | 'quest-centre' | 'habit-tracker' | 'fitness-hub';
+export type ThemeId = 'student-os' | 'rpg' | 'vault' | 'life-planner' | 'quest-centre' | 'habit-tracker' | 'fitness-hub' | 'cyberpunk' | 'curriculum';
 
 const THEMES: { id: ThemeId; label: string; icon: string }[] = [
   { id: 'student-os', label: 'Student OS', icon: '🎓' },
@@ -10,6 +10,8 @@ const THEMES: { id: ThemeId; label: string; icon: string }[] = [
   { id: 'quest-centre', label: 'Quest Centre', icon: '🏆' },
   { id: 'habit-tracker', label: 'Habit Tracker', icon: '🔥' },
   { id: 'fitness-hub', label: 'Fitness Hub', icon: '💪' },
+  { id: 'cyberpunk', label: 'Cyberpunk', icon: '🌆' },
+  { id: 'curriculum', label: 'Curriculum', icon: '🏛️' },
 ];
 
 const STORAGE_KEY = 'student-os-theme';

@@ -6,6 +6,10 @@ import { StudentRadarChart } from '../components/visualization/RadarChart';
 import { MiniTodoList } from '../components/taskmanager/MiniTodoList';
 import { RemindersList } from '../components/taskmanager/RemindersList';
 import { AcademicCalendar } from '../components/calendar/AcademicCalendar';
+import { BrainDumpWidget } from '../components/BrainDumpWidget';
+import { DayProgressWidget } from '../components/schedule/DayProgressWidget';
+import { EnrollmentBadge } from '../components/dashboard/EnrollmentBadge';
+import { CurriculumSection } from '../components/dashboard/CurriculumSection';
 
 export const Dashboard = () => {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -38,6 +42,15 @@ export const Dashboard = () => {
         <div className="stat-tile"><div className="label">Assignments Done</div><div className="value">{completedAssignments}/{assignments.length}</div></div>
         <div className="stat-tile"><div className="label">Upcoming Exams</div><div className="value">{upcomingExams}</div></div>
         <div className="stat-tile"><div className="label">Goal Progress</div><div className="value">{avgProgress}%</div></div>
+      </div>
+
+      <div className="page-section" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <BrainDumpWidget />
+        <DayProgressWidget />
+      </div>
+
+      <div className="page-section" style={{ maxWidth: 420 }}>
+        <EnrollmentBadge />
       </div>
 
       <div className="page-section">
@@ -100,6 +113,8 @@ export const Dashboard = () => {
       <div className="page-section">
         <AcademicCalendar tasks={tasks} />
       </div>
+
+      <CurriculumSection />
     </div>
   );
 };

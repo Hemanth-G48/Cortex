@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Date
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Float, Date
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -22,3 +22,17 @@ class User(Base):
     target_weight = Column(Float, nullable=True)
     membership_status = Column(String(50), default="Active")
     next_payment_date = Column(Date, nullable=True)
+
+    # Role auth (STUDENT-PLANAR G1)
+    username = Column(String(100), nullable=True)
+    email = Column(String(255), nullable=True)
+    password_hash = Column(String(255), nullable=True)
+    role = Column(String(20), default="student")
+
+    # SyllabusAI (G1): local curator/admin flag (additive — the student/teacher
+    # `role` from STUDENT-PLANAR is left untouched).
+    is_admin = Column(Boolean, default=False)
+
+    # Enrollment binding (Phase 13)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
+    program_id = Column(Integer, ForeignKey("curriculum_courses.id"), nullable=True)

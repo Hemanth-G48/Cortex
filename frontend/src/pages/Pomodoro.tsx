@@ -5,6 +5,8 @@ import type { PomodoroSession } from '../services/api';
 import { usePomodoro } from '../hooks/usePomodoro';
 import { ProgressRing } from '../components/pomodoro/ProgressRing';
 import { SettingsModal } from '../components/pomodoro/SettingsModal';
+import { BrainDumpWidget } from '../components/BrainDumpWidget';
+import { playDing } from '../utils/sounds';
 
 export const Pomodoro = () => {
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
@@ -17,6 +19,7 @@ export const Pomodoro = () => {
   const startFocus = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     pom.startFocus();
+    playDing('focus');
     intervalRef.current = setInterval(() => {
       pom.tick();
     }, 1000);
@@ -25,6 +28,7 @@ export const Pomodoro = () => {
   const startBreak = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     pom.startBreak();
+    playDing(pom.mode === 'focus' ? 'break' : 'long-break');
     intervalRef.current = setInterval(() => {
       pom.tick();
     }, 1000);
@@ -38,6 +42,7 @@ export const Pomodoro = () => {
   // Log completed session
   useEffect(() => {
     if (!pom.running && pom.timer === 0 && pom.mode === 'focus') {
+      playDing('break');
       endpoints.pomodoro.create({
         start_time: new Date().toISOString(),
         duration_minutes: pom.settings.focusMinutes,
@@ -88,6 +93,11 @@ export const Pomodoro = () => {
       </div>
 
       <div className="page-section" style={{ marginTop: '2rem' }}>
+        <h2>Brain Dump</h2>
+        <BrainDumpWidget />
+      </div>
+
+      <div className="page-section">
         <h2>Session History</h2>
         <div className="card">
           <table className="data-table">

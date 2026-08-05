@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { endpoints } from '../../services/api';
 import type { User } from '../../services/api';
+import { NotificationsBell } from '../NotificationsBell';
 
 export const Header = ({ title }: { title: string }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -12,6 +13,7 @@ export const Header = ({ title }: { title: string }) => {
   return (
     <header className="header">
       <h1>{title}</h1>
+      <NotificationsBell />
       {user && (
         <div className="user-badge">
           <div style={{ textAlign: 'right' }}>

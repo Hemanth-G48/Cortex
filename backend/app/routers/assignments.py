@@ -1,24 +1,51 @@
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
-from app.models import Assignment, Exam
+from app.models import Assignment, Exam, User
 from app.schemas.assignment import (
     AssignmentCreate,
     AssignmentResponse,
+    AssignmentStatusUpdate,
     ExamCreate,
     ExamResponse,
 )
+from app.schemas.study_stats import AssignmentAnalyticsResponse
+from app.services.security import get_current_user
+from app.services.study_stats import compute_assignment_analytics
+import uuid
+from pathlib import Path
 
 router = APIRouter(prefix="/api", tags=["assignments"])
 
 
 # -- Assignments --
+@router.get("/assignments/analytics", response_model=AssignmentAnalyticsResponse)
+def assignment_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return compute_assignment_analytics(db, current_user.id)
+
+
 @router.get("/assignments", response_model=List[AssignmentResponse])
-def list_assignments(db: Session = Depends(get_db)):
-    return db.query(Assignment).all()
+def list_assignments(
+    type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    course_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Assignment)
+    if type is not None:
+        query = query.filter(Assignment.type == type)
+    if status is not None:
+        query = query.filter(Assignment.status == status)
+    if course_id is not None:
+        query = query.filter(Assignment.course_id == course_id)
+    return query.all()
 
 
 @router.get("/courses/{course_id}/assignments", response_model=List[AssignmentResponse])
@@ -42,6 +69,68 @@ def update_assignment(assignment_id: int, data: AssignmentCreate, db: Session = 
         raise HTTPException(404, "Assignment not found")
     for key, val in data.model_dump().items():
         setattr(assignment, key, val)
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+
+@router.post("/assignments/{assignment_id}/status", response_model=AssignmentResponse)
+def update_assignment_status(
+    assignment_id: int,
+    data: AssignmentStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(404, "Assignment not found")
+    if data.status not in {"Not started", "In progress", "Completed"}:
+        raise HTTPException(400, detail={"error": "Invalid status"})
+    assignment.status = data.status
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+
+@router.post("/assignments/{assignment_id}/complete", response_model=AssignmentResponse)
+def complete_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+):
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(404, "Assignment not found")
+    assignment.status = "Completed"
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+
+@router.post("/assignments/{assignment_id}/attachment", response_model=AssignmentResponse)
+def upload_assignment_attachment(
+    assignment_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(404, "Assignment not found")
+
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in {".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg"}:
+        raise HTTPException(400, detail={"error": "File type not allowed"})
+
+    data = file.file.read()
+    if len(data) > settings.max_upload_bytes:
+        raise HTTPException(413, detail={"error": "File too large"})
+
+    directory = Path(settings.UPLOAD_DIR)
+    directory.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{uuid.uuid4().hex}{suffix}"
+    target = directory / stored_name
+    with target.open("wb") as out:
+        out.write(data)
+
+    assignment.file_url = f"/uploads/{stored_name}"
     db.commit()
     db.refresh(assignment)
     return assignment

@@ -15,3 +15,4 @@ class Event(Base):
     location = Column(String(200), nullable=True)
     is_completed = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
+    google_id = Column(String(100), nullable=True)

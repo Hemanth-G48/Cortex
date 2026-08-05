@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, Date, Float, Boolean, ForeignKey
+from datetime import datetime
+
+from sqlalchemy import Column, Integer, String, Text, Date, Float, Boolean, DateTime, ForeignKey
 from app.database import Base
 
 
@@ -10,6 +12,9 @@ class Note(Base):
     content = Column(Text, nullable=True)
     course_id = Column(Integer, ForeignKey("courses.id"))
     created_date = Column(Date, nullable=False)
+    # Notes editor (99-phase plan, Group 13)
+    pinned = Column(Boolean, default=False)
+    updated_at = Column(DateTime, nullable=True)
 
 
 class Goal(Base):

@@ -54,6 +54,47 @@ def test_update_course(client):
     assert resp.json()["status"] == "Completed"
 
 
+def test_course_links_curriculum_subject(client, db_session):
+    # SyllabusAI G12 (Phase 78): personal courses can carry an optional
+    # curriculum_subject_id FK (enrichment only; null-safe everywhere else).
+    from app.models import CurriculumSubject
+
+    subject = CurriculumSubject(
+        program_id=1,
+        name="Link Subject",
+        code="LINK-SUBJ",
+        semester=9,
+        credits=3,
+        is_active=True,
+    )
+    db_session.add(subject)
+    db_session.commit()
+    db_session.refresh(subject)
+
+    resp = client.post("/api/courses/", json={
+        "title": "Linked Course",
+        "user_id": 1,
+        "curriculum_subject_id": subject.id,
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["curriculum_subject_id"] == subject.id
+
+    # Response shape exposes the FK and it round-trips on update.
+    resp2 = client.put(f"/api/courses/{data['id']}", json={
+        "title": "Linked Course",
+        "user_id": 1,
+        "curriculum_subject_id": subject.id,
+    })
+    assert resp2.status_code == 200
+    assert resp2.json()["curriculum_subject_id"] == subject.id
+
+    # Null by default → no behavior change for ordinary courses.
+    resp3 = client.get(f"/api/courses/{data['id']}")
+    assert resp3.status_code == 200
+    assert resp3.json()["curriculum_subject_id"] == subject.id
+
+
 def test_delete_course(client):
     resp = client.delete("/api/courses/1")
     assert resp.status_code == 200

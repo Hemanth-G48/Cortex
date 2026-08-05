@@ -2,10 +2,18 @@ from datetime import date, datetime, time, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.seed.curriculum import seed_curriculum
+from app.seed.materials_seed import parts_demo_materials
+
 from app.models import (
     Assignment,
     Character,
     Course,
+    CourseWeight,
+    Flashcard,
+    FlashcardDeck,
+    Grade,
+    StudyPlan,
     DailyLog,
     DietPlan,
     Event,
@@ -20,6 +28,7 @@ from app.models import (
     LifeArea,
     Mission,
     MissionTask,
+    MoodLog,
     MuscleGroup,
     Note,
     PersonalRecord,
@@ -32,18 +41,27 @@ from app.models import (
     Reward,
     Schedule,
     ScheduleEvent,
+    SleepLog,
     Task,
     User,
     Workout,
     WorkoutSplit,
 )
-
-
 def seed_database(db: Session) -> None:
     user = db.query(User).first()
     fresh = user is None
     if not user:
         seed_full(db)
+    # SyllabusAI curriculum catalog (idempotent): Institution → Program →
+    # Subject → Unit. Called unconditionally so demo catalog is always present.
+    seed_curriculum(db)
+    # SyllabusAI materials: idempotent, safe if no curriculum units exist yet.
+    parts_demo_materials(db)
+    # SyllabusAI (G1): the single local user is the admin/curator so admin-gated
+    # catalog endpoints are usable out of the box (backfill for existing DBs).
+    if user and db.query(User).count() == 1 and not user.is_admin:
+        user.is_admin = True
+        db.commit()
     seed_rpg_additions(db)
     # Default vault habits are intentionally re-seeded on every startup (they are
     # the app's built-in defaults), unlike the demo projects/tasks/goals below
@@ -58,11 +76,21 @@ def seed_database(db: Session) -> None:
     seed_habit_tracker(db)
     # Fitness Hub data (Phases 41-42): idempotent.
     seed_fitness_hub(db)
+    # Grades/GPA demo data (99-phase plan, Phases 15): idempotent.
+    seed_grades(db)
+    # Flashcard demo decks (99-phase plan, Phase 30): idempotent.
+    seed_flashcards(db)
+    # Study plan demo (99-phase plan, Phase 43): idempotent.
+    seed_study_plans(db)
+    # Mood tracking demo (Zenith-Study-Planner G2): idempotent on logged_at.
+    seed_mood(db)
+    # Sleep tracker demo (Zenith-Study-Planner G3): idempotent on date.
+    seed_sleep(db)
 
 
 def seed_full(db: Session) -> None:
     # -- User --
-    user = User(name="Alex", current_level=5, total_xp=2340, avatar_class="Wizard", current_streak=3)
+    user = User(name="Alex", current_level=5, total_xp=2340, avatar_class="Wizard", current_streak=3, is_admin=True)
     db.add(user)
     db.flush()
 
@@ -247,6 +275,127 @@ def seed_full(db: Session) -> None:
     seed_missions(db, user)
     # -- Schedule Events --
     seed_schedule_events(db, user)
+
+    db.commit()
+
+
+def seed_study_plans(db: Session) -> None:
+    """Study plan demo (99-phase plan, Phase 43). Idempotent on subject."""
+    import json as _json
+
+    if db.query(StudyPlan).first():
+        return
+    weeks = [
+        {"week": 1, "topic": "Cell Biology & Organelles", "tasks": ["Read Ch 1-2", "Make flashcards", "Practice diagrams"]},
+        {"week": 2, "topic": "Genetics & DNA", "tasks": ["Read Ch 3-4", "Punnett square practice", "Review lecture notes"]},
+        {"week": 3, "topic": "Evolution & Ecology", "tasks": ["Read Ch 5-6", "Watch videos", "Past exam questions"]},
+        {"week": 4, "topic": "Review & Practice Exams", "tasks": ["Full practice test", "Review weak areas", "Final revision"]},
+    ]
+    db.add(StudyPlan(
+        subject="Biology Final",
+        exam_date=None,
+        weeks_json=_json.dumps(weeks, ensure_ascii=False),
+    ))
+    db.commit()
+
+
+def seed_flashcards(db: Session) -> None:
+    """Flashcard demo decks (99-phase plan, Phase 30).
+
+    Idempotent / append-only: decks keyed on name, cards on (deck, front).
+    Two decks with 5-6 cards each, mirroring Shiori's DEMO_DECKS.
+    """
+    courses = db.query(Course).order_by(Course.id).all()
+    deck_spec = [
+        (
+            "Integration Techniques",
+            courses[0].id if courses else None,
+            [
+                ("What is the formula for Integration by Parts?", "∫u dv = uv − ∫v du. Remember LIATE for choosing u.", "basic", 3),
+                ("When do you use u-substitution?", "When the integrand contains a composite function f(g(x))·g'(x). Let u = g(x), du = g'(x)dx.", "easy", 2),
+                ("What substitution is used for √(a²−x²)?", "x = a·sin(θ). This converts the square root to a·cos(θ).", "medium", 0),
+                ("What does LIATE stand for?", "Logarithms → Inverse trig → Algebraic → Trig → Exponential. Choose u as whichever comes first.", "basic", 1),
+                ("∫ sin²(x) dx = ?", "Use the half-angle identity: sin²(x) = (1 − cos(2x))/2 → x/2 − sin(2x)/4 + C.", "hard", 0),
+            ],
+        ),
+        (
+            "Data Structures — Key Concepts",
+            courses[1].id if len(courses) > 1 else None,
+            [
+                ("Time complexity of BST search (average case)?", "O(log n) average, O(n) worst case (degenerate tree).", "easy", 2),
+                ("What traversal gives a BST in sorted order?", "Inorder traversal (Left → Root → Right) always produces ascending sorted output.", "basic", 3),
+                ("Difference between BFS and DFS?", "BFS uses a queue (level by level, shortest path); DFS uses a stack/recursion (depth-first, cycle detection).", "medium", 1),
+                ("What is amortized O(1) for dynamic arrays?", "Appends are O(1) amortized because doubling the array rarely occurs; n operations cost O(n) total.", "hard", 0),
+            ],
+        ),
+    ]
+
+    existing_decks = {d.name: d for d in db.query(FlashcardDeck).all()}
+    for name, cid, cards in deck_spec:
+        deck = existing_decks.get(name)
+        if not deck:
+            deck = FlashcardDeck(name=name, course_id=cid)
+            db.add(deck)
+            db.flush()
+            existing_decks[name] = deck
+        have = {c.front for c in deck.cards}
+        for front, back, difficulty, streak in cards:
+            if front in have:
+                continue
+            db.add(Flashcard(
+                deck_id=deck.id, front=front, back=back,
+                difficulty=difficulty, streak=streak,
+            ))
+
+    db.commit()
+
+
+def seed_grades(db: Session) -> None:
+    """Grades/GPA demo data (99-phase plan, Phase 15).
+
+    Idempotent / append-only: weights keyed on (course_id, name) and grades on
+    (course_id, title). Seeded for the first two demo courses so the Grades
+    page + cumulative GPA have data out of the box.
+    """
+    courses = db.query(Course).order_by(Course.id).all()
+    if len(courses) < 2:
+        return
+
+    # ── Weighted categories for course 1 (Computer Science) ──
+    weight_spec = [("Homework", 25.0), ("Quizzes", 25.0), ("Midterm", 25.0), ("Final Exam", 25.0)]
+    existing_weights = {(w.course_id, w.name) for w in db.query(CourseWeight).all()}
+    weight_ids: dict[str, int] = {}
+    for name, weight in weight_spec:
+        key = (courses[0].id, name)
+        if key not in existing_weights:
+            w = CourseWeight(course_id=courses[0].id, name=name, weight=weight)
+            db.add(w)
+            db.flush()
+            weight_ids[name] = w.id
+            existing_weights.add(key)
+        else:
+            weight_ids[name] = db.query(CourseWeight).filter(
+                CourseWeight.course_id == courses[0].id, CourseWeight.name == name
+            ).first().id
+
+    # ── Grade entries for course 1 (categorized) + course 2 (plain) ──
+    grade_spec = [
+        (courses[0].id, "HW 1 — Linked Lists", 48.0, 50.0, weight_ids.get("Homework")),
+        (courses[0].id, "HW 2 — Sorting", 44.0, 50.0, weight_ids.get("Homework")),
+        (courses[0].id, "Quiz 1", 18.0, 20.0, weight_ids.get("Quizzes")),
+        (courses[0].id, "Midterm 1", 138.0, 150.0, weight_ids.get("Midterm")),
+        (courses[1].id, "Array vs Linked List", 95.0, 100.0, None),
+        (courses[1].id, "Stacks & Queues", 88.0, 100.0, None),
+    ]
+    existing_grades = {(g.course_id, g.title) for g in db.query(Grade).all()}
+    for cid, title, earned, possible, cat_id in grade_spec:
+        if (cid, title) in existing_grades:
+            continue
+        db.add(Grade(
+            course_id=cid, title=title,
+            points_earned=earned, points_possible=possible,
+            category_id=cat_id,
+        ))
 
     db.commit()
 
@@ -624,6 +773,76 @@ def seed_fitness_hub(db: Session) -> None:
                 type="good", status="Completed", xp_change=h.xp_reward,
             ))
 
+    db.commit()
+
+
+def seed_mood(db: Session) -> None:
+    """Mood tracking demo data (Zenith-Study-Planner G2, Phase 8).
+
+    Idempotent / append-only: one entry per day for the last 7 days, keyed on
+    (mood, energy, date) so re-seeding never duplicates.
+    """
+    from app.models.mood_log import MOODS
+
+    user = db.query(User).first()
+    if not user:
+        return
+
+    today = datetime.now().date()
+    existing = {(m.mood, m.energy, m.logged_at.date()) for m in db.query(MoodLog).all()}
+
+    # A believable week: focused high-energy study days + a stressed dip.
+    pattern = [
+        ("focused", 4, "Deep work session on algorithms"),
+        ("focused", 5, "Great study flow"),
+        ("stressed", 2, "Midterm pressure building"),
+        ("relaxed", 3, "Recovered after a walk"),
+        ("focused", 4, "Final revision sprint"),
+        ("relaxed", 4, "Weekend reset"),
+        ("focused", 3, "Prepared for the exam"),
+    ]
+    for i, (mood, energy, note) in enumerate(pattern):
+        day = today - timedelta(days=6 - i)
+        if (mood, energy, day) in existing:
+            continue
+        db.add(MoodLog(
+            user_id=user.id, mood=mood, energy=energy, note=note,
+            logged_at=datetime.combine(day, time(18, 0)),
+        ))
+    db.commit()
+
+
+def seed_sleep(db: Session) -> None:
+    """Sleep tracker demo data (Zenith-Study-Planner G3, Phase 15).
+
+    Idempotent / append-only: one log per date for the last 7 nights, keyed on
+    date so re-seeding never duplicates.
+    """
+    user = db.query(User).first()
+    if not user:
+        return
+
+    today = datetime.now().date()
+    existing_dates = {s.date for s in db.query(SleepLog).all()}
+
+    # A believable week: mostly 7-8h nights with one short one.
+    pattern = [
+        ("23:00", "07:00", 4),
+        ("23:30", "07:00", 3),
+        ("00:30", "06:30", 2),  # short night
+        ("22:45", "06:45", 4),
+        ("23:15", "07:15", 4),
+        ("23:45", "08:00", 4),
+        ("23:00", "07:00", 5),
+    ]
+    for i, (bedtime, wake_time, quality) in enumerate(pattern):
+        day = today - timedelta(days=6 - i)
+        if day in existing_dates:
+            continue
+        db.add(SleepLog(
+            user_id=user.id, date=day,
+            bedtime=bedtime, wake_time=wake_time, quality=quality,
+        ))
     db.commit()
 
 

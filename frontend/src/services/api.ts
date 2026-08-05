@@ -3,8 +3,11 @@ import { toIso } from '../utils/vaultDates';
 const BASE = '/api';
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts?.headers as Record<string, string> || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...opts?.headers },
+    headers,
     ...opts,
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
@@ -17,10 +20,14 @@ export const api = {
     request<T>(path, { method: 'POST', body: data !== undefined && data !== null ? JSON.stringify(data) : undefined }),
   put: <T>(path: string, data: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
+  patch: <T>(path: string, data?: unknown) =>
+    request<T>(path, { method: 'PATCH', body: data !== undefined && data !== null ? JSON.stringify(data) : undefined }),
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 
-// ----- Types -----
+// ----- Auth types -----
+export type UserRole = 'student' | 'teacher';
+
 export interface User {
   id: number;
   name: string;
@@ -36,13 +43,82 @@ export interface User {
   target_weight: number | null;
   membership_status: string | null;
   next_payment_date: string | null;
+  // Auth (Phase 3)
+  username?: string | null;
+  email?: string | null;
+  role?: UserRole;
+  // SyllabusAI (G1): local curator/admin flag.
+  is_admin?: boolean;
+  // SyllabusAI (G2): curriculum enrollment binding.
+  institution_id?: number | null;
+  program_id?: number | null;
 }
+
+export interface AuthUser extends User {
+  role: UserRole;
+  token: string;
+}
+
+// ----- Token helpers -----
+export function getToken(): string | null {
+  return localStorage.getItem('student_os_token');
+}
+
+export function setToken(t: string): void {
+  localStorage.setItem('student_os_token', t);
+}
+
+export function clearToken(): void {
+  localStorage.removeItem('student_os_token');
+}
+
+// ----- Auth API -----
+export const authApi = {
+  signup: (d: { name: string; username?: string; email?: string; password: string; role: UserRole; teacher_secret?: string }) =>
+    request<{ user: AuthUser; token: string }>('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify(d),
+    }),
+  login: (d?: { identifier?: string; password?: string }) =>
+    request<{ user: AuthUser; token: string }>('/auth/login', {
+      method: 'POST',
+      body: d !== undefined ? JSON.stringify(d) : undefined,
+    }).then((r) => {
+      setToken(r.token);
+      return r;
+    }),
+  me: () => request<{ user: AuthUser }>('/auth/me'),
+  logout: () =>
+    request<{ ok: boolean }>('/auth/logout', { method: 'POST' }).then(() => {
+      clearToken();
+      return { ok: true } as const;
+    }),
+};
+
+// ----- Upload API -----
+export const uploadApi = {
+  upload: (file: File, kind?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (kind) formData.append('kind', kind);
+    return fetch(`${BASE}/uploads`, {
+      method: 'POST',
+      body: formData,
+    }).then((res) => {
+      if (!res.ok) throw new Error(`Upload ${res.status}: ${res.statusText}`);
+      return res.json();
+    }) as Promise<{ url: string; filename: string; size: number; content_type: string }>;
+  },
+};
 
 export interface Course {
   id: number; title: string; image_url: string | null;
   current_assignment: number; total_assignments: number;
   next_exam: number | null; total_exams: number;
   status: string; user_id: number;
+  credits: number;
+  // SyllabusAI G12 (Phase 78): optional link to a catalog subject.
+  curriculum_subject_id?: number | null;
 }
 
 export interface Task {
@@ -55,6 +131,10 @@ export interface Task {
 export interface Assignment {
   id: number; title: string; description: string | null;
   course_id: number; due_date: string; status: string;
+  type?: string | null;
+  type_color?: string | null;
+  time_estimate?: number | null;
+  file_url?: string | null;
 }
 
 export interface Exam {
@@ -65,6 +145,8 @@ export interface Exam {
 export interface Note {
   id: number; title: string; content: string | null;
   course_id: number; created_date: string;
+  pinned: boolean;
+  updated_at: string | null;
 }
 
 export interface Goal {
@@ -531,9 +613,541 @@ export interface EisenhowerMatrix {
   not_important: EisenhowerTask[];
 }
 
+// ----- AI types (99-phase plan, Group 1) -----
+export interface AIHealth {
+  available: boolean;
+  mode: string;
+  model: string | null;
+  models: string[];
+}
+
+export interface AIClientModels {
+  models: string[];
+  enabled: boolean;
+}
+
+export interface AICompleteRequest {
+  prompt: string;
+  max_tokens?: number;
+  temperature?: number;
+  model?: string | null;
+}
+
+export interface AICompleteResponse {
+  text: string;
+  ai_used: boolean;
+}
+
+export interface AIQuizQuestion {
+  q: string;
+  opts: string[];
+  ans: number;
+}
+
+export interface AIQuizResponse {
+  questions: AIQuizQuestion[];
+  ai_used: boolean;
+}
+
+export interface AIFlashcard {
+  front: string;
+  back: string;
+}
+
+export interface AIFlashcardsResponse {
+  cards: AIFlashcard[];
+  ai_used: boolean;
+}
+
+export interface AIStudyPlanWeek {
+  week: number;
+  topic: string;
+  tasks: string[];
+}
+
+export interface AIStudyPlan {
+  subject: string;
+  exam_date: string | null;
+  weeks: AIStudyPlanWeek[];
+}
+
+export interface AIStudyPlanResponse {
+  plan: AIStudyPlan;
+  ai_used: boolean;
+}
+
+export interface AISyllabusAssignment {
+  title: string;
+  due_date: string;
+  course: string;
+  priority: string;
+}
+
+export interface AISyllabusResponse {
+  assignments: AISyllabusAssignment[];
+  ai_used: boolean;
+}
+
+export interface AIGradeAnswerResponse {
+  correct: boolean;
+  explanation: string;
+  ai_used: boolean;
+}
+
+export interface AIChatResponse {
+  message: string;
+  should_generate_plan?: boolean;
+  plan_context?: unknown;
+}
+
+// ----- Grades types (99-phase plan, Groups 2-3) -----
+export interface Grade {
+  id: number;
+  course_id: number;
+  assignment_id: number | null;
+  title: string;
+  points_earned: number;
+  points_possible: number;
+  category_id: number | null;
+  date: string | null;
+}
+
+export interface CourseWeight {
+  id: number;
+  course_id: number;
+  name: string;
+  weight: number;
+}
+
+export interface GradeCalculateResult {
+  course_id: number;
+  percentage: number | null;
+  letter_grade: string | null;
+  is_weighted: boolean;
+  total_earned: number | null;
+  total_possible: number | null;
+  grade_count: number;
+}
+
+export interface GPACourse {
+  course_id: number;
+  title: string;
+  credits: number;
+  percentage: number | null;
+  letter_grade: string | null;
+  gpa: number | null;
+}
+
+export interface GPAResponse {
+  gpa: number | null;
+  courses: GPACourse[];
+}
+
+export interface NeededOnFinalResponse {
+  needed_pct: number;
+}
+
+// ----- Flashcards types (99-phase plan, Groups 4-5) -----
+export interface Flashcard {
+  id: number;
+  deck_id: number;
+  front: string;
+  back: string;
+  difficulty: string;
+  streak: number;
+  next_review: string | null;
+  created_at: string | null;
+}
+
+export interface FlashcardDeck {
+  id: number;
+  name: string;
+  course_id: number | null;
+  created_at: string | null;
+  card_count: number;
+  cards: Flashcard[];
+}
+
+// ----- Study plans types (99-phase plan, Groups 6-7) -----
+export interface StudyPlanWeek {
+  week: number;
+  topic: string;
+  tasks: string[];
+}
+
+export interface StudyPlan {
+  id: number;
+  subject: string;
+  exam_date: string | null;
+  weeks: StudyPlanWeek[];
+  created_at: string | null;
+}
+
+// ----- Analytics types (99-phase plan, Groups 11-12) -----
+export interface AnalyticsSummary {
+  total_focus_minutes: number;
+  weekly_focus_minutes: number;
+  completed_assignments: number;
+  total_assignments: number;
+  completion_rate: number;
+  gpa: number | null;
+  total_xp: number;
+  level: number;
+  current_streak: number;
+}
+
+export interface WeeklyFocus {
+  week: string;
+  label: string;
+  minutes: number;
+}
+
+export interface HeatmapDay {
+  date: string;
+  minutes: number;
+}
+
+// ----- Google sync types (99-phase plan, Group 14) -----
+export interface GoogleStatus {
+  connected: boolean;
+  email: string | null;
+  scopes: string[];
+}
+
+export interface GoogleConnectResponse {
+  url: string | null;
+  error?: string | null;
+}
+
+export interface ClassroomCourse {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface ClassroomAssignment {
+  id: string;
+  courseId: string;
+  courseName: string;
+  title: string;
+  description: string;
+  dueDate: string | null;
+  status: string;
+}
+
+export interface GmailMessage {
+  id: string;
+  from: string;
+  subject: string;
+  date: string;
+  snippet: string;
+}
+
+export interface GmailUnread {
+  count: number;
+}
+
+export interface CalendarSyncEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  location: string | null;
+  link: string | null;
+}
+
+// ----- SyllabusAI curriculum types -----
+export interface Institution {
+  id: number;
+  name: string;
+  short_name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at?: string | null;
+}
+
+export interface Program {
+  id: number;
+  institution_id: number;
+  name: string;
+  code: string;
+  description: string | null;
+  duration: number;
+  is_active: boolean;
+  created_at?: string | null;
+}
+
+export interface Subject {
+  id: number;
+  program_id: number;
+  name: string;
+  code: string;
+  semester: number | null;
+  credits: number;
+  description: string | null;
+  is_active: boolean;
+  unit_count: number;
+  created_at?: string | null;
+}
+
+export interface CurriculumUnit {
+  id: number;
+  subject_id: number;
+  unit_number: number;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at?: string | null;
+}
+
+// ----- SyllabusAI materials -----
+export interface Material {
+  id: number;
+  unit_id: number;
+  title: string;
+  description: string | null;
+  file_type: string;
+  file_url: string;
+  file_size: number;
+  original_file_name: string;
+  view_count: number;
+  download_count: number;
+  is_active: boolean;
+  extracted_text: string | null;
+  created_at: string;
+}
+
+export interface MaterialListResponse {
+  items: Material[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// ----- SyllabusAI summaries -----
+export interface Summary {
+  id: number;
+  unit_ids: number[];
+  content: string;
+  key_points: string[];
+  created_at?: string | null;
+}
+
+export interface SummaryGenerateResponse {
+  summary: { content: string; key_points: string[] };
+  cached: boolean;
+}
+
+// ----- SyllabusAI quizzes -----
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correct_index: number;
+  explanation: string;
+}
+
+export interface Quiz {
+  id: number;
+  unit_id: number;
+  questions: QuizQuestion[];
+  difficulty: string;
+  created_at?: string | null;
+}
+
+export interface QuizAttemptResultItem {
+  question_index: number;
+  selected: number | null;
+  correct: boolean;
+  correct_index: number;
+  explanation: string;
+}
+
+export interface QuizAttemptResult {
+  score: number;
+  total: number;
+  percentage: number;
+  results: QuizAttemptResultItem[];
+  // G13 (Phase 85): XP granted for a passing attempt (0 when none).
+  xp_awarded?: number;
+}
+
+export interface QuizHistoryItem {
+  id: number;
+  quiz_id: number;
+  answers: number[];
+  score: number | null;
+  total_questions: number | null;
+  created_at?: string | null;
+}
+
+export interface QuizAnalytics {
+  avg_score: number;
+  best_score: number;
+  total_attempts: number;
+  per_unit: Record<number, number>;
+}
+
+// ----- SyllabusAI enrollment -----
+export interface EnrollmentSummary {
+  institution_id: number | null;
+  program_id: number | null;
+  institution_name: string | null;
+  program_name: string | null;
+  subjects: Subject[];
+  units: CurriculumUnit[];
+  material_count: number;
+  quiz_attempts: number;
+  avg_quiz_percentage: number | null;
+  uploaded_materials: number;
+}
+
 // ----- API endpoint helpers -----
 export const endpoints = {
-  login: () => api.post<{ user: User }>('/auth/login', {}),
+  login: () => authApi.login().then((r) => ({ user: r.user })),
+  curriculum: {
+    institutions: () => api.get<Institution[]>('/curriculum/institutions'),
+    institution: (id: number) => api.get<Institution>(`/curriculum/institutions/${id}`),
+    programs: (institutionId: number) =>
+      api.get<Program[]>(`/curriculum/institutions/${institutionId}/programs`),
+    program: (id: number) => api.get<Program>(`/curriculum/programs/${id}`),
+    subjects: (programId: number) =>
+      api.get<Subject[]>(`/curriculum/programs/${programId}/subjects`),
+    subject: (id: number) => api.get<Subject>(`/curriculum/subjects/${id}`),
+    units: (subjectId: number) =>
+      api.get<CurriculumUnit[]>(`/curriculum/subjects/${subjectId}/units`),
+    unit: (id: number) => api.get<CurriculumUnit>(`/curriculum/units/${id}`),
+  },
+  materials: {
+    list: (unitId: number, q?: string, page = 1, pageSize = 20) => {
+      const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+      if (q) params.set('q', q);
+      return api.get<MaterialListResponse>(`/curriculum/units/${unitId}/materials?${params.toString()}`);
+    },
+    detail: (id: number) => api.get<Material>(`/materials/${id}`),
+    upload: (unitId: number, file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      return fetch(`${BASE}/curriculum/units/${unitId}/materials`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: form,
+      }).then((res) => {
+        if (!res.ok) throw new Error(`Upload ${res.status}: ${res.statusText}`);
+        return res.json();
+      }) as Promise<Material>;
+    },
+    downloadUrl: (id: number) => `${BASE}/materials/${id}/download`,
+  },
+  summaries: {
+    generate: (unitIds: number[]) => api.post<SummaryGenerateResponse>('/summaries', { unit_ids: unitIds }),
+    list: () => api.get<Summary[]>('/summaries'),
+    remove: (id: number) => api.del<{ ok: boolean }>(`/summaries/${id}`),
+  },
+  quizzes: {
+    generate: (unitId: number, numQuestions = 10, difficulty = 'medium') =>
+      api.post<Quiz>('/quizzes', { unit_id: unitId, num_questions: numQuestions, difficulty }),
+    attempt: (quizId: number, answers: (number | null)[]) =>
+      api.post<QuizAttemptResult>(`/quizzes/${quizId}/attempt`, { answers }),
+    history: () => api.get<QuizHistoryItem[]>('/quizzes/history'),
+    analytics: () => api.get<QuizAnalytics>('/quizzes/analytics'),
+  },
+  enrollment: {
+    summary: () => api.get<EnrollmentSummary>('/enrollment/summary'),
+    update: (d: { institution_id: number; program_id: number }) =>
+      api.put<{ user: AuthUser }>('/auth/enrollment', d),
+  },
+  admin: {
+    allInstitutions: () => api.get<Institution[]>('/curriculum/institutions/admin/all'),
+    createInstitution: (d: {
+      name: string;
+      short_name: string;
+      description?: string | null;
+      is_active?: boolean;
+    }) => api.post<Institution>('/curriculum/institutions', d),
+    toggleInstitution: (id: number) =>
+      api.patch<{ ok: boolean; is_active: boolean }>(`/curriculum/institutions/${id}/status`),
+    createProgram: (institutionId: number, d: { name: string; code: string; description?: string | null; duration?: number }) =>
+      api.post<Program>(`/curriculum/institutions/${institutionId}/programs`, d),
+    createSubject: (programId: number, d: {
+      name: string;
+      code: string;
+      semester?: number | null;
+      credits?: number;
+      description?: string | null;
+    }) => api.post<Subject>(`/curriculum/programs/${programId}/subjects`, d),
+    createUnit: (subjectId: number, d: { unit_number: number; name: string; description?: string | null }) =>
+      api.post<CurriculumUnit>(`/curriculum/subjects/${subjectId}/units`, d),
+  },
+  analytics: {
+    summary: () => api.get<AnalyticsSummary>('/analytics/summary'),
+    weeklyFocus: (weeks = 8) => api.get<WeeklyFocus[]>(`/analytics/weekly-focus?weeks=${weeks}`),
+    heatmap: (weeks = 52) => api.get<HeatmapDay[]>(`/analytics/heatmap?weeks=${weeks}`),
+  },
+  google: {
+    connect: () => api.get<GoogleConnectResponse>('/auth/google'),
+    status: () => api.get<GoogleStatus>('/auth/google/status'),
+    disconnect: () => api.post<{ connected: boolean }>('/auth/google/disconnect'),
+  },
+  classroom: {
+    courses: () => api.get<ClassroomCourse[]>('/classroom/courses'),
+    assignments: () => api.get<ClassroomAssignment[]>('/classroom/assignments'),
+  },
+  gmail: {
+    unread: () => api.get<GmailUnread>('/gmail/unread'),
+    messages: (limit = 10) => api.get<GmailMessage[]>(`/gmail/messages?limit=${limit}`),
+  },
+  calendarSync: {
+    events: () => api.get<CalendarSyncEvent[]>('/calendar/events'),
+  },
+  studyPlans: {
+    list: () => api.get<StudyPlan[]>('/study-plans'),
+    get: (id: number) => api.get<StudyPlan>(`/study-plans/${id}`),
+    create: (d: { subject: string; exam_date?: string | null; weeks: StudyPlanWeek[] }) =>
+      api.post<StudyPlan>('/study-plans', d),
+    delete: (id: number) => api.del<{ ok: boolean }>(`/study-plans/${id}`),
+  },
+  flashcards: {
+    list: () => api.get<FlashcardDeck[]>('/flashcard-decks'),
+    get: (id: number) => api.get<FlashcardDeck>(`/flashcard-decks/${id}`),
+    create: (d: { name: string; course_id?: number | null }) => api.post<FlashcardDeck>('/flashcard-decks', d),
+    update: (id: number, d: Partial<FlashcardDeck>) => api.put<FlashcardDeck>(`/flashcard-decks/${id}`, d),
+    delete: (id: number) => api.del<{ ok: boolean }>(`/flashcard-decks/${id}`),
+    cards: (deckId: number) => api.get<Flashcard[]>(`/flashcard-decks/${deckId}/cards`),
+    addCard: (deckId: number, d: Partial<Flashcard>) => api.post<Flashcard>(`/flashcard-decks/${deckId}/cards`, d),
+    updateCard: (deckId: number, cardId: number, d: Partial<Flashcard>) =>
+      api.put<Flashcard>(`/flashcard-decks/${deckId}/cards/${cardId}`, d),
+    deleteCard: (deckId: number, cardId: number) =>
+      api.del<{ ok: boolean }>(`/flashcard-decks/${deckId}/cards/${cardId}`),
+  },
+  grades: {
+    list: () => api.get<Grade[]>('/grades'),
+    byCourse: (cid: number) => api.get<Grade[]>(`/grades/courses/${cid}`),
+    create: (d: Partial<Grade>) => api.post<Grade>('/grades', d),
+    update: (id: number, d: Partial<Grade>) => api.put<Grade>(`/grades/${id}`, d),
+    delete: (id: number) => api.del<{ ok: boolean }>(`/grades/${id}`),
+    calculate: (courseId: number) => api.post<GradeCalculateResult>('/grades/calculate', { course_id: courseId }),
+    gpa: () => api.get<GPAResponse>('/grades/gpa'),
+    neededOnFinal: (d: { current_pct: number; final_weight_pct: number; desired_pct: number }) =>
+      api.post<NeededOnFinalResponse>('/grades/needed-on-final', d),
+    weights: (cid: number) => api.get<CourseWeight[]>(`/grades/courses/${cid}/weights`),
+    createWeight: (d: { course_id: number; name: string; weight: number }) => api.post<CourseWeight>('/grades/weights', d),
+    updateWeight: (id: number, d: Partial<CourseWeight>) => api.put<CourseWeight>(`/grades/weights/${id}`, d),
+    deleteWeight: (id: number) => api.del<{ ok: boolean }>(`/grades/weights/${id}`),
+  },
+  ai: {
+    health: () => api.get<AIHealth>('/ai/health'),
+    models: () => api.get<AIClientModels>('/ai/models'),
+    complete: (d: Partial<AICompleteRequest>) => api.post<AICompleteResponse>('/ai/complete', d),
+    quiz: (content?: string) => api.post<AIQuizResponse>('/ai/quiz', { content }),
+    flashcards: (d: { content?: string; topic?: string; difficulty?: string }) =>
+      api.post<AIFlashcardsResponse>('/ai/flashcards', d),
+    studyPlan: (subject: string, examDate?: string) =>
+      api.post<AIStudyPlanResponse>('/ai/study-plan', { subject, exam_date: examDate ?? null }),
+    syllabus: (text: string) => api.post<AISyllabusResponse>('/ai/syllabus', { text }),
+    gradeAnswer: (d: { question: string; expected: string; answer: string }) =>
+      api.post<AIGradeAnswerResponse>('/ai/grade-answer', d),
+    chat: (d: { message: string }) => api.post<AIChatResponse>('/ai/chat', d),
+  },
   courses: {
     list: () => api.get<Course[]>('/courses/'),
     get: (id: number) => api.get<Course>(`/courses/${id}`),
@@ -542,8 +1156,32 @@ export const endpoints = {
     delete: (id: number) => api.del<{ ok: boolean }>(`/courses/${id}`),
   },
   assignments: {
-    list: () => api.get<Assignment[]>('/assignments'),
+    list: (filters?: { type?: string; status?: string; course_id?: number }) => {
+      const qs = new URLSearchParams();
+      if (filters?.type) qs.set('type', filters.type);
+      if (filters?.status) qs.set('status', filters.status);
+      if (filters?.course_id) qs.set('course_id', String(filters.course_id));
+      const q = qs.toString();
+      return api.get<Assignment[]>(`/assignments${q ? `?${q}` : ''}`);
+    },
     byCourse: (cid: number) => api.get<Assignment[]>(`/courses/${cid}/assignments`),
+    create: (d: Partial<Assignment>) => api.post<Assignment>('/assignments', d),
+    update: (id: number, d: Partial<Assignment>) => api.put<Assignment>(`/assignments/${id}`, d),
+    delete: (id: number) => api.del<{ ok: boolean }>(`/assignments/${id}`),
+    setStatus: (id: number, status: string) => api.post<Assignment>(`/assignments/${id}/status`, { status }),
+    complete: (id: number) => api.post<Assignment>(`/assignments/${id}/complete`),
+    attach: (id: number, file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      return fetch(`${BASE}/assignments/${id}/attachment`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: form,
+      }).then((r) => {
+        if (!r.ok) throw new Error(`Attach ${r.status}: ${r.statusText}`);
+        return r.json();
+      }) as Promise<Assignment>;
+    },
   },
   exams: {
     list: () => api.get<Exam[]>('/exams'),
@@ -552,6 +1190,10 @@ export const endpoints = {
   notes: {
     list: () => api.get<Note[]>('/notes'),
     byCourse: (cid: number) => api.get<Note[]>(`/courses/${cid}/notes`),
+    create: (d: Partial<Note>) => api.post<Note>('/notes', d),
+    update: (id: number, d: Partial<Note>) => api.put<Note>(`/notes/${id}`, d),
+    delete: (id: number) => api.del<{ ok: boolean }>(`/notes/${id}`),
+    pin: (id: number) => api.put<{ id: number; pinned: boolean }>(`/notes/${id}/pin`, {}),
   },
   goals: {
     list: (habitId?: number) => api.get<Goal[]>(`/goals${habitId !== undefined ? `?habit_id=${habitId}` : ''}`),
@@ -758,3 +1400,206 @@ export const endpoints = {
     database: () => api.get<DatabaseCounts>('/vault/database'),
   },
 };
+
+// ===== STUDENT-PLANAR domains: reading tracker, brain dump, daily schedule, notifications =====
+
+export type BookCategory = 'reading' | 'finished' | 'want';
+
+export interface Book {
+  id: number;
+  title: string;
+  author: string | null;
+  category: BookCategory;
+  cover_url: string | null;
+  file_url: string | null;
+  created_at: string;
+}
+
+export interface BookInsights {
+  total: number;
+  finished: number;
+  reading: number;
+  want: number;
+  completion_pct: number;
+  per_author: Record<string, number>;
+}
+
+export interface BookListResponse {
+  items: Book[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface BrainDump {
+  id: number;
+  user_id: number;
+  content: string | null;
+  updated_at: string | null;
+}
+
+export type DailyCategory = 'School' | 'Study Time' | 'Break';
+export type EnergyLevel = 'High' | 'Medium' | 'Low';
+
+export interface DailyScheduleItem {
+  id: number;
+  date: string;
+  time_range: string;
+  activity: string;
+  category: DailyCategory;
+  cat_class: string | null;
+  location: string | null;
+  energy: EnergyLevel;
+  e_class: string | null;
+  notes: string | null;
+  done: boolean;
+  created_at: string;
+}
+
+export interface DailyScheduleStats {
+  date: string;
+  total: number;
+  done: number;
+  ratio: number;
+}
+
+export interface AppNotification {
+  id: number;
+  user_id: number;
+  kind: string;
+  title: string;
+  body: string | null;
+  ref_type: string | null;
+  ref_id: number | null;
+  read: boolean;
+  created_at: string;
+}
+
+export const bookApi = {
+  list: (params?: { category?: BookCategory; page?: number; page_size?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.category) qs.set('category', params.category);
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.page_size) qs.set('page_size', String(params.page_size));
+    const q = qs.toString();
+    return api.get<BookListResponse>(`/books${q ? `?${q}` : ''}`);
+  },
+  create: (d: { title: string; author?: string | null; category?: BookCategory }) => api.post<Book>('/books', d),
+  update: (id: number, d: Partial<Omit<Book, 'id' | 'created_at'>>) => api.put<Book>(`/books/${id}`, d),
+  remove: (id: number) => api.del<{ ok: boolean }>(`/books/${id}`),
+  insights: () => api.get<BookInsights>('/books/insights'),
+  uploadFile: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return fetch(`${BASE}/books/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: form,
+    }).then((r) => {
+      if (!r.ok) throw new Error(`Upload ${r.status}: ${r.statusText}`);
+      return r.json();
+    }) as Promise<{ url: string; filename: string }>;
+  },
+};
+
+export const brainDumpApi = {
+  get: () => api.get<{ content: string | null }>('/braindumps'),
+  save: (content: string) => api.put<BrainDump>('/braindumps', { content }),
+};
+
+export const dailyScheduleApi = {
+  list: (date: string) => api.get<DailyScheduleItem[]>(`/dailyschedule?date=${date}`),
+  create: (d: {
+    date: string;
+    time_range: string;
+    activity: string;
+    category?: DailyCategory;
+    location?: string | null;
+    energy?: EnergyLevel;
+    notes?: string | null;
+  }) => api.post<DailyScheduleItem>('/dailyschedule', d),
+  update: (id: number, d: Partial<Omit<DailyScheduleItem, 'id' | 'created_at'>>) =>
+    api.put<DailyScheduleItem>(`/dailyschedule/${id}`, d),
+  remove: (id: number) => api.del<{ ok: boolean }>(`/dailyschedule/${id}`),
+  toggle: (id: number) => api.post<DailyScheduleItem>(`/dailyschedule/${id}/toggle`),
+  stats: (date: string) => api.get<DailyScheduleStats>(`/dailyschedule/stats?date=${date}`),
+};
+
+export const notificationApi = {
+  list: () => api.get<AppNotification[]>('/notifications'),
+  unreadCount: () => api.get<{ unread: number }>('/notifications/unread-count'),
+  markRead: (id: number) => api.post<AppNotification>(`/notifications/${id}/read`),
+  markAllRead: () => api.post<{ ok: boolean }>('/notifications/mark-all-read'),
+  remove: (id: number) => api.del<{ ok: boolean }>(`/notifications/${id}`),
+  clearAll: () => api.del<{ ok: boolean; deleted: number }>('/notifications'),
+};
+
+export interface TeacherStudentStats {
+  courses: number;
+  assignments: number;
+  todos: number;
+  books: number;
+  braindump: boolean;
+}
+
+export interface TeacherStudent {
+  id: number;
+  name: string;
+  stats: TeacherStudentStats;
+}
+
+export interface TeacherStudentDetail {
+  id: number;
+  name: string;
+  assignments: Assignment[];
+  todos: Task[];
+  braindump: { content: string | null } | null;
+  books: Book[];
+}
+
+export interface TeacherBroadcastResult {
+  created: number;
+}
+
+function broadcastForm(payload: Record<string, unknown>, file?: File | null): FormData {
+  const form = new FormData();
+  Object.entries(payload).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) form.append(k, JSON.stringify(v));
+  });
+  if (file) form.append('file', file);
+  return form;
+}
+
+function multipartPost(path: string, form: FormData): Promise<TeacherBroadcastResult> {
+  return fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: form,
+  }).then((r) => {
+    if (!r.ok) throw new Error(`Broadcast ${r.status}: ${r.statusText}`);
+    return r.json();
+  }) as Promise<TeacherBroadcastResult>;
+}
+
+export const teacherApi = {
+  students: () => api.get<TeacherStudent[]>('/teacher/students'),
+  studentDetail: (studentId: number) => api.get<TeacherStudentDetail>(`/teacher/students/${studentId}/detail`),
+  broadcastCourses: (course: Partial<Course>, studentIds?: number[]) =>
+    api.post<TeacherBroadcastResult>('/teacher/broadcast/courses', { course, student_ids: studentIds ?? null }),
+  broadcastTodos: (todo: { title: string; due_date?: string | null; priority_tag?: string; subject_tag?: string }, studentIds?: number[]) =>
+    api.post<TeacherBroadcastResult>('/teacher/broadcast/todos', { todo, student_ids: studentIds ?? null }),
+  broadcastSchedule: (item: { date: string; time_range: string; activity: string; category?: string; energy?: string; location?: string | null; notes?: string | null }, studentIds?: number[]) =>
+    api.post<TeacherBroadcastResult>('/teacher/broadcast/schedule', { item, student_ids: studentIds ?? null }),
+  broadcastAssignments: (assignment: { title: string; description?: string; due_date?: string; status?: string; type?: string }, studentIds?: number[], file?: File | null) =>
+    multipartPost('/teacher/broadcast/assignments', broadcastForm({ assignment, student_ids: studentIds ?? null }, file)),
+  broadcastBooks: (book: { title: string; author?: string; category?: string }, studentIds?: number[], file?: File | null) =>
+    multipartPost('/teacher/broadcast/books', broadcastForm({ book, student_ids: studentIds ?? null }, file)),
+};
+
+// ----- SyllabusAI API clients (aliases over `endpoints` for named imports) -----
+export const curriculumApi = endpoints.curriculum;
+export const materialApi = endpoints.materials;
+export const summaryApi = endpoints.summaries;
+export const quizApi = endpoints.quizzes;
+export const adminApi = endpoints.admin;
+export const enrollmentApi = endpoints.enrollment;

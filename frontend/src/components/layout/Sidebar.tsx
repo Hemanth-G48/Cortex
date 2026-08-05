@@ -8,6 +8,7 @@ import { GoalTracker } from '../widgets/GoalTracker';
 import { PerformanceWidget } from '../vault/PerformanceWidget';
 import { HabitStatistics } from '../vault/HabitStatistics';
 import { endpoints, type VaultSummary } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 
 interface HabitStat {
   habit: string;
@@ -17,6 +18,7 @@ interface HabitStat {
 }
 
 export const Sidebar = () => {
+  const { user } = useAuth();
   const [summary, setSummary] = useState<VaultSummary | null>(null);
   const [stats, setStats] = useState<HabitStat[]>([]);
   const [streakGraph, setStreakGraph] = useState<{ date: string; streak_length: number }[]>([]);
@@ -45,6 +47,7 @@ export const Sidebar = () => {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">🎓 Student OS</div>
+      {user && <div className="sidebar-user">{user.name} · {user.role ?? 'student'}</div>}
       <ThemeSwitcher />
       <NavLinks />
       <div className="sidebar-widgets">

@@ -184,7 +184,7 @@ character level.
 
 ## Unified Theme System
 
-The app ships five themes, switched with the emoji switcher in the sidebar
+The app ships eight themes, switched with the emoji switcher in the sidebar
 (persisted to `localStorage` under `student-os-theme`):
 
 | Theme | `data-theme` | Accent | Notes |
@@ -194,14 +194,209 @@ The app ships five themes, switched with the emoji switcher in the sidebar
 | Vault | `vault` | `#3b82f6` blue | `#0d0d0d` background |
 | Life Planner | `life-planner` | `#e8496d` magenta | `#121212` background |
 | Quest Centre | `quest-centre` | `#fbbf24` gold | `#121212` background |
+| Habit Tracker | `habit-tracker` | `#ffd700` gold | `#0c0c0c` background |
+| Fitness Hub | `fitness-hub` | `#3b82f6` blue | `#0f1012` background |
+| Cyberpunk | `cyberpunk` | `#00e5ff` cyan | Orbitron/Space Grotesk fonts (`themes/cyberpunk-theme.css`) |
 
 Each `[data-theme='…']` block in `styles/theme.css` overrides only its unique
 tokens; shared tokens live at `:root`. The Life Planner page additionally wraps
 itself in `data-theme="life-planner"` so it always renders with its own palette.
+The Cyberpunk theme's token set and font stacks live in
+`themes/cyberpunk-theme.css` (imported from `src/index.css`) — Orbitron for
+display headings, Space Grotesk for body text, neon cyan/magenta accents and a
+subtle scanline page backdrop.
 The switcher lives in `src/components/shared/ThemeSwitcher.tsx`.
+
+## Role auth, teacher flow & ported features (STUDENT-PLANAR)
+
+The STUDENT-PLANAR reference (a MERN role-based study planner) was ported onto
+Student Life OS's FastAPI + React architecture: real role auth (student /
+teacher + teacher secret key), a teacher broadcast dashboard, a reading
+tracker, the brain-dump autosave widget, date-specific daily schedule blocks,
+assignment type/status/attachments, in-app notifications, and file uploads.
+
+### Role auth
+
+- `POST /api/auth/signup` — create a student, or a teacher with the correct
+  `teacher_secret` (`TEACHER_SECRET_KEY` env, empty ⇒ teacher signups blocked)
+- `POST /api/auth/login` — credential login (username/email + password); the
+  legacy no-body login still returns the first user for single-user boot
+- `GET /api/auth/me`, `POST /api/auth/logout`, `PUT /api/auth/enrollment`
+- `GET /api/auth/google` … — Google OAuth (see Google Sync section)
+- Passwords are bcrypt-hashed; sessions are HMAC-SHA256 bearer tokens
+  (`APP_SECRET`); every API route is guarded by `get_current_user`,
+  `require_student`, `require_teacher` or `require_admin`
+  (`app/services/security.py`)
+- Login throttling: 10 failed credential attempts per IP within 60s ⇒ 429
+
+### Teacher dashboard (`/teacher`, teacher role only)
+
+- `GET /api/teacher/students` — per-student stats (courses/assignments/todos/books/braindump)
+- `GET /api/teacher/students/{id}/detail` — assignments, todos, brain dump, books (404 for unknown students)
+- `POST /api/teacher/broadcast/{courses|assignments|todos|books|schedule}` — create
+  rows for selected students (or all) + emit a notification per target
+
+### Reading tracker (`/reading`)
+
+- `GET|POST /api/books`, `PUT|DELETE /api/books/{id}` (category: reading/finished/want)
+- `POST /api/books/upload`, `GET /api/books/insights` (total/completion %/per-author)
+- `?category=` filter + `?page=&page_size=` pagination
+- PDF reader modal + insights tab in the UI
+
+### Brain dump
+
+- `GET|PUT /api/braindumps` — single row per user; `BrainDumpWidget` on the
+  Dashboard and Pomodoro auto-saves with a 1s debounce + "Synced" indicator
+
+### Daily schedule (`/schedule` daily view)
+
+- `GET /api/dailyschedule?date=`, `POST`, `PUT|DELETE /{id}`, `POST /{id}/toggle`, `GET /stats?date=`
+- Blocks carry category (School/Study Time/Break), energy (High/Medium/Low),
+  location and done; server-side overlap validation
+
+### Assignments (enhanced)
+
+- Columns: `type` (Homework/Quiz/Project/Test/Other), `type_color`, `time_estimate`, `file_url`
+- `POST /api/assignments/{id}/status`, `POST /api/assignments/{id}/complete`, `POST /api/assignments/{id}/attachment`
+- `GET /api/assignments?type=&status=&course_id=`, `GET /api/assignments/analytics`
+- UI: Current / By Course / By Type / Completed tabs + status workflow + attachment upload
+
+### Notifications
+
+- `GET /api/notifications`, `GET /unread-count`, `POST /{id}/read`, `POST /mark-all-read`, `DELETE /{id}`, `DELETE` (clear all)
+- `NotificationsBell` in the header with unread badge + deep-link navigation
+
+### Uploads
+
+- `POST /api/uploads` (multipart) + static serving from `UPLOAD_DIR`
+- Extension allowlist + 10 MB cap + magic-byte sniffing (MIME spoofs rejected)
+- `MAX_UPLOAD_MB`, `UPLOAD_DIR`, `APP_SECRET`, `TEACHER_SECRET_KEY` env vars (see `.env.example`)
+
+### Demo accounts
+
+Seeded on startup: student `alex` / `demo-password-123` (first user) and
+teacher `demo.teacher` / `demo-password-123`, plus a demo reading shelf, brain
+dump, daily-schedule day and assignment types.
 
 ## Toasts
 
 All vault and life-planner mutations (create/edit/complete/archive/delete/log-in)
 fire success/error toasts. The `ToastProvider` wraps the app in `main.tsx`; use
 `useToast()` from `src/hooks/useToast.ts`.
+
+## AI Layer (Shiori-v1 parity)
+
+Every AI feature is server-backed (`backend/app/services/ai_client.py`, an
+OpenAI-compatible client) and **always works offline**: when the provider is
+unreachable or `AI_ENABLED=false`, the backend returns deterministic fallback
+content (`services/ai_fallback.py`) so the UI never breaks.
+
+### Routes
+
+| Route | Page | Purpose |
+|---|---|---|
+| `/quiz` | Quiz | AI-generated multiple-choice quiz from pasted notes (setup → quiz → results, history in localStorage) |
+| `/flashcards` | Flashcards | Deck grid, flip study mode, written-answer AI grading, AI card generation from notes |
+| `/study-plans` | StudyPlans | Week-by-week AI study plan generator + saved plans + PDF export |
+| `/import` | SyllabusImport | Paste a syllabus → AI-extracted assignments, one-click import |
+| `/grades` | Grades | Grade/GPA tracker: credit-weighted GPA, per-course calculations, weighted categories, "needed on final" predictor, trend chart |
+| `/analytics` | Analytics | Focus hours, completion rate, GPA, XP, study heatmap + weekly focus bars |
+| `/settings` | Settings | Profile, AI model override, Google sync, JSON data export |
+
+### AI endpoints (`/api/ai/*`)
+
+`GET /health`, `GET /models`, `POST /complete`, `POST /quiz`, `POST /flashcards`,
+`POST /study-plan`, `POST /syllabus`, `POST /grade-answer`, `POST /chat`.
+The chat endpoint is context-aware — it reads your assignments, exams, grades,
+plans and XP from the DB to answer study questions.
+
+### AI chat + keyboard shortcuts
+
+- **Ctrl+K** toggles the collapsible **Shiori Assistant** panel (bottom-right).
+- **g** + letter navigates (`ga` assignments, `gg` grades, `gp` study plans, …).
+- **Ctrl+Shift+A** opens the floating **Quick Capture** assignment form.
+- **?** shows the shortcut help modal (`ShortcutModal`).
+
+### Notes editor
+
+`/notes` is now a split-pane editor: list + search + pin on the left, rich
+markdown-ish editor (headings, bold, italics, code, lists) with live preview on
+the right. Notes carry `pinned` + `updated_at` (pin toggle via `PUT /notes/{id}/pin`).
+
+### Exports & sounds
+
+- `utils/icalExport.ts` — export pending assignments to `.ics` (Assignments page)
+- `utils/pdfExport.ts` — jsPDF dark-themed exports (Assignments PDF + Study Plan PDF)
+- `utils/sounds.ts` — WebAudio dings wired into the Pomodoro timer
+
+## Google Sync (read-only)
+
+Optional read-only Google integration (`Settings → Google Sync`), server-side in
+FastAPI with the token stored in the local DB. Configure via
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI`.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/auth/google` / `/status` / `POST /disconnect` | OAuth connect/status/disconnect |
+| `GET /api/classroom/courses` | Classroom courses → merged into local Course table |
+| `GET /api/classroom/assignments` | Classroom coursework → merged into local Assignment table |
+| `GET /api/gmail/unread`, `/messages` | Unread count + study-related messages |
+| `GET /api/calendar/events` | Next-30-day events → merged into local Event table |
+
+All merges are **idempotent** (matched by `google_id`, manual edits preserved).
+When Google is not configured/connected the endpoints return deterministic mock
+data so the UI is fully demonstrable offline.
+
+## Curriculum & SyllabusAI (SyllabusAI parity)
+
+Port of the SyllabusAI curriculum knowledge platform: a five-level catalog
+(Institution → Program → Subject → Unit → Material) with file uploads, text
+extraction, AI summaries and AI quizzes. Uses distinct `curriculum_*` tables and
+`/api/curriculum` etc. namespaces so nothing collides with the personal `Course`
+model or the in-flight `/api/ai` router.
+
+### Routes
+
+| Route | Page | Purpose |
+|---|---|---|
+| `/browse` | Browse | Public 3-level browse: Institution → Program → Subjects by semester |
+| `/subjects/:id` | Subject | Unit cards + multi-unit summary selection |
+| `/units/:id` | Unit | Material library, upload, Generate Quiz / Generate Summary |
+| `/admin` | Admin | Role-gated curator page: approve institutions, create catalog |
+| `/complete-profile` | CompleteProfile | Pick institution + program (enrollment) |
+
+### Backend endpoints consumed
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/curriculum/institutions` (+ `/admin/all`) | Active institutions / all (admin) |
+| `GET /api/curriculum/institutions/{id}/programs`, `POST` | Program listing/create under institution |
+| `GET /api/curriculum/programs/{id}/subjects`, `POST` | Subject listing/create under program |
+| `GET /api/curriculum/subjects/{id}/units`, `POST` | Unit listing/create under subject |
+| `GET /api/curriculum/units/{id}/materials` | Paginated, searchable material list |
+| `POST /api/curriculum/units/{id}/materials` | Multipart upload (pdf/docx/txt/md, ≤10 MB) |
+| `GET /api/materials/{id}`, `/download` | Detail (view count) + download (download count) |
+| `POST /api/quizzes` / `POST /api/quizzes/{id}/attempt` | Generate quiz / submit answers (scored, indexed) |
+| `GET /api/quizzes/history`, `/analytics` | Last-50 attempts + per-unit stats |
+| `POST /api/summaries` | Single/multi-unit AI summary (cached by sorted unit ids) |
+| `GET /api/enrollment/summary`, `PUT /api/auth/enrollment` | Enrolled program progress + save enrollment |
+| `PATCH /api/curriculum/institutions/{id}/status` | Admin approve/deactivate |
+
+### Gamification & guards (SyllabusAI G13)
+
+- Passing a quiz (≥70%) awards **+25 XP** once per quiz (`xp_awarded` in the
+  attempt response; banner shown on the results screen).
+- First material upload to a unit awards **+15 XP**; duplicates earn nothing.
+- Non-cached AI summary generations are capped at `SUMMARY_DAILY_LIMIT` (default
+  10/day, 429 beyond). Cached lookups and the deterministic demo fallback are
+  exempt.
+
+### Components & theme
+
+- `src/components/curriculum/` — InstitutionCard, ProgramCard, SubjectCard,
+  SemesterGroup, MaterialList/Row/Search, MaterialUpload (drag-drop + optional
+  course linking), InstitutionTable, StatusBadge, all create forms.
+- `src/components/quiz/Quiz.tsx` — full quiz flow (navigation, radiogroup with
+  arrow keys, results with explanations + XP banner).
+- `src/themes/curriculum-theme.css` — opt-in scholarly indigo/navy theme
+  (`data-theme="curriculum"`), responsive + reduced-motion rules.

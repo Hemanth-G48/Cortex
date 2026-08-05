@@ -1,17 +1,26 @@
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
 interface NavGroup {
   label: string;
   links: { to: string; label: string; icon: string }[];
 }
 
-const groups: NavGroup[] = [
+const studentGroups: NavGroup[] = [
   {
     label: 'Academics',
     links: [
       { to: '/courses', label: 'Courses', icon: '📚' },
       { to: '/assignments', label: 'Assignments', icon: '📝' },
       { to: '/exams', label: 'Exams', icon: '📋' },
+      { to: '/grades', label: 'Grades', icon: '📊' },
+      { to: '/flashcards', label: 'Flashcards', icon: '🃏' },
+      { to: '/study-plans', label: 'Study Plans', icon: '🗓️' },
+      { to: '/quiz', label: 'Quiz', icon: '🧠' },
+      { to: '/import', label: 'Import Syllabus', icon: '📥' },
+      { to: '/analytics', label: 'Analytics', icon: '📈' },
+      { to: '/reading', label: 'Reading', icon: '📖' },
+      { to: '/browse', label: 'Browse Curriculum', icon: '🗂️' },
     ],
   },
   {
@@ -70,28 +79,59 @@ const groups: NavGroup[] = [
       { to: '/life-planner', label: 'Life Planner Dashboard', icon: '🌱' },
     ],
   },
+  {
+    label: 'System',
+    links: [
+      { to: '/settings', label: 'Settings', icon: '⚙️' },
+    ],
+  },
+];
+
+const teacherGroups: NavGroup[] = [
+  {
+    label: 'Teacher',
+    links: [
+      { to: '/teacher', label: 'Teacher Dashboard', icon: '👨‍🏫' },
+    ],
+  },
+];
+
+const adminGroups: NavGroup[] = [
+  {
+    label: 'Admin',
+    links: [
+      { to: '/admin', label: 'Curriculum Admin', icon: '🛠️' },
+    ],
+  },
 ];
 
 /** Categorised navigation links replacing the flat sidebar nav */
-export const NavLinks = () => (
-  <nav className="sidebar-nav">
-    <NavLink to="/" end className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
-      <span>📊</span> Dashboard
-    </NavLink>
-    {groups.map((g) => (
-      <div key={g.label} className="nav-group">
-        <div className="nav-group-label">{g.label}</div>
-        {g.links.map((l) => (
-          <NavLink
-            key={l.to}
-            to={l.to}
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-          >
-            <span>{l.icon}</span>
-            {l.label}
-          </NavLink>
-        ))}
-      </div>
-    ))}
-  </nav>
-);
+export const NavLinks = () => {
+  const { role, user } = useAuth();
+  const base = role === 'teacher' ? [...teacherGroups, ...studentGroups] : studentGroups;
+  // Admin is the `is_admin` flag (SyllabusAI G11); teachers/students may also be admins.
+  const groups = user?.is_admin ? [...base, ...adminGroups] : base;
+
+  return (
+    <nav className="sidebar-nav">
+      <NavLink to="/" end className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
+        <span>📊</span> Dashboard
+      </NavLink>
+      {groups.map((g) => (
+        <div key={g.label} className="nav-group">
+          <div className="nav-group-label">{g.label}</div>
+          {g.links.map((l) => (
+            <NavLink
+              key={l.to}
+              to={l.to}
+              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+            >
+              <span>{l.icon}</span>
+              {l.label}
+            </NavLink>
+          ))}
+        </div>
+      ))}
+    </nav>
+  );
+};

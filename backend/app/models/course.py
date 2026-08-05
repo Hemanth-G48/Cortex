@@ -14,3 +14,7 @@ class Course(Base):
     total_exams = Column(Integer, default=0)
     status = Column(String(50), default="Not started")
     user_id = Column(Integer, ForeignKey("users.id"))
+    credits = Column(Integer, default=3)
+    google_id = Column(String(100), nullable=True)
+    # SyllabusAI G12: optional link to a catalog subject (enrichment only).
+    curriculum_subject_id = Column(Integer, ForeignKey("curriculum_subjects.id"), nullable=True)

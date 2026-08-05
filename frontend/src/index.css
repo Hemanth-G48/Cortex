@@ -1,6 +1,9 @@
 @import './styles/theme.css';
 @import './themes/rpg-theme.css';
+@import './themes/cyberpunk-theme.css';
+@import './themes/curriculum-theme.css';
 @import './styles/pixel-art.css';
 @import './styles/quest-centre.css';
 @import './styles/habit-tracker.css';
 @import './styles/fitness-hub.css';
+@import './styles/settings.css';

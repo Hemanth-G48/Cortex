@@ -1,0 +1,96 @@
+/* ══════════════════════════════════════════════════════════════
+   STUDENT-PLANAR (G12, Phases 78–79) — Cyberpunk Theme
+   --------------------------------------------------------------
+   Opt-in theme mirroring the reference app's cyberpunk neon
+   palette (--bg-color / --accent-cyan). Activated by setting
+   data-theme="cyberpunk" on <html> via the ThemeSwitcher, or on
+   any wrapper element for scoped theming.
+
+   Includes the Orbitron / Space Grotesk font stacks (Phase 79);
+   the @import below loads them exactly like the RPG theme loads
+   Press Start 2P, and the stacks only apply under this theme.
+   ══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+[data-theme='cyberpunk'] {
+  /* ── Core palette (mirrors STUDENT-PLANAR cyberpunk tokens) ── */
+  --bg-primary: #0a0a14;
+  --bg-card: #12121f;
+  --bg-hover: #1a1a2e;
+  --bg-sidebar: #0d0d18;
+
+  --accent: #00e5ff;
+  --accent-hover: #4df3ff;
+  --accent-glow: rgba(0, 229, 255, 0.25);
+  --accent-muted: rgba(0, 229, 255, 0.14);
+
+  --text-primary: #e6f7ff;
+  --text-secondary: #9fb4c7;
+  --text-muted: #5f7486;
+
+  --border: #1e2a3a;
+  --border-light: #2c3e50;
+
+  --success: #00ff9d;
+  --success-muted: rgba(0, 255, 157, 0.15);
+  --warning: #ffd60a;
+  --warning-muted: rgba(255, 214, 10, 0.15);
+  --danger: #ff3d81;
+  --danger-muted: rgba(255, 61, 129, 0.15);
+  --info: #a78bfa;
+  --info-muted: rgba(167, 139, 250, 0.15);
+
+  --shadow-glow: 0 0 20px rgba(0, 229, 255, 0.18);
+
+  /* ── Cyberpunk-specific tokens (reference parity) ── */
+  --cp-cyan: #00e5ff;
+  --cp-magenta: #ff3d81;
+  --cp-purple: #a78bfa;
+  --cp-yellow: #ffd60a;
+  --cp-green: #00ff9d;
+  --cp-font-display: 'Orbitron', 'Space Grotesk', 'Inter', sans-serif;
+  --cp-font-body: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  font-family: var(--cp-font-body);
+}
+
+/* ── Typography (Phase 79): display font for headings, body font elsewhere ── */
+[data-theme='cyberpunk'] h1,
+[data-theme='cyberpunk'] h2,
+[data-theme='cyberpunk'] h3,
+[data-theme='cyberpunk'] .sidebar-logo,
+[data-theme='cyberpunk'] .vault-title,
+[data-theme='cyberpunk'] .stat-tile .value {
+  font-family: var(--cp-font-display);
+  letter-spacing: 0.02em;
+}
+
+/* ── Neon edge glow on primary buttons (micro-interaction) ── */
+[data-theme='cyberpunk'] .btn-primary {
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+[data-theme='cyberpunk'] .btn-primary:hover {
+  box-shadow: 0 0 20px var(--accent-glow), 0 0 32px var(--accent-muted);
+}
+
+/* ── Focus ring in theme cyan ── */
+[data-theme='cyberpunk'] input:focus,
+[data-theme='cyberpunk'] select:focus,
+[data-theme='cyberpunk'] textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+/* ── Subtle scanline backdrop for the page background ── */
+[data-theme='cyberpunk'] body {
+  background-image: linear-gradient(
+    180deg,
+    rgba(0, 229, 255, 0.03) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgba(255, 61, 129, 0.04) 100%
+  );
+  background-attachment: fixed;
+}

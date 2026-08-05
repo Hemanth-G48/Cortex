@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 
 
 class NoteBase(BaseModel):
@@ -8,6 +8,8 @@ class NoteBase(BaseModel):
     content: Optional[str] = None
     course_id: int
     created_date: date
+    pinned: bool = False
+    updated_at: Optional[datetime] = None
 
 
 class NoteCreate(NoteBase):
@@ -18,6 +20,11 @@ class NoteResponse(NoteBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class NotePinResponse(BaseModel):
+    id: int
+    pinned: bool
 
 
 class GoalBase(BaseModel):

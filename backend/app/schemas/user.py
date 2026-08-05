@@ -17,6 +17,15 @@ class UserBase(BaseModel):
     target_weight: Optional[float] = None
     membership_status: str = "Active"
     next_payment_date: Optional[date] = None
+    # Role auth (STUDENT-PLANAR G1)
+    username: Optional[str] = None
+    email: Optional[str] = None
+    role: str = "student"
+    # SyllabusAI (G1): local curator/admin flag.
+    is_admin: bool = False
+    # SyllabusAI (G2): curriculum enrollment binding.
+    institution_id: Optional[int] = None
+    program_id: Optional[int] = None
 
 
 class UserCreate(UserBase):
@@ -35,6 +44,10 @@ class UserUpdate(BaseModel):
     target_weight: Optional[float] = None
     membership_status: Optional[str] = None
     next_payment_date: Optional[date] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    is_admin: Optional[bool] = None
 
 
 class UserResponse(UserBase):
@@ -42,3 +55,22 @@ class UserResponse(UserBase):
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserSignup(BaseModel):
+    name: str
+    username: Optional[str] = None
+    email: Optional[str] = None
+    password: str
+    role: str = "student"
+    teacher_secret: Optional[str] = None
+
+
+class UserLogin(BaseModel):
+    identifier: str
+    password: str
+
+
+class EnrollmentUpdate(BaseModel):
+    institution_id: int
+    program_id: int

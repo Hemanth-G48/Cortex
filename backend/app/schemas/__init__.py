@@ -1,9 +1,11 @@
-from app.schemas.user import UserBase, UserCreate, UserUpdate, UserResponse
+from app.schemas.user import UserBase, UserCreate, UserUpdate, UserResponse, UserSignup, UserLogin
 from app.schemas.course import CourseBase, CourseCreate, CourseResponse
 from app.schemas.assignment import (
     AssignmentBase,
     AssignmentCreate,
     AssignmentResponse,
+    AssignmentUpdate,
+    AssignmentStatusUpdate,
     ExamBase,
     ExamCreate,
     ExamResponse,
@@ -39,6 +41,52 @@ from app.schemas.mission import (
 )
 from app.schemas.daily_log import DailyLogBase, DailyLogCreate, DailyLogUpdate, DailyLogResponse
 from app.schemas.event import EventBase, EventCreate, EventUpdate, EventResponse
+from app.schemas.grade import (
+    GradeBase, GradeCreate, GradeResponse,
+    CourseWeightBase, CourseWeightCreate, CourseWeightUpdate, CourseWeightResponse,
+    GradeCalculateRequest, GradeCalculateResponse,
+    NeededOnFinalRequest, NeededOnFinalResponse,
+    GPACourse, GPAResponse,
+)
+from app.schemas.flashcard import (
+    FlashcardBase, FlashcardCreate, FlashcardUpdate, FlashcardResponse,
+    FlashcardDeckBase, FlashcardDeckCreate, FlashcardDeckUpdate, FlashcardDeckResponse,
+    FlashcardDeckSummary,
+)
+from app.schemas.study_plan import StudyPlanBase, StudyPlanCreate, StudyPlanResponse, StudyPlanWeek
+from app.schemas.mood import (
+    MoodCreate,
+    MoodResponse,
+    MoodAnalytics,
+    MoodDistributionItem,
+    MoodDailyPoint,
+    MoodWeekly,
+    MoodInsight,
+    SessionParams,
+)
+from app.schemas.sleep import (
+    SleepCreate,
+    SleepUpdate,
+    SleepResponse,
+    SleepAnalytics,
+    SleepDayPoint,
+    SleepSummary,
+    SleepRecommendation,
+)
+from app.schemas.book import (
+    BookBase, BookCreate, BookUpdate, BookResponse, BookInsights,
+)
+from app.schemas.braindump import BrainDumpCreate, BrainDumpResponse
+from app.schemas.daily_schedule import (
+    DailyScheduleItemBase, DailyScheduleItemCreate, DailyScheduleItemUpdate,
+    DailyScheduleItemResponse, DailyScheduleStats,
+)
+from app.schemas.notification import (
+    NotificationCreate, NotificationResponse, NotificationUnreadCount,
+)
+from app.schemas.study_stats import (
+    CourseAnalytics, OverallAnalytics, AssignmentAnalyticsResponse,
+)
 
 __all__ = [
     "AddXpRequest",
@@ -65,6 +113,8 @@ __all__ = [
     "LifeAreaBase", "LifeAreaCreate", "LifeAreaUpdate", "LifeAreaResponse",
     "MissionBase", "MissionCreate", "MissionUpdate", "MissionResponse",
     "MissionTaskBase", "MissionTaskCreate", "MissionTaskUpdate", "MissionTaskResponse",
+    "MoodAnalytics", "MoodCreate", "MoodDailyPoint", "MoodDistributionItem",
+    "MoodInsight", "MoodResponse", "MoodWeekly",
     "NoteBase", "NoteCreate", "NoteResponse",
     "PomodoroSessionBase", "PomodoroSessionCreate", "PomodoroSessionResponse",
     "ProjectBase", "ProjectCreate", "ProjectResponse",
@@ -73,7 +123,17 @@ __all__ = [
     "QuestTaskBase", "QuestTaskCreate", "QuestTaskResponse",
     "ReminderBase", "ReminderCreate", "ReminderUpdate", "ReminderResponse",
     "ScheduleBase", "ScheduleCreate", "ScheduleResponse",
+    "SessionParams",
+    "SleepAnalytics", "SleepCreate", "SleepDayPoint", "SleepRecommendation",
+    "SleepResponse", "SleepSummary", "SleepUpdate",
     "TaskBase", "TaskCreate", "TaskResponse",
-    "UserBase", "UserCreate", "UserUpdate", "UserResponse",
+    "UserBase", "UserCreate", "UserUpdate", "UserResponse", "UserSignup", "UserLogin",
     "WorkoutBase", "WorkoutCreate", "WorkoutResponse",
+    "AssignmentUpdate", "AssignmentStatusUpdate",
+    "BookBase", "BookCreate", "BookUpdate", "BookResponse", "BookInsights",
+    "BrainDumpCreate", "BrainDumpResponse",
+    "DailyScheduleItemBase", "DailyScheduleItemCreate", "DailyScheduleItemUpdate",
+    "DailyScheduleItemResponse", "DailyScheduleStats",
+    "NotificationCreate", "NotificationResponse", "NotificationUnreadCount",
+    "CourseAnalytics", "OverallAnalytics", "AssignmentAnalyticsResponse",
 ]

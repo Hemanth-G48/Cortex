@@ -1,8 +1,24 @@
-# 99-Phase Implementation Plan — Shiori-v1 Feature Parity into Student Life OS
+# 99-Phase Implementation Plan — Shiori-v1 → Student Life OS (productivity_app) Integration
 
-**Target repo:** `/home/hemanth/productivity_app` — React 19 + TypeScript strict + Vite + react-router-dom + vitest frontend · FastAPI + SQLAlchemy + SQLite backend
+**Source repo:** `Shiori-v1/` (shiori-v1)
+**Target repo:** `productivity_app` (Student Life OS) — `/home/hemanth/productivity_app` — React 19 + TypeScript strict + Vite + react-router-dom + vitest frontend · FastAPI + SQLAlchemy + SQLite backend
 **Source repo:** `/home/hemanth/productivity_app/Shiori-v1` — React 18 + Zustand + Supabase + Express + client-side Gemini
 **Baseline (verified 2026-08-03):** Backend **234 pytest** (`test_courses`, `test_habits`, `test_health`, `test_life_planner`, `test_other_endpoints`, `test_regression`, `test_rpg`, `test_tasks`, `test_vault`, `test_fitness_hub`, `test_habit_tracker`, `test_quest_centre`) · Frontend `tsc -b` + `npm run build` clean · **23 vitest** across `App`, `fitnessHub`, `habitTracker`, `questCentre` + 2 util test files · oxlint clean (5 pre-existing warnings).
+
+> **✅ IMPLEMENTATION STATUS — 2026-08-03: ALL 16 GROUPS COMPLETE**
+>
+> Backend **290 pytest** (baseline 234 + `test_ai` 21, `test_grades` 13, `test_flashcards` 9,
+> `test_study_plans` 5, `test_analytics` 4, `test_google` 11, notes-pin additions) · Frontend
+> **55 vitest** (baseline 23 + grades 4, flashcards 4, studyPlans 4, quiz 2, syllabus 2, aiChat 3,
+> analytics 3, notes 3, settings 3) · `tsc -b` clean · **oxlint 0 warnings / 0 errors** · fresh-DB
+> smoke passed on all 13 new endpoint groups. Deps added: `httpx` (backend, root `pyproject.toml`),
+> `jspdf` (frontend). `.env.example` documents `AI_*` + `GOOGLE_*`.
+>
+> **Notes / deviations:** `Quiz.tsx` + `SyllabusImport.tsx` live in the same session as Groups 6–9
+> (AI endpoints landed in Group 1 since they only depend on `ai_client`/`ai_fallback`).
+> `AIChat`'s toggle bus was extracted to `utils/aiChatBus.ts` to satisfy fast-refresh lint.
+> Assignments keeps its table (export buttons added); filters/priority deferred as optional per PART B row 22.
+> Google OAuth requires real credentials (`GOOGLE_CLIENT_ID/SECRET`) to go beyond the deterministic mock fallbacks.
 
 ---
 
@@ -640,13 +656,13 @@ Each phase: **Objective · Files to modify · Files to create · Deps · Complex
 
 ## PART I — Final Checklist
 
-- [ ] Group 1–16 gates all green (phases 9, 17, 24, 32, 39, 44, 49, 56, 61, 67, 71, 77, 83, 91, 97, 98)
-- [ ] New models: `Grade`, `CourseWeight`, `FlashcardDeck`, `Flashcard`, `StudyPlan` (+ `Course.credits`, `Note.pinned`, `Note.updated_at`)
-- [ ] New routers: `ai`, `grades`, `flashcards`, `study_plans`, `analytics`, `auth_google`, `classroom`, `gmail`, `calendar`
-- [ ] New services: `ai_client`, `ai_fallback`, `grade_calc`, `analytics`, `google_oauth`
-- [ ] New pages: `Grades`, `Flashcards`, `StudyPlans`, `Quiz`, `SyllabusImport`, `Analytics`, `Settings`; rewritten `Notes`
-- [ ] New frontend utils/hooks: `ai.ts`, `icalExport.ts`, `pdfExport.ts`, `sounds.ts`, `useKeyboardShortcuts.ts`
-- [ ] Deps added: `httpx` (backend), `jspdf` (frontend)
-- [ ] Env documented: `AI_*`, `GOOGLE_*`
-- [ ] Fresh-DB smoke test passed
-- [ ] `frontend/README.md` updated
+- [x] Group 1–16 gates all green (phases 9, 17, 24, 32, 39, 44, 49, 56, 61, 67, 71, 77, 83, 91, 97, 98)
+- [x] New models: `Grade`, `CourseWeight`, `FlashcardDeck`, `Flashcard`, `StudyPlan`, `GoogleToken` (+ `Course.credits`, `Note.pinned`, `Note.updated_at`, `Course.google_id`, `Assignment.google_id`, `Event.google_id`)
+- [x] New routers: `ai`, `grades`, `flashcards`, `study_plans`, `analytics`, `auth_google`, `classroom`, `gmail`, `calendar`
+- [x] New services: `ai_client`, `ai_fallback`, `grade_calc`, `analytics`, `google_oauth`
+- [x] New pages: `Grades`, `Flashcards`, `StudyPlans`, `Quiz`, `SyllabusImport`, `Analytics`, `Settings`; rewritten `Notes`
+- [x] New frontend utils/hooks/components: `ai.ts`, `aiChatBus.ts`, `icalExport.ts`, `pdfExport.ts`, `sounds.ts`, `useKeyboardShortcuts.ts`, `ShortcutModal.tsx`, `QuickCapture.tsx`, `GoogleSyncCard.tsx`, `GradeTrendChart.tsx`, `StudyHeatmap.tsx`, `TimeTrackerBars.tsx`
+- [x] Deps added: `httpx` (backend), `jspdf` (frontend)
+- [x] Env documented: `AI_*`, `GOOGLE_*`
+- [x] Fresh-DB smoke test passed
+- [x] `frontend/README.md` updated

@@ -1,5 +1,6 @@
 from app.models.user import User
 from app.models.course import Course
+from app.models.grade import Grade, CourseWeight
 from app.models.assignment import Assignment, Exam
 from app.models.note import Note, Goal
 from app.models.task import Task, Reminder, Schedule
@@ -25,15 +26,37 @@ from app.models.mission import Mission, MissionTask
 from app.models.schedule_event import ScheduleEvent
 from app.models.daily_log import DailyLog
 from app.models.event import Event
+from app.models.flashcard import FlashcardDeck, Flashcard
+from app.models.study_plan import StudyPlan
+from app.models.google_oauth import GoogleToken
+from app.models.mood_log import MoodLog
+from app.models.sleep_log import SleepLog
+from app.models.institution import Institution
+from app.models.curriculum_course import CurriculumCourse
+from app.models.curriculum_subject import CurriculumSubject
+from app.models.curriculum_unit import CurriculumUnit
+from app.models.material import Material
+from app.models.summary import Summary
+from app.models.quiz import Quiz
+from app.models.quiz_attempt import QuizAttempt
+from app.models.book import Book
+from app.models.braindump import BrainDump
+from app.models.daily_schedule_item import DailyScheduleItem
+from app.models.notification import Notification
 
 __all__ = [
     "Assignment",
     "Character",
     "Course",
+    "CourseWeight",
+    "Grade",
     "DailyLog",
     "Event",
     "Exam",
     "FitnessGoal",
+    "Flashcard",
+    "FlashcardDeck",
+    "GoogleToken",
     "Exercise",
     "MuscleGroup",
     "WorkoutSplit",
@@ -47,6 +70,7 @@ __all__ = [
     "LifeArea",
     "Mission",
     "MissionTask",
+    "MoodLog",
     "Note",
     "Reward",
     "PomodoroSession",
@@ -56,8 +80,22 @@ __all__ = [
     "QuestTask",
     "Reminder",
     "Schedule",
+    "SleepLog",
+    "StudyPlan",
     "ScheduleEvent",
     "Task",
     "User",
     "Workout",
+    "Institution",
+    "CurriculumCourse",
+    "CurriculumSubject",
+    "CurriculumUnit",
+    "Material",
+    "Summary",
+    "Quiz",
+    "QuizAttempt",
+    "Book",
+    "BrainDump",
+    "DailyScheduleItem",
+    "Notification",
 ]

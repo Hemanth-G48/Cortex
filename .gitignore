@@ -41,3 +41,5 @@ backend/uploads/
 
 # LibreOffice lock files
 .~lock.*#
+
+similar_repos/

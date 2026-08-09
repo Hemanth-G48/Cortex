@@ -36,3 +36,7 @@ class User(Base):
     # Enrollment binding (Phase 13)
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
     program_id = Column(Integer, ForeignKey("curriculum_courses.id"), nullable=True)
+
+    # Phase 5 (Idea 49, phrase 83): per-user pacing multiplier for time
+    # estimates (default 1.0; learning_events will tune it later).
+    pacing_multiplier = Column(Float, default=1.0)

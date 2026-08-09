@@ -13,6 +13,8 @@ class CurriculumUnit(Base):
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
+    # Phase 5 (Idea 43): string term ("Fall 2026") mirrored from the profile.
+    semester = Column(String(20), nullable=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (

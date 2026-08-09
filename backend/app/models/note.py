@@ -21,6 +21,8 @@ class Goal(Base):
     __tablename__ = "goals"
 
     id = Column(Integer, primary_key=True, index=True)
+    # Phase 10 (Idea 98): per-user scoping for the goal/reflection system.
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     title = Column(String(200), nullable=False)
     quarter = Column(String(10), nullable=False)  # Q1–Q4
     progress_percentage = Column(Float, default=0.0)
@@ -28,3 +30,6 @@ class Goal(Base):
     habit_id = Column(Integer, ForeignKey("habits.id"), nullable=True)
     target_date = Column(Date, nullable=True)
     is_completed = Column(Boolean, default=False)
+    # Phase 10 (Idea 98, phrase 71): goal↔subject/roadmap linkage.
+    subject_id = Column(Integer, ForeignKey("curriculum_subjects.id"), nullable=True, index=True)
+    roadmap_id = Column(Integer, ForeignKey("roadmaps.id"), nullable=True)

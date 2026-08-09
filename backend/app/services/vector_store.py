@@ -133,7 +133,14 @@ store = VectorStore()
 
 
 def get_store() -> VectorStore:
-    """Return the shared store instance (swap point for FAISS backend)."""
+    """Return the shared store instance (swap point for backends).
+
+    Supported ``VECTOR_STORE_BACKEND`` values:
+    - ``numpy`` (default) — in-memory numpy store.
+    - ``faiss`` — optional FAISS index (if installed).
+    - ``file`` — file-backed numpy store under ``UPLOAD_DIR/kb_index/``.
+    - ``pgvector`` — import-guarded pgvector (prod); falls back to numpy.
+    """
     backend = getattr(settings, "VECTOR_STORE_BACKEND", "numpy")
     if backend == "faiss":
         try:
@@ -142,4 +149,18 @@ def get_store() -> VectorStore:
             return get_faiss_store()
         except Exception as exc:  # noqa: BLE001 — graceful fallback to numpy
             logger.warning("FAISS backend unavailable (%s); using numpy store", exc)
+    elif backend == "file":
+        try:
+            from app.services.vector_store_file import get_file_store  # noqa: PLC0415
+
+            return get_file_store()
+        except Exception as exc:  # noqa: BLE001 — graceful fallback to numpy
+            logger.warning("File vector store unavailable (%s); using numpy store", exc)
+    elif backend == "pgvector":
+        try:
+            from app.services.vector_store_pg import get_pg_store  # noqa: PLC0415
+
+            return get_pg_store()
+        except Exception as exc:  # noqa: BLE001 — graceful fallback to numpy
+            logger.warning("pgvector backend unavailable (%s); using numpy store", exc)
     return store

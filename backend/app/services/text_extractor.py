@@ -63,6 +63,17 @@ def extract(file_path: str, file_type: str) -> str:
     return result
 
 
+def extract_pdf_pages(file_path: str) -> list[str]:
+    """Return per-page text of a PDF (page boundaries for OCR, Idea 5/6).
+
+    ``extract()`` is intentionally unchanged so existing callers keep working.
+    """
+    from pypdf import PdfReader  # noqa: PLC0415
+
+    reader = PdfReader(Path(file_path))
+    return [page.extract_text() or "" for page in reader.pages]
+
+
 def extract_multiple(files: list[tuple[str, str]]) -> str:
     """Extract text from multiple files, joining with headers.
 

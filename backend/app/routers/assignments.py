@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -16,6 +17,7 @@ from app.schemas.assignment import (
 from app.schemas.study_stats import AssignmentAnalyticsResponse
 from app.services.security import get_current_user
 from app.services.study_stats import compute_assignment_analytics
+from app.services.kb.assignment_intel import plan_assignment
 import uuid
 from pathlib import Path
 
@@ -134,6 +136,38 @@ def upload_assignment_attachment(
     db.commit()
     db.refresh(assignment)
     return assignment
+
+
+# -- Phase 6 (Idea 54): assignment intelligence --
+class PlanAssignmentRequest(BaseModel):
+    create_tasks: bool = True
+    create_reminders: bool = True
+
+
+@router.post("/assignments/{assignment_id}/plan")
+def plan_assignment_endpoint(
+    assignment_id: int,
+    body: PlanAssignmentRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """LLM subtask breakdown + task/reminder creation + hint chunks.
+
+    Additive — the existing assignments flow is untouched (phrase 40).
+    """
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(404, "Assignment not found")
+    body = body or PlanAssignmentRequest()
+    result = plan_assignment(
+        db,
+        current_user.id,
+        assignment,
+        create_tasks=body.create_tasks,
+        create_reminders=body.create_reminders,
+    )
+    db.commit()
+    return result
 
 
 # -- Exams --

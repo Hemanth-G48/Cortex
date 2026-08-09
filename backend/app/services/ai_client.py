@@ -1,12 +1,17 @@
-"""OpenAI-compatible AI client (OmniRoute by default).
+"""AI client facade — provider-agnostic, local-first.
 
-Wraps ``POST {AI_BASE_URL}/chat/completions`` with:
-- model override + retry across ``AI_MODELS_FALLBACK``
-- ``AI_ENABLED=false`` short-circuit so CI/tests never hit the network
-- ``extract_json`` — robust JSON-block extraction from model output
+The rest of the application talks to *this* module (``ai_available``,
+``ai_models``, ``generate``, ``generate_json``, ``extract_json``). Since the
+provider registry refactor, these functions resolve the active provider from
+``app.services.ai_providers`` — a local JSON registry of configurable
+providers (Ollama, LM Studio, OpenAI, Anthropic, Google, custom OpenAI-
+compatible endpoints) with the legacy ``AI_BASE_URL``/``AI_MODEL`` env config
+as the implicit default provider.
 
-Mirrors Shiori-v1's ``utils/ai.js`` + ``utils/gemini.js`` model-retry pattern,
-adapted to a server-side FastAPI + httpx architecture.
+The public API is unchanged, so every existing caller keeps working:
+``AI_ENABLED=false`` short-circuits to deterministic fallbacks, network
+failures return ``None``, and ``extract_json`` still robustly parses model
+output.
 """
 from __future__ import annotations
 
@@ -14,9 +19,8 @@ import json
 import logging
 import re
 
-import httpx
-
 from app.config import settings
+from app.services import ai_providers
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +28,28 @@ DEFAULT_TIMEOUT = 60.0
 
 
 def ai_available() -> bool:
-    """True when the AI provider is configured and enabled."""
+    """True when an AI provider is configured, enabled, and reachable.
+
+    Preserves the legacy strictness (a base URL AND a model are required, the
+    same way the old env check required ``AI_BASE_URL and AI_MODEL``): an
+    enabled-but-incomplete registry entry (empty base URL, or no model and no
+    known models) must not report AI as available — ``generate`` would fail.
+    The legacy env fallback model list only counts for the env provider, which
+    always carries ``AI_MODEL`` as its configured model.
+    """
     if not settings.AI_ENABLED:
         return False
-    return bool(settings.AI_BASE_URL and settings.AI_MODEL)
+    active = ai_providers.get_registry().active()
+    if active is None:
+        return False
+    return bool(active.base_url and (active.model or active.models))
 
 
 def ai_models() -> list[str]:
-    """Ordered model list: primary + fallbacks."""
-    return list(settings.ai_model_list)
+    """Ordered model list of the active provider (or env fallbacks)."""
+    if not settings.AI_ENABLED:
+        return list(settings.ai_model_list)
+    return ai_providers.get_registry().models() or list(settings.ai_model_list)
 
 
 def extract_json(text: str | None) -> object | None:
@@ -98,51 +115,20 @@ def generate(
     temperature: float = 0.7,
     model: str | None = None,
 ) -> str | None:
-    """Send a chat-completions request and return the text, or None on failure.
+    """Send a request to the active provider and return text, or None on failure.
 
-    Tries ``model`` first, then falls back through ``settings.ai_model_list``.
-    Returns None when AI is disabled/unreachable so callers can fall back to
-    deterministic local generators.
+    Callers fall back to deterministic local generators when this returns
+    None (AI disabled or unreachable).
     """
     if not ai_available():
         return None
-
-    candidates = []
-    if model:
-        candidates.append(model)
-    candidates.extend(ai_models())
-
-    for name in candidates:
-        try:
-            payload = {
-                "model": name,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": max_tokens,
-                "temperature": temperature,
-            }
-            resp = httpx.post(
-                f"{settings.AI_BASE_URL.rstrip('/')}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.AI_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-                timeout=DEFAULT_TIMEOUT,
-            )
-            if resp.status_code == 404 and len(candidates) > 1:
-                # Model retired/renamed — try the next one (Shiori pattern).
-                continue
-            if resp.status_code != 200:
-                logger.warning("AI provider returned %s for model %s", resp.status_code, name)
-                return None
-            data = resp.json()
-            content = data.get("choices", [{}])[0].get("message", {}).get("content")
-            if content:
-                return str(content).strip()
-            return None
-        except Exception as exc:  # noqa: BLE001 — network layer, all failures fall through
-            logger.warning("AI request failed for model %s: %s", name, exc)
-    return None
+    try:
+        return ai_providers.get_registry().generate(
+            prompt, max_tokens=max_tokens, temperature=temperature, model=model
+        )
+    except Exception as exc:  # noqa: BLE001 — registry must never raise
+        logger.warning("AI generate failed: %s", exc)
+        return None
 
 
 def generate_json(
@@ -151,6 +137,6 @@ def generate_json(
     temperature: float = 0.7,
     model: str | None = None,
 ) -> object | None:
-    """Call the model and parse the response as JSON. Returns None on failure."""
+    """Call the active provider and parse the response as JSON. None on failure."""
     text = generate(prompt, max_tokens=max_tokens, temperature=temperature, model=model)
     return extract_json(text)

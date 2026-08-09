@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Flashcard, FlashcardDeck
+from app.services import flashcard_srs
 from app.schemas.flashcard import (
     FlashcardCreate,
     FlashcardDeckCreate,
@@ -22,12 +24,38 @@ router = APIRouter(prefix="/api/flashcard-decks", tags=["flashcards"])
 
 
 # ---------------------------------------------------------------------------
+# FSRS spaced-repetition (Idea 52 — vendored py-fsrs)
+# ---------------------------------------------------------------------------
+
+
+class CardReviewRequest(BaseModel):
+    grade: int = Field(ge=0, le=5)
+
+
+@router.get("/due")
+def list_due_cards(
+    deck_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Cards due now (never-reviewed cards count as due)."""
+    items = flashcard_srs.due_cards(db, deck_id=deck_id)
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/due-counts")
+def due_counts(db: Session = Depends(get_db)):
+    """deck_id → due card count, for deck-list badges."""
+    return {"counts": flashcard_srs.due_count_by_deck(db)}
+
+
+# ---------------------------------------------------------------------------
 # Decks
 # ---------------------------------------------------------------------------
 
 @router.get("", response_model=List[FlashcardDeckSummary])
 def list_decks(db: Session = Depends(get_db)):
     decks = db.query(FlashcardDeck).order_by(FlashcardDeck.id).all()
+    counts = flashcard_srs.due_count_by_deck(db)
     return [
         FlashcardDeckSummary(
             id=d.id, name=d.name, course_id=d.course_id, created_at=d.created_at,
@@ -118,3 +146,15 @@ def delete_card(deck_id: int, card_id: int, db: Session = Depends(get_db)):
     db.delete(card)
     db.commit()
     return {"ok": True}
+
+
+@router.post("/{deck_id}/cards/{card_id}/review")
+def review_card(deck_id: int, card_id: int, body: CardReviewRequest, db: Session = Depends(get_db)):
+    """Grade a card 0–5 → FSRS reschedules it (Again/Hard/Good/Easy)."""
+    card = db.query(Flashcard).filter(Flashcard.id == card_id, Flashcard.deck_id == deck_id).first()
+    if not card:
+        raise HTTPException(404, "Card not found")
+    flashcard_srs.review_card(db, card, body.grade)
+    db.commit()
+    db.refresh(card)
+    return {"ok": True, "schedule": flashcard_srs.review_payload(card)}

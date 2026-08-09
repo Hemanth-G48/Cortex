@@ -1,4 +1,5 @@
 import os
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -20,6 +21,20 @@ from app.routers import (
     mood, sleep,
     books, braindumps, daily_schedule, notifications,
     teacher, enrollment,
+    kb_sources, kb_documents, kb_papers, kb_jobs,
+    kb_stats, kb_metadata, kb_tags, kb_concepts,
+    kb_graph, kb_related, kb_duplicates, kb_reindex,
+    kb_search, kb_health,
+    global_search,
+    kb_content, kb_daily_notes, kb_citations, kb_edges, kb_mindmap, kb_quality,
+    kb_subjects,
+    kb_study, kb_labs, kb_attendance,
+    kb_tutor, kb_practice, kb_skills,
+    kb_automation, kb_categorize, kb_links,
+    kb_personal,
+    kb_agents, kb_memory, kb_context, kb_research,
+    kb_recommendations, kb_reflections, kb_forecast, kb_observability,
+    leaderboard,
 )
 from app.seed import seed_database
 from app.seed.student_planar import seed_student_planar
@@ -29,6 +44,11 @@ from app.seed.student_planar import seed_student_planar
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     migrate_schema()
+    # Second Brain (Phase 3, Idea 21): create the FTS5 index + sync triggers
+    # idempotently at startup. No-op when KB_FTS_ENABLED=false.
+    from app.services.kb import fts
+
+    fts.ensure_fts_schema(engine)
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     from app.database import SessionLocal
     db = SessionLocal()
@@ -38,9 +58,35 @@ async def lifespan(app: FastAPI):
         # schedule day, brain dump, assignment taxonomy) — live app only, so
         # test isolation is preserved (tests call seed_database directly).
         seed_student_planar(db)
+        # Second Brain (Phase 1): resume jobs interrupted by a restart (Idea 10,
+        # phrase 95). Idempotent — safe on every boot; skipped under pytest so
+        # tests never touch the app's SQLite file.
+        if "pytest" not in sys.modules:
+            from app.services.kb import jobs
+
+            jobs.resume_interrupted_jobs()
     finally:
         db.close()
+    # Second Brain folder watcher (Idea 3, phrase 29) — never in tests.
+    kb_watcher = None
+    if settings.KB_WATCH_ENABLED and "pytest" not in sys.modules:
+        from app.services.kb import watcher as kb_watcher_module
+
+        kb_watcher_module.start_watcher()
+        kb_watcher = kb_watcher_module
+    # Warm the local embedding model so the first search/reindex after boot
+    # isn't stalled by a lazy load (fastembed/ONNX, ~seconds). Never in tests.
+    if "pytest" not in sys.modules:
+        try:
+            from app.services import embeddings
+
+            if embeddings.fastembed_available():
+                embeddings._get_fastembed()
+        except Exception:  # noqa: BLE001 — warm-up is best-effort
+            pass
     yield
+    if kb_watcher is not None:
+        kb_watcher.stop_watcher()
 
 
 app = FastAPI(title=settings.APP_NAME, version=settings.VERSION, lifespan=lifespan)
@@ -108,6 +154,47 @@ app.include_router(daily_schedule.router)
 app.include_router(notifications.router)
 app.include_router(teacher.router)
 app.include_router(enrollment.router)
+app.include_router(kb_sources.router)
+app.include_router(kb_documents.router)
+app.include_router(kb_papers.router)
+app.include_router(kb_jobs.router)
+app.include_router(kb_stats.router)
+app.include_router(kb_metadata.router)
+app.include_router(kb_tags.router)
+app.include_router(kb_concepts.router)
+app.include_router(kb_graph.router)
+app.include_router(kb_related.router)
+app.include_router(kb_duplicates.router)
+app.include_router(kb_reindex.router)
+app.include_router(kb_search.router)
+app.include_router(kb_health.router)
+app.include_router(global_search.router)
+app.include_router(kb_content.router)
+app.include_router(kb_daily_notes.router)
+app.include_router(kb_citations.router)
+app.include_router(kb_edges.router)
+app.include_router(kb_mindmap.router)
+app.include_router(kb_quality.router)
+app.include_router(kb_subjects.router)
+app.include_router(kb_study.router)
+app.include_router(kb_labs.router)
+app.include_router(kb_attendance.router)
+app.include_router(kb_tutor.router)
+app.include_router(kb_practice.router)
+app.include_router(kb_skills.router)
+app.include_router(kb_automation.router)
+app.include_router(kb_categorize.router)
+app.include_router(kb_links.router)
+app.include_router(kb_personal.router)
+app.include_router(kb_agents.router)
+app.include_router(kb_memory.router)
+app.include_router(kb_context.router)
+app.include_router(kb_research.router)
+app.include_router(kb_recommendations.router)
+app.include_router(kb_reflections.router)
+app.include_router(kb_forecast.router)
+app.include_router(kb_observability.router)
+app.include_router(leaderboard.router)
 
 
 @app.get("/api/health")

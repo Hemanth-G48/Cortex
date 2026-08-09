@@ -113,6 +113,8 @@ def signup(body: UserSignup, db: Session = Depends(get_db)):
     )
     db.add(user)
     db.flush()
+    db.commit()  # persist the new user before the session closes (otherwise the
+                 # next request never sees them and their token 401s)
     db.refresh(user)
 
     token = create_bearer_token(user.id, user.role)

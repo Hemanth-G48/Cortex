@@ -8,13 +8,29 @@ Every feature endpoint:
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
 from app.models import Assignment, Course, User
-from app.services import ai_client, ai_fallback
+from app.services import ai_cache, ai_client, ai_fallback, ai_providers, embeddings
+from app.services.security import _bearer_scheme, decode_bearer_token
+
+
+async def _optional_user(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Auth that never 401s — used by grade-answer's advanced mode so the
+    existing anonymous flashcard flow keeps working (Idea 66, phrase 51)."""
+    if credentials is None or not credentials.credentials:
+        return None
+    payload = decode_bearer_token(credentials.credentials)
+    if not payload:
+        return None
+    return db.query(User).filter(User.id == payload["user_id"]).first()
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -25,17 +41,147 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 @router.get("/health")
 def ai_health() -> dict:
+    active = ai_providers.get_registry().active()
     return {
         "available": ai_client.ai_available(),
         "mode": "AI" if ai_client.ai_available() else "Offline (deterministic fallback)",
-        "model": settings.AI_MODEL if ai_client.ai_available() else None,
+        "model": (active.model if active else None) if ai_client.ai_available() else None,
         "models": ai_client.ai_models() if ai_client.ai_available() else [],
+        # Provider registry: which provider is active and how to reach it.
+        "active_provider": ai_providers.mask_config(active) if active else None,
+        "providers_count": len(ai_providers.get_registry().all()),
+        # Phase 2 (Idea 11): embeddings capability surfaced for the UI footer.
+        "embeddings": {
+            "available": embeddings.embed_available(),
+            "model": settings.EMBEDDINGS_MODEL if embeddings.embed_available() else None,
+            "dim": settings.EMBEDDINGS_DIM,
+            "batch_size": settings.EMBEDDINGS_BATCH_SIZE,
+            "backend": settings.VECTOR_STORE_BACKEND,
+        },
+        # QuestLog (Idea 95): AI response cache status (mirrors getAIStatus).
+        "cache": ai_cache.cache_stats(),
     }
 
 
 @router.get("/models")
 def ai_models() -> dict:
-    return {"models": ai_client.ai_models(), "enabled": ai_client.ai_available()}
+    active = ai_providers.get_registry().active()
+    return {
+        "models": ai_client.ai_models(),
+        "enabled": ai_client.ai_available(),
+        # Backwards-compatible extra: active provider + per-provider models.
+        "active_provider": ai_providers.mask_config(active) if active else None,
+        "providers": [ai_providers.mask_config(p) for p in ai_providers.get_registry().all()],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Provider registry management (local-first, single-user)
+# ---------------------------------------------------------------------------
+
+
+class ProviderCreate(BaseModel):
+    name: str
+    provider_type: str = "custom"  # custom | openai | ollama | lmstudio | anthropic | google
+    base_url: str | None = None
+    api_key: str | None = None
+    model: str | None = None
+    enabled: bool = True
+    is_default: bool = False
+
+
+class ProviderUpdate(BaseModel):
+    name: str | None = None
+    provider_type: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None  # empty/None → leave unchanged
+    model: str | None = None
+    enabled: bool | None = None
+    is_default: bool | None = None
+
+
+@router.get("/providers")
+def list_providers() -> dict:
+    """All configured providers with masked credentials (never raw API keys)."""
+    registry = ai_providers.get_registry()
+    return {
+        "providers": [ai_providers.mask_config(p) for p in registry.all()],
+        "active_id": registry.active().id if registry.active() else None,
+    }
+
+
+@router.post("/providers", status_code=201)
+def create_provider(data: ProviderCreate) -> dict:
+    registry = ai_providers.get_registry()
+    config = registry.create(
+        name=data.name,
+        provider_type=data.provider_type,
+        base_url=data.base_url,
+        api_key=data.api_key,
+        model=data.model,
+        enabled=data.enabled,
+        is_default=data.is_default,
+    )
+    return ai_providers.mask_config(config)
+
+
+@router.put("/providers/{provider_id}")
+def update_provider(provider_id: str, data: ProviderUpdate) -> dict:
+    registry = ai_providers.get_registry()
+    config = registry.update(
+        provider_id,
+        name=data.name,
+        provider_type=data.provider_type,
+        base_url=data.base_url,
+        api_key=data.api_key,
+        model=data.model,
+        enabled=data.enabled,
+        is_default=data.is_default,
+    )
+    if config is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, "Provider not found")
+    return ai_providers.mask_config(config)
+
+
+@router.delete("/providers/{provider_id}")
+def delete_provider(provider_id: str) -> dict:
+    registry = ai_providers.get_registry()
+    ok = registry.remove(provider_id)
+    from fastapi import HTTPException
+
+    if not ok:
+        raise HTTPException(404, "Provider not found")
+    return {"ok": True}
+
+
+@router.post("/providers/{provider_id}/test")
+def test_provider(provider_id: str) -> dict:
+    """Live connection test against the provider (short timeout)."""
+    return ai_providers.get_registry().test(provider_id)
+
+
+@router.post("/providers/{provider_id}/refresh-models")
+def refresh_provider_models(provider_id: str) -> dict:
+    """Fetch the provider's current model list and persist it."""
+    from fastapi import HTTPException
+
+    config = ai_providers.get_registry().refresh_models(provider_id)
+    if config is None:
+        raise HTTPException(404, "Provider not found")
+    return ai_providers.mask_config(config)
+
+
+@router.post("/providers/{provider_id}/default")
+def set_default_provider(provider_id: str) -> dict:
+    """Mark this provider as the active/default one."""
+    from fastapi import HTTPException
+
+    config = ai_providers.get_registry().set_default(provider_id)
+    if config is None:
+        raise HTTPException(404, "Provider not found")
+    return ai_providers.mask_config(config)
 
 
 class CompleteRequest(BaseModel):
@@ -157,6 +303,11 @@ class GradeAnswerRequest(BaseModel):
     question: str
     expected: str
     answer: str
+    # Phase 7 (Idea 66, phrase 51): "basic" (backward-compatible) or
+    # "advanced" — partial credit + structured feedback. Optional so the
+    # existing flashcard flow keeps working unchanged.
+    mode: str = "basic"
+    topic_id: int | None = None
 
 
 class ChatRequest(BaseModel):
@@ -167,6 +318,24 @@ class ChatResponse(BaseModel):
     message: str
     should_generate_plan: bool = False
     ai_used: bool = False
+
+
+@router.post("/insights")
+def ai_insights(db: Session = Depends(get_db)) -> dict:
+    """Cached productivity insights from real user stats (QuestLog pattern).
+
+    Builds a per-user stats bundle (task completion rate, XP/level, upcoming
+    deadlines, habit streaks), sends it to the provider through the TTL cache
+    (``services.ai_cache``), and falls back to a deterministic local analysis
+    when AI is disabled. Repeated calls within the TTL return instantly with
+    ``cached=True`` — no provider spend, no latency.
+    """
+    from app.services.ai_insights import get_insights
+
+    user = db.query(User).first()
+    result = get_insights(db, user)
+    db.flush()
+    return result
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -237,7 +406,27 @@ def ai_chat(data: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
 
 
 @router.post("/grade-answer")
-def ai_grade_answer(data: GradeAnswerRequest) -> dict:
+def ai_grade_answer(
+    data: GradeAnswerRequest,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(_optional_user),
+) -> dict:
+    if data.mode == "advanced":
+        # Phase 7 (Idea 66): partial credit + structured feedback, persisted to
+        # learning events when the caller is authenticated.
+        from app.services.kb.grading import grade_answer
+
+        result = grade_answer(
+            db,
+            current_user.id if current_user else 0,
+            data.question,
+            data.expected,
+            data.answer,
+            topic_id=data.topic_id if current_user else None,
+        )
+        db.commit()
+        return {**result["grade"], "ai_used": result["ai_used"], "mode": "advanced"}
+
     prompt = (
         f'You are grading a student\'s flashcard answer. Question: "{data.question}"\n'
         f'Expected answer: "{data.expected}"\nStudent\'s answer: "{data.answer}"\n\n'

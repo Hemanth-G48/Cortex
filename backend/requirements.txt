@@ -9,3 +9,30 @@ pypdf
 python-docx
 httpx
 numpy
+python-frontmatter
+# Local embeddings (fastembed/ONNX, no PyTorch) — used when
+# EMBEDDINGS_BACKEND=fastembed. Import-guarded in embeddings.py, so the app
+# works without it (falls back to deterministic hashes).
+#
+# CPU-only machines: pin fastembed (onnxruntime CPU).
+#   fastembed
+#
+# NVIDIA GPU machines: use fastembed-gpu + the CUDA-12 onnxruntime build from
+# the NVIDIA aiinfra index plus the pip-shipped CUDA runtime libs. The PyPI
+# onnxruntime-gpu wheel is built for CUDA 13 and needs system CUDA libs, so the
+# aiinfra CUDA-12 wheel is pinned below (a plain `pip install -r requirements.txt`
+# then also runs the pinned URL — see the URL entry at the bottom).
+#   pip install fastembed-gpu
+#   pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 nvidia-cuda-runtime-cu12 \
+#       nvidia-curand-cu12 nvidia-cufft-cu12
+# embeddings.py preloads the venv-shipped CUDA libs automatically.
+fastembed-gpu
+# CUDA-12 onnxruntime-gpu build (NVIDIA aiinfra index) — overrides the PyPI
+# CUDA-13 wheel so no system CUDA toolkit/cuDNN is required.
+onnxruntime-gpu @ https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/onnxruntime_gpu/1.28.0/onnxruntime_gpu-1.28.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+
+# ── Optional Second Brain OCR (Idea 6) — import-guarded, nothing breaks when
+#    absent. Requires system binaries too: tesseract-ocr and poppler-utils.
+# pytesseract
+# pdf2image
+# Pillow

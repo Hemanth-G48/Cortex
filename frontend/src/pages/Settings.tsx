@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Header } from '../components/layout/Header';
 import { endpoints } from '../services/api';
-import type { AIHealth, User } from '../services/api';
+import type { AIHealth } from '../services/api';
 import GoogleSyncCard from '../components/settings/GoogleSyncCard';
+import AIProviderSettings from '../components/settings/AIProviderSettings';
+import ModelPicker from '../components/settings/ModelPicker';
+import { LearningPreferences } from '../components/kb/LearningPreferences';
+import { useAuth } from '../hooks/useAuth';
 
 const AI_MODEL_KEY = 'slos-ai-model';
 
@@ -16,21 +20,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export const Settings = () => {
-  const [user, setUser] = useState<User | null>(null);
+  // Use the authenticated user from AuthContext (see Header.tsx note about
+  // why the legacy ``endpoints.login()`` first-user call was removed).
+  const { user } = useAuth();
   const [aiHealth, setAiHealth] = useState<AIHealth | null>(null);
   const [aiModels, setAiModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem(AI_MODEL_KEY) ?? '');
   const [exporting, setExporting] = useState(false);
 
-  const loadUser = useCallback(() => {
-    endpoints.login().then((r) => setUser(r.user)).catch(() => {});
-  }, []);
-
   useEffect(() => {
-    loadUser();
     endpoints.ai.health().then(setAiHealth).catch(() => setAiHealth(null));
     endpoints.ai.models().then((r) => setAiModels(r.models)).catch(() => setAiModels([]));
-  }, [loadUser]);
+  }, []);
 
   const saveModel = (model: string) => {
     setSelectedModel(model);
@@ -94,42 +95,61 @@ export const Settings = () => {
         </Section>
 
         <Section title="🤖 AI">
+          <AIProviderSettings />
           <div className="settings-ai">
             <div className="stat-row">
               <span className={`badge ${aiHealth?.available ? 'badge-success' : 'badge-muted'}`}>
-                {aiHealth?.available ? `AI enabled · ${aiHealth.model ?? 'default model'}` : 'AI offline — using deterministic fallbacks'}
+                {aiHealth?.available
+                  ? `AI enabled · ${aiHealth.model ?? aiHealth.active_provider?.model ?? 'default model'}${aiHealth.active_provider ? ` via ${aiHealth.active_provider.name}` : ''}`
+                  : 'AI offline — using deterministic fallbacks'}
               </span>
               {aiHealth?.available && aiHealth.mode ? <span className="muted">mode: {aiHealth.mode}</span> : null}
             </div>
             {aiModels.length > 0 && (
               <div className="field-row">
-                <label htmlFor="ai-model">Model override (stored locally)</label>
-                <select id="ai-model" value={selectedModel} onChange={(e) => saveModel(e.target.value)}>
-                  <option value="">Use backend default</option>
-                  {aiModels.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                <label htmlFor="ai-model">
+                  Model override{' '}
+                  <span className="muted">({aiModels.length} models — dropdown, type to search)</span>
+                </label>
+                <ModelPicker
+                  models={aiModels}
+                  value={selectedModel}
+                  defaultModel={aiHealth?.model ?? null}
+                  placeholder={`Search ${aiModels.length} models… (e.g. auto/best-free)`}
+                  onSelect={saveModel}
+                />
+                {selectedModel && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    title="Reset to the backend default model"
+                    onClick={() => saveModel('')}
+                  >
+                    ✕ Reset to default
+                  </button>
+                )}
               </div>
             )}
             <p className="muted settings-hint">
               Every AI feature falls back to a deterministic local generator when the provider is unreachable, so
-              the app always works offline.
+              the app always works offline. Manage providers above — configure Ollama, LM Studio, or any
+              OpenAI-compatible endpoint and switch models without touching code.
             </p>
           </div>
         </Section>
 
         <GoogleSyncCard />
 
+        <Section title="🎓 Learning Preferences">
+          <LearningPreferences />
+        </Section>
+
         <Section title="🎨 Appearance">
           <div className="settings-row">
             <div>
               <div>Theme</div>
-              <div className="muted">Dark theme (more themes coming soon)</div>
+              <div className="muted">Use the theme switcher in the sidebar to choose between available themes.</div>
             </div>
-            <span className="badge badge-info">Dark</span>
           </div>
         </Section>
 

@@ -1,14 +1,12 @@
-import { useEffect, useState } from 'react';
-import { endpoints } from '../../services/api';
-import type { User } from '../../services/api';
 import { NotificationsBell } from '../NotificationsBell';
+import { useAuth } from '../../hooks/useAuth';
 
 export const Header = ({ title }: { title: string }) => {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    endpoints.login().then((r) => setUser(r.user)).catch(() => {});
-  }, []);
+  // Use the authenticated user (AuthContext) rather than the legacy
+  // no-body ``/auth/login`` (first-user) call — the latter would silently
+  // overwrite the stored token with the first user's on every page load,
+  // breaking multi-user sessions.
+  const { user } = useAuth();
 
   return (
     <header className="header">

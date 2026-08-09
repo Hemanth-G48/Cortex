@@ -41,9 +41,24 @@ import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
 import { Reading } from './pages/Reading';
+import { KnowledgeBase } from './pages/KnowledgeBase';
+import { KnowledgeGraph } from './pages/KnowledgeGraph';
+import { VaultSearch } from './pages/VaultSearch';
+import { KbInsights } from './pages/KbInsights';
+import { Tutor } from './pages/Tutor';
+import { Practice } from './pages/Practice';
+import { Mocks } from './pages/Mocks';
+import { Interview } from './pages/Interview';
+import { Skills } from './pages/Skills';
+import { FlashcardReview } from './pages/FlashcardReview';
+import { Leaderboard } from './pages/Leaderboard';
+import { QualityList } from './pages/QualityList';
+import { CommandPalette } from './components/kb/CommandPalette';
 import { Teacher } from './pages/Teacher';
 import { Browse } from './pages/Browse';
 import { Subject } from './pages/Subject';
+import { Subjects } from './pages/Subjects';
+import { SubjectWorkspace } from './pages/SubjectWorkspace';
 import { Unit } from './pages/Unit';
 import { Admin } from './pages/Admin';
 import { CompleteProfile } from './pages/CompleteProfile';
@@ -52,6 +67,7 @@ import { AuthProvider } from './context/AuthContext';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ShortcutModal } from './components/ShortcutModal';
 import { QuickCapture } from './components/QuickCapture';
+import { InstallBanner } from './components/InstallBanner';
 
 function App() {
   return (
@@ -120,8 +136,23 @@ function AppShell() {
           <Route path="/fitness-hub" element={<FitnessHubDashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/reading" element={<Reading />} />
+          <Route path="/knowledge-base" element={<KnowledgeBase />} />
+          <Route path="/knowledge-graph" element={<KnowledgeGraph />} />
+          <Route path="/vault-search" element={<VaultSearch />} />
+          <Route path="/kb-insights" element={<KbInsights />} />
+          {/* ----- Phase 7: AI Tutor & Assessment (Ideas 61-70) ----- */}
+          <Route path="/tutor" element={<Tutor />} />
+          <Route path="/practice" element={<Practice />} />
+          <Route path="/mocks" element={<Mocks />} />
+          <Route path="/interview" element={<Interview />} />
+          <Route path="/skills" element={<Skills />} />
+          <Route path="/flashcard-review" element={<FlashcardReview />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/quality" element={<QualityList />} />
           <Route path="/teacher" element={<RoleGate role="teacher"><Teacher /></RoleGate>} />
           <Route path="/browse" element={<Browse />} />
+          <Route path="/subjects" element={<Subjects />} />
+          <Route path="/subjects/profiles/:id" element={<SubjectWorkspace />} />
           <Route path="/subjects/:id" element={<Subject />} />
           <Route path="/units/:id" element={<Unit />} />
           <Route path="/admin" element={<RoleGate role="admin"><Admin /></RoleGate>} />
@@ -129,8 +160,10 @@ function AppShell() {
         </Routes>
       </main>
       <AIChat />
+      <CommandPalette />
       <QuickCapture open={captureOpen} onOpenChange={setCaptureOpen} />
       <ShortcutModal open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
+      <InstallBanner />
     </div>
   );
 }

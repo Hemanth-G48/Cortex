@@ -22,6 +22,7 @@ export const SHORTCUTS: { key: string; label: string; path: string }[] = [
 
 export const GLOBAL_SHORTCUTS = [
   { key: 'Ctrl+K', label: 'Open AI Chat' },
+  { key: 'Ctrl+Shift+K', label: 'Global search' },
   { key: 'Ctrl+Shift+A', label: 'Quick add assignment' },
   { key: '?', label: 'Show this help' },
 ];
@@ -43,9 +44,10 @@ export const useKeyboardShortcuts = ({ onShortcutHelp, onQuickCapture }: Options
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
 
-      // Ctrl/Cmd-based globals
+      // Ctrl/Cmd-based globals. Ctrl+Shift+K is reserved for the global
+      // search palette (Phase 3, Idea 30) — only plain Ctrl+K toggles AI chat.
       if (e.ctrlKey || e.metaKey) {
-        if (e.key.toLowerCase() === 'k') {
+        if (e.key.toLowerCase() === 'k' && !e.shiftKey) {
           e.preventDefault();
           toggleAIChat();
           return;

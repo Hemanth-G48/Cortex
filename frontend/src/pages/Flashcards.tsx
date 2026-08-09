@@ -43,6 +43,9 @@ export const Flashcards = () => {
 
   const [aiMode, setAiMode] = useState('Offline');
   const [xpEarned, setXpEarned] = useState(0);
+  const [dueCounts, setDueCounts] = useState<Record<string, number>>({});
+  const [gradingBusy, setGradingBusy] = useState(false);
+  const [lastGraded, setLastGraded] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -50,6 +53,8 @@ export const Flashcards = () => {
       setDecks(d);
       const n = await endpoints.notes.list().catch(() => []);
       setNotes(n);
+      const dc = await endpoints.flashcards.dueCounts().catch(() => ({ counts: {} }));
+      setDueCounts(dc.counts);
     } catch {
       /* silent */
     }
@@ -179,6 +184,37 @@ export const Flashcards = () => {
     setGradeResult(null);
   };
 
+  // ── FSRS grading (Idea 52 — vendored py-fsrs) ──
+  const gradeButtons = [
+    { grade: 0, label: 'Again', color: 'var(--danger)' },
+    { grade: 2, label: 'Hard', color: 'var(--warning)' },
+    { grade: 3, label: 'Good', color: 'var(--success)' },
+    { grade: 5, label: 'Easy', color: 'var(--info)' },
+  ] as const;
+
+  const handleGrade = async (grade: number) => {
+    if (!studyDeck) return;
+    const card = studyDeck.cards[cardIndex];
+    if (!card) return;
+    setGradingBusy(true);
+    setLastGraded(null);
+    try {
+      const res = await endpoints.flashcards.review(studyDeck.id, card.id, grade);
+      const label = gradeButtons.find((g) => g.grade === grade)?.label ?? '';
+      setLastGraded(
+        `${label} → next review ${res.schedule.interval_days > 0 ? `in ${res.schedule.interval_days}d` : 'today'}`,
+      );
+      // Wrap to the next card (the graded card is rescheduled away).
+      setCardIndex((i) => (i + 1) % studyDeck.cards.length);
+      setFlipped(false);
+    } catch {
+      /* silent */
+    } finally {
+      setGradingBusy(false);
+      void refresh();
+    }
+  };
+
   // ── Study mode ──
   if (studyDeck) {
     const cards = studyDeck.cards;
@@ -296,6 +332,42 @@ export const Flashcards = () => {
                   <button type="button" className="btn btn-ghost" onClick={() => setFlipped(false)}>↺ Flip Back</button>
                   <button type="button" className="btn btn-primary" onClick={nextCard} disabled={cardIndex === cards.length - 1}>Next →</button>
                 </div>
+
+                {flipped && (
+                  <>
+                    <div
+                      style={{
+                        marginTop: '1.1rem',
+                        paddingTop: '1.1rem',
+                        borderTop: '1px dashed var(--border)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                        HOW WELL DID YOU KNOW IT?
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        {gradeButtons.map((g) => (
+                          <button
+                            key={g.label}
+                            type="button"
+                            className="btn btn-sm"
+                            disabled={gradingBusy}
+                            onClick={() => void handleGrade(g.grade)}
+                            style={{ color: g.color, borderColor: g.color, background: `${g.color}1a` }}
+                          >
+                            {g.label}
+                          </button>
+                        ))}
+                      </div>
+                      {lastGraded && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                          🧠 {lastGraded}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -479,7 +551,14 @@ export const Flashcards = () => {
           {decks.map((d) => (
             <div key={d.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ fontSize: '1.5rem' }}>🃏</div>
-              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{d.name}</div>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {d.name}
+                {(dueCounts[d.id] ?? 0) > 0 && (
+                  <span className="badge" style={{ color: 'var(--info)', background: 'var(--info-muted)', fontSize: '0.62rem' }}>
+                    ⏳ {dueCounts[d.id]} due
+                  </span>
+                )}
+              </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{d.card_count} cards</div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button type="button" className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => void loadDeck(d.id)}>

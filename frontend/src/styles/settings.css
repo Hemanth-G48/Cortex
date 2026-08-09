@@ -71,6 +71,96 @@
   min-width: 240px;
 }
 
+/* ── Model picker (searchable dropdown for large catalogs) ── */
+
+.model-picker {
+  position: relative;
+  min-width: 300px;
+  max-width: 420px;
+}
+
+.model-picker-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.model-picker-input {
+  width: 100%;
+  padding-right: 2.1rem;
+}
+
+.model-picker-arrow {
+  position: absolute;
+  right: 0.15rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
+}
+
+.model-picker-arrow:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.model-picker-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.model-picker-option {
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.12s, color 0.12s;
+}
+
+.model-picker-option:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.model-picker-option.highlighted {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.model-picker-default {
+  color: var(--accent);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+}
+
+.model-picker-empty {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .settings-ai .stat-row {
   margin-bottom: 0.25rem;
 }
@@ -422,4 +512,102 @@
   font-family: monospace;
   font-size: 0.72rem;
   color: var(--info);
+}
+
+/* ── AI Provider settings (configurable AI models) ── */
+
+.ai-provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.ai-provider-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+  background: var(--bg-primary);
+}
+
+.ai-provider-card.is-default {
+  border-color: var(--success);
+  background: var(--success-muted);
+}
+
+.ai-provider-card.is-disabled {
+  opacity: 0.6;
+}
+
+.ai-provider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ai-provider-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.ai-provider-meta {
+  margin-top: 0.4rem;
+  font-size: 0.74rem;
+  word-break: break-all;
+}
+
+.ai-provider-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.1rem 0;
+}
+
+.ai-provider-form-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.ai-provider-form .field-row {
+  justify-content: flex-start;
+  gap: 1.25rem;
+}
+
+.ai-provider-form .field-row label {
+  min-width: 110px;
+}
+
+.ai-provider-form .field-row input[type='text'],
+.ai-provider-form .field-row input[type='password'] {
+  flex: 1;
+  max-width: 380px;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+
+.ai-provider-checks {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.85rem;
+}
+
+.ai-provider-check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.ai-provider-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }

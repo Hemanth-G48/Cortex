@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { dailyScheduleApi, type DailyScheduleItem } from '../../services/api';
-import { useAuth } from '../../hooks/useAuth';
 import { EmptyState } from '../shared/EmptyState';
 import { SkeletonCard } from '../shared/Skeleton';
 import { CategoryTag } from './CategoryTag';
@@ -12,7 +11,6 @@ interface DailyScheduleViewProps {
 }
 
 export const DailyScheduleView = ({ className = '' }: DailyScheduleViewProps) => {
-  const { } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
   const [items, setItems] = useState<DailyScheduleItem[]>([]);

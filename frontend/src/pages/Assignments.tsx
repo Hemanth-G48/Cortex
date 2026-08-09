@@ -44,7 +44,7 @@ export const Assignments = () => {
     endpoints.courses.list().then(setCourses).catch(() => {});
   }, [refresh]);
 
-  const courseName = (cid: number) => courses.find((c) => c.id === cid)?.title ?? '—';
+  const courseName = useCallback((cid: number) => courses.find((c) => c.id === cid)?.title ?? '—', [courses]);
 
   const filtered = useMemo(() => {
     const visible =

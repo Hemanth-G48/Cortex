@@ -21,13 +21,41 @@ const { user } = vi.hoisted(() => {
   return { user };
 });
 
+vi.mock('../hooks/useAuth', () => ({
+  useAuth: vi.fn(() => ({
+    user,
+    token: 'tok',
+    role: 'student',
+    loading: false,
+    isAuthenticated: true,
+    login: vi.fn(),
+    signup: vi.fn(),
+    logout: vi.fn(),
+    refreshMe: vi.fn(),
+  })),
+}));
+
 vi.mock('../services/api', () => {
   return {
     endpoints: {
-      login: vi.fn().mockResolvedValue({ user }),
+      kb: {
+        preferences: {
+          get: vi.fn().mockResolvedValue({ depth: 'overview', style: 'concise' }),
+          update: vi.fn().mockResolvedValue({ depth: 'overview', style: 'concise' }),
+        },
+      },
       ai: {
-        health: vi.fn().mockResolvedValue({ available: true, mode: 'openai', model: 'oc/deepseek-v4-flash-free', models: [] }),
+        health: vi.fn().mockResolvedValue({ available: true, mode: 'openai', model: 'oc/deepseek-v4-flash-free', models: [], providers_count: 0 }),
         models: vi.fn().mockResolvedValue({ models: ['oc/deepseek-v4-flash-free', 'oc/gpt-4o-free'], enabled: true }),
+        providers: {
+          list: vi.fn().mockResolvedValue({ providers: [], active_id: null }),
+          create: vi.fn(),
+          update: vi.fn(),
+          remove: vi.fn(),
+          test: vi.fn(),
+          refreshModels: vi.fn(),
+          setDefault: vi.fn(),
+        },
       },
       google: {
         connect: vi.fn().mockResolvedValue({ url: 'https://accounts.google.com/o/oauth2/auth?...', error: null }),
@@ -85,13 +113,23 @@ describe('Settings', () => {
     expect(screen.getByText(/Connect Google/)).toBeInTheDocument();
   });
 
-  it('offers AI model override options from the backend', async () => {
+  it('offers a searchable model dropdown from the backend', async () => {
     render(<Settings />);
-    await waitFor(() => expect(screen.getByLabelText('Model override (stored locally)')).toBeInTheDocument());
-    const select = screen.getByLabelText('Model override (stored locally)') as HTMLSelectElement;
-    expect(select.options.length).toBe(3); // default + 2 models
+    await waitFor(() => expect(screen.getByLabelText(/Model override/)).toBeInTheDocument());
+    const input = screen.getByLabelText(/Model override/) as HTMLInputElement;
 
-    fireEvent.change(select, { target: { value: 'oc/gpt-4o-free' } });
+    // Focusing the field opens the dropdown with every model listed.
+    fireEvent.focus(input);
+    await waitFor(() => expect(screen.getByText(/^oc\/deepseek-v4-flash-free$/)).toBeInTheDocument());
+    expect(screen.getByText(/^oc\/gpt-4o-free$/)).toBeInTheDocument();
+
+    // Typing filters the list.
+    fireEvent.change(input, { target: { value: 'gpt' } });
+    expect(screen.queryByText(/^oc\/deepseek-v4-flash-free$/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^oc\/gpt-4o-free$/)).toBeInTheDocument();
+
+    // Selecting an option persists the override locally.
+    fireEvent.mouseDown(screen.getByText(/^oc\/gpt-4o-free$/));
     expect(localStorage.getItem('slos-ai-model')).toBe('oc/gpt-4o-free');
   });
 });

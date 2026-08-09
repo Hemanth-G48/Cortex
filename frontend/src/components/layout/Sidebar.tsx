@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { NavLinks } from '../widgets/NavLinks';
 import { ThemeSwitcher } from '../shared/ThemeSwitcher';
 import { DigitalClock } from '../widgets/DigitalClock';
@@ -18,7 +19,8 @@ interface HabitStat {
 }
 
 export const Sidebar = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<VaultSummary | null>(null);
   const [stats, setStats] = useState<HabitStat[]>([]);
   const [streakGraph, setStreakGraph] = useState<{ date: string; streak_length: number }[]>([]);
@@ -47,7 +49,25 @@ export const Sidebar = () => {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">🎓 Student OS</div>
-      {user && <div className="sidebar-user">{user.name} · {user.role ?? 'student'}</div>}
+      {user ? (
+        <div className="sidebar-user">
+          <span>{user.name} · {user.role ?? 'student'}</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            title="Log out"
+            onClick={() => {
+              void logout().finally(() => navigate('/login'));
+            }}
+          >
+            Log out
+          </button>
+        </div>
+      ) : (
+        <div className="sidebar-user">
+          <Link className="btn btn-primary btn-sm" to="/login">Sign in</Link>
+        </div>
+      )}
       <ThemeSwitcher />
       <NavLinks />
       <div className="sidebar-widgets">

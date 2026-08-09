@@ -7,8 +7,15 @@ const iso = (x: Date) => x.toISOString().split('T')[0];
 const todayD = iso(new Date());
 const monday = new Date(d);
 monday.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1));
-const wed = new Date(monday);
-wed.setDate(monday.getDate() + 3);
+// Pick a Mon..Sat day within this week that is NOT today, so the `today`
+// filter never accidentally matches the 'this week'/'no project' fixtures
+// (the previous Monday+3 choice made the test fail whenever today is Thursday).
+const weekDays = [1, 2, 3, 4, 5, 6].map((n) => {
+  const x = new Date(monday);
+  x.setDate(monday.getDate() + n);
+  return x;
+});
+const wed = weekDays.find((x) => iso(x) !== todayD) ?? weekDays[0];
 const nextMon = new Date(monday);
 nextMon.setDate(monday.getDate() + 7);
 

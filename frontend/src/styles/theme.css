@@ -88,6 +88,10 @@ a:hover { color: var(--accent-hover); }
   left: 0;
   height: 100vh;
   z-index: 100;
+  /* The nav is ~50 links long; without this the bottom groups
+     (System → Settings) are clipped below the fold and unreachable. */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar-logo {

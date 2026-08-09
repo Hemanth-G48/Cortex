@@ -8,8 +8,11 @@ import { RemindersList } from '../components/taskmanager/RemindersList';
 import { AcademicCalendar } from '../components/calendar/AcademicCalendar';
 import { BrainDumpWidget } from '../components/BrainDumpWidget';
 import { DayProgressWidget } from '../components/schedule/DayProgressWidget';
+import { TodayCaptures } from '../components/kb/TodayCaptures';
 import { EnrollmentBadge } from '../components/dashboard/EnrollmentBadge';
 import { CurriculumSection } from '../components/dashboard/CurriculumSection';
+import { NextUpCard } from '../components/kb/NextUpCard';
+import { AiInsightsCard } from '../components/kb/AiInsightsCard';
 
 export const Dashboard = () => {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -47,6 +50,21 @@ export const Dashboard = () => {
       <div className="page-section" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <BrainDumpWidget />
         <DayProgressWidget />
+      </div>
+
+      {/* QuestLog (Idea 95): cached AI productivity insights from real stats */}
+      <div className="page-section" style={{ maxWidth: 560 }}>
+        <AiInsightsCard />
+      </div>
+
+      {/* Phase 8 (Idea 75): single best cross-subject next action with reasons */}
+      <div className="page-section" style={{ maxWidth: 560 }}>
+        <NextUpCard />
+      </div>
+
+      {/* Phase 4 (Idea 35): what the vault captured today, joined with schedule + journal */}
+      <div className="page-section" style={{ maxWidth: 560 }}>
+        <TodayCaptures />
       </div>
 
       <div className="page-section" style={{ maxWidth: 420 }}>

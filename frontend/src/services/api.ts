@@ -25,6 +25,21 @@ export const api = {
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 
+/**
+ * Download a backend file that requires the Authorization header (e.g.
+ * BibTeX / mind-map exports) as a browser download.
+ */
+export async function downloadAsFile(url: string, filename: string): Promise<void> {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 // ----- Auth types -----
 export type UserRole = 'student' | 'teacher';
 
@@ -401,6 +416,472 @@ export interface DatabaseCounts {
   [key: string]: number;
 }
 
+// ----- Second Brain / Knowledge Base types (Phase 1) -----
+export type KbSourceType = 'vault_folder' | 'local_dir' | 'upload' | 'cloud';
+
+export type KbSyncType = 'none' | 'git' | 'drive' | 'clip';
+
+export interface KbSource {
+  id: number;
+  user_id: number;
+  name: string;
+  source_type: KbSourceType;
+  root_path: string | null;
+  enabled: boolean;
+  last_scanned_at: string | null;
+  files_seen: number;
+  files_added: number;
+  files_changed: number;
+  files_removed: number;
+  created_at: string | null;
+  document_count: number;
+  // Phase 9 (Idea 89): external sync adapter + per-source cursor.
+  sync_type: KbSyncType;
+  sync_cursor: Record<string, unknown> | null;
+}
+
+export type KbDocumentStatus = 'new' | 'changed' | 'unchanged' | 'deleted' | 'failed' | 'draft';
+
+export interface KbDocument {
+  id: number;
+  user_id: number;
+  source_id: number | null;
+  path_rel: string | null;
+  title: string | null;
+  doc_type: string;
+  content_hash: string | null;
+  char_count: number;
+  frontmatter: Record<string, unknown> | null;
+  outline: { level: number; text: string; char_start: number }[] | null;
+  metadata: {
+    wikilinks?: string[];
+    tags?: string[];
+    callouts?: string[];
+    arxiv_id?: string;
+    authors?: string[];
+    abstract?: string;
+  } | null;
+  ocr_used: boolean;
+  needs_ocr: boolean;
+  status: KbDocumentStatus;
+  doc_date: string | null;
+  // Phase 2 metadata fields (Idea 13)
+  author: string | null;
+  source_url: string | null;
+  language: string | null;
+  reading_time_seconds: number | null;
+  // Phase 2 dirty flags (Idea 20)
+  embedding_dirty: boolean;
+  graph_dirty: boolean;
+  tags_dirty: boolean;
+  // Phase 4 note-quality cache (Idea 39)
+  quality_score: number | null;
+  quality_detail: Record<string, unknown> | null;
+  // Phase 9 (Idea 86): summary stale flag consumed by the nightly job.
+  summary_dirty: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+  indexed_at: string | null;
+  chunk_count: number;
+}
+
+export interface KbChunk {
+  id: number;
+  document_id: number;
+  seq: number;
+  content: string;
+  char_start: number;
+  char_end: number;
+  heading_path: string | null;
+  token_estimate: number;
+}
+
+export type KbJobStatus = 'queued' | 'running' | 'done' | 'failed' | 'interrupted';
+
+export interface KbJob {
+  id: number;
+  user_id: number;
+  job_type: string;
+  status: KbJobStatus;
+  total_items: number;
+  processed_items: number;
+  error: string | null;
+  ref_type: string | null;
+  ref_id: number | null;
+  created_at: string | null;
+  finished_at: string | null;
+  summary: Record<string, number> | null;
+}
+
+export interface KbScanResult {
+  job: KbJob;
+  summary: Record<string, number> | null;
+}
+
+export interface KbDocumentListResponse {
+  items: KbDocument[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface KbUploadResult {
+  document: KbDocument | null;
+  deduped: boolean;
+  duplicate_of_id: number | null;
+}
+
+export interface KbVersion {
+  id: number;
+  document_id: number;
+  version_seq: number;
+  content_hash: string | null;
+  snapshot_text: string | null;
+  created_at: string | null;
+}
+
+export interface KbDiffResponse {
+  from_version: number;
+  to_version: number;
+  changed: boolean;
+  diff: string;
+}
+
+// ----- Second Brain Phase 2 types (Embeddings, Indexing & Knowledge Graph) -----
+export interface KbStats {
+  document_count: number;
+  chunk_count: number;
+  embedding_count: number;
+  embedded_documents: number;
+  tag_count: number;
+  concept_count: number;
+  edge_count: number;
+  duplicate_count: number;
+  total_tokens: number;
+  embeddings_today: number;
+  embeddings_limit: number;
+  inferences_today: number;
+  inference_limit: number;
+  dirty_documents: number;
+}
+
+export interface KbRelatedItem {
+  id: number;
+  title: string;
+  relation: string | null;
+  weight: number | null;
+  provenance?: string | null;
+  direction?: string | null;
+}
+
+export interface KbRelatedResponse {
+  document_id: number;
+  related: KbRelatedItem[];
+  method: string;
+}
+
+export interface KbTagSuggestion {
+  tag_id: number;
+  name: string;
+  provenance: string;
+  confidence: number;
+}
+
+export interface KbDocumentTagsResponse {
+  document_id: number;
+  tags: KbTagSuggestion[];
+}
+
+export interface KbConcept {
+  id: number;
+  canonical_name: string;
+  definition: string | null;
+  aliases: string[] | null;
+  document_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface KbDuplicateItem {
+  document_id: number;
+  duplicate_of_id: number;
+  similarity: number;
+  method: string;
+  created_at: string | null;
+}
+
+export interface KbDuplicatesResponse {
+  items: KbDuplicateItem[];
+  total: number;
+  method: string;
+}
+
+export interface KbMetadataUpdate {
+  author?: string | null;
+  source_url?: string | null;
+  language?: string | null;
+  reading_time_seconds?: number | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+// ----- Knowledge Graph types (Group 8, Phase 2) -----
+export type KbGraphNodeKind = 'document' | 'concept' | 'tag';
+
+export interface KbGraphNode {
+  id: string;
+  kind: KbGraphNodeKind;
+  label: string;
+  doc_type?: string | null;
+  status?: string | null;
+  degree: number;
+}
+
+export interface KbGraphEdge {
+  source: string;
+  target: string;
+  relation: string;
+  weight: number;
+  provenance: string;
+}
+
+export interface KbGraphResponse {
+  nodes: KbGraphNode[];
+  edges: KbGraphEdge[];
+  truncated: boolean;
+  total_nodes: number;
+  total_edges: number;
+}
+
+// ----- Second Brain Phase 3 types (Search & Retrieval, Ideas 21-30) -----
+export type KbSearchMode = 'keyword' | 'semantic' | 'hybrid';
+
+export interface KbSearchItem {
+  chunk_id: number;
+  document_id: number;
+  seq: number;
+  title: string;
+  snippet: string;
+  score: number;
+  mode: string;
+  source_path: string | null;
+  heading_path: string | null;
+  doc_type: string;
+  doc_date: string | null;
+  char_start: number;
+  char_end: number;
+  sources: string[] | null;
+}
+
+export interface KbSearchResponse {
+  items: KbSearchItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  mode: string;
+  original_query: string;
+  expanded_query: string;
+}
+
+export interface KbSearchEventItem {
+  id: number;
+  query: string;
+  mode: string;
+  clicked_id: number | null;
+  rating: number | null;
+  created_at: string | null;
+}
+
+export interface KbHealth {
+  score: number;
+  document_count: number;
+  edge_count: number;
+  signals: {
+    orphans: { count: number; document_ids: number[] };
+    dead_links: {
+      count: number;
+      edges: {
+        edge_id: number;
+        source_document_id: number | null;
+        target_document_id: number | null;
+        relation: string;
+      }[];
+    };
+    stale_notes: { count: number; document_ids: number[] };
+    unindexed_files: {
+      count: number;
+      documents: { document_id: number; missing: string[] }[];
+    };
+    coverage_gaps: { topic: string; covered: number; coverage: number }[];
+    // Phase 4 (Idea 39, phrase 90)
+    avg_quality?: { average: number; weight: number };
+  };
+}
+
+export interface KbGapItem {
+  topic: string;
+  coverage: number;
+  is_gap: boolean;
+}
+
+export interface KbGapsResponse {
+  items: KbGapItem[];
+  gaps: KbGapItem[];
+  threshold: number;
+  total: number;
+}
+
+// ----- Second Brain Phase 4 types (Note Intelligence & Content Generation, Ideas 31-40) -----
+export interface KbSummaryResponse {
+  document_id: number;
+  cached: boolean;
+  summary: {
+    content: string;
+    key_points: string[];
+    definitions: { term: string; definition: string }[];
+    open_questions: string[];
+  };
+}
+
+export interface KbExplainCitation {
+  chunk_id: number;
+  document_id: number | null;
+  title: string | null;
+  snippet: string;
+  source_path: string | null;
+  heading_path: string | null;
+}
+
+export interface KbExplainResponse {
+  concept: string;
+  depth: string;
+  explanation: string;
+  citations: KbExplainCitation[];
+  fallback: boolean;
+  document_ids: number[];
+}
+
+export interface KbFlashcardCandidate {
+  id: number;
+  document_id: number;
+  document_title?: string;
+  question: string;
+  answer: string;
+  source_chunk_id: number | null;
+  status: string;
+  // Phase 9 (Idea 85): manual | auto
+  source?: string;
+  created_at?: string | null;
+}
+
+export interface KbFlashcardGenerateResult {
+  document_id: number;
+  generated: number;
+  skipped_duplicates: number;
+  fallback: boolean;
+  candidates: KbFlashcardCandidate[];
+}
+
+export interface KbCitation {
+  id: number;
+  document_id: number | null;
+  cite_key: string;
+  title: string | null;
+  authors: string[];
+  year: number | null;
+  venue: string | null;
+  doi: string | null;
+  arxiv_id: string | null;
+  raw_text: string | null;
+  created_at?: string | null;
+}
+
+export interface KbMindMapNode {
+  id: string;
+  label: string;
+  children: KbMindMapNode[];
+  concepts: string[];
+  chunk_ids: number[];
+}
+
+export interface KbDailyNoteDoc {
+  id: number;
+  title: string;
+  doc_type: string;
+  char_count: number;
+  reading_time_seconds: number | null;
+  quality_score: number | null;
+}
+
+export interface KbDailyNoteSchedule {
+  id: number;
+  time_range: string;
+  activity: string;
+  category: string;
+  done: boolean;
+}
+
+export interface KbDailyNoteJournal {
+  id: number;
+  mood: string | null;
+  content: string;
+  tags: string | null;
+}
+
+export interface KbDailyNotes {
+  date: string;
+  documents: KbDailyNoteDoc[];
+  schedule: KbDailyNoteSchedule[];
+  journal: KbDailyNoteJournal[];
+}
+
+export interface KbQualitySuggestion {
+  id: number;
+  action: string;
+  detail: string | null;
+  status: string;
+}
+
+export interface KbQualityResult {
+  document_id: number;
+  score: number;
+  components: Record<string, number>;
+  weights: Record<string, number>;
+  computed_at?: string;
+  suggestions: KbQualitySuggestion[];
+}
+
+export interface KbQualityItem {
+  document_id: number;
+  title: string;
+  doc_type: string;
+  score: number;
+  components: Record<string, number>;
+  suggestions: number;
+}
+
+export interface KbLinksResponse {
+  document_id: number;
+  concepts: { concept_id: number; edge_id?: number; name: string; weight: number }[];
+  related: { id: number; edge_id?: number; title: string; relation: string; weight: number }[];
+}
+
+export interface GlobalSearchHit {
+  id: number;
+  title: string;
+  domain: string;
+  snippet: string;
+  url: string;
+  score: number;
+}
+
+export interface GlobalSearchResponse {
+  items: GlobalSearchHit[];
+  groups: Record<string, GlobalSearchHit[]>;
+  total: number;
+  query: string;
+  domains: string[];
+}
+
 export interface LifeArea {
   id: number; user_id: number; name: string;
   satisfaction_score: number; goal: string | null;
@@ -614,16 +1095,88 @@ export interface EisenhowerMatrix {
 }
 
 // ----- AI types (99-phase plan, Group 1) -----
+
+// Configurable AI provider (local-first provider registry).
+export type AIProviderType = 'custom' | 'openai' | 'ollama' | 'lmstudio' | 'anthropic' | 'google';
+
+export interface AIProviderConfig {
+  id: string;
+  name: string;
+  provider_type: AIProviderType;
+  is_local: boolean;
+  base_url: string;
+  has_api_key: boolean;
+  api_key_preview: string | null;
+  model: string | null;
+  models: string[];
+  enabled: boolean;
+  is_default: boolean;
+}
+
+export interface AIProviderTestResult {
+  ok: boolean;
+  message: string;
+  latency_ms?: number;
+  models?: string[];
+}
+
+export interface AIProvidersResponse {
+  providers: AIProviderConfig[];
+  active_id: string | null;
+}
+
 export interface AIHealth {
   available: boolean;
   mode: string;
   model: string | null;
   models: string[];
+  // Provider registry: which provider is active (masked) + count.
+  active_provider?: AIProviderConfig | null;
+  providers_count?: number;
+  // QuestLog (Idea 95): AI response cache status.
+  cache?: {
+    size: number;
+    hits: number;
+    misses: number;
+    enabled: boolean;
+    ttl_seconds: number;
+  };
+  // Phase 2 (Idea 11): embeddings capability.
+  embeddings?: {
+    available: boolean;
+    model: string | null;
+    dim: number;
+    batch_size: number;
+    backend: string;
+  };
+}
+
+export interface AIInsightsStats {
+  user: { level: number | null; total_xp: number; streak: number };
+  tasks: {
+    total: number;
+    completed: number;
+    completion_rate: number;
+    recent_completions: { title: string; subject: string | null; due_date: string | null }[];
+  };
+  assignments: { pending: number; upcoming: { title: string; due_date: string; status: string }[] };
+  exams: { upcoming_exams: { title: string; date: string }[] };
+  habits: { total: number; active_streaks: number; best_streak: number };
+}
+
+export interface AIInsightsResponse {
+  insights: string;
+  stats: AIInsightsStats;
+  cached: boolean;
+  ai_used: boolean;
 }
 
 export interface AIClientModels {
   models: string[];
   enabled: boolean;
+  // Provider registry extras (backwards-compatible).
+  active_provider?: AIProviderConfig | null;
+  providers?: AIProviderConfig[];
 }
 
 export interface AICompleteRequest {
@@ -757,6 +1310,55 @@ export interface Flashcard {
   streak: number;
   next_review: string | null;
   created_at: string | null;
+}
+
+// FSRS spaced-repetition state (Idea 52 — vendored py-fsrs).
+export interface FlashcardSchedule {
+  card_id: number;
+  next_review: string | null;
+  interval_days: number;
+  state: number | null;
+  stability: number | null;
+  fsrs_difficulty: number | null;
+  reps: number;
+  lapses: number;
+  streak: number;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  user_id: number;
+  name: string;
+  username: string | null;
+  avatar_class: string | null;
+  level: number;
+  current_streak: number;
+  total_xp: number;
+  me: boolean;
+}
+
+export interface LeaderboardMe {
+  user_id: number;
+  total_xp: number;
+  rank: number;
+  percentile: number;
+  total_users: number;
+}
+
+export interface LeaderboardResponse {
+  items: LeaderboardEntry[];
+  me: LeaderboardMe;
+}
+
+export interface DueFlashcard {
+  id: number;
+  deck_id: number;
+  front: string;
+  back: string;
+  difficulty: string;
+  next_review: string | null;
+  interval_days: number;
+  streak: number;
 }
 
 export interface FlashcardDeck {
@@ -1001,8 +1603,420 @@ export interface EnrollmentSummary {
   uploaded_materials: number;
 }
 
+// ----- Second Brain Phase 5 types (Subject Management Core, Ideas 41-50) -----
+export type SubjectProfileStatus = 'proposed' | 'confirmed' | 'rejected';
+
+export interface SubjectParsedUnit {
+  title: string;
+  description: string | null;
+  topics: { name: string; outcomes: string[] }[];
+  deadlines: string[];
+}
+
+export interface SubjectParsed {
+  title: string | null;
+  semester: string | null;
+  credits: number | null;
+  grading: string | null;
+  units: SubjectParsedUnit[];
+}
+
+export interface SubjectProfile {
+  id: number;
+  user_id: number;
+  curriculum_subject_id: number | null;
+  semester: string | null;
+  status: SubjectProfileStatus;
+  created_at: string | null;
+  updated_at: string | null;
+  parsed: SubjectParsed | null;
+  topics_count: number;
+  units_count: number;
+  raw_syllabus_text?: string | null;
+}
+
+export type TopicStatus = 'pending' | 'confirmed' | 'merged' | 'rejected';
+
+export interface TopicOutcome {
+  text: string;
+  status: 'pending' | 'done';
+  completed_at: string | null;
+}
+
+export interface TopicItem {
+  id: number;
+  subject_id: number;
+  unit_id: number | null;
+  name: string;
+  normalized_name: string;
+  bloom_level: string | null;
+  difficulty: string | null;
+  difficulty_confidence: number | null;
+  first_pass_mins: number | null;
+  review_mins: number | null;
+  mastery_mins: number | null;
+  outcomes: TopicOutcome[];
+  status: TopicStatus;
+}
+
+export interface UnitMatchCandidate {
+  title: string;
+  description: string | null;
+  candidate_unit_id: number | null;
+  candidate_title: string | null;
+  score: number;
+  match_type: 'name' | 'embedding' | 'none';
+}
+
+export interface DependencyGraphTopic {
+  id: number;
+  name: string;
+  normalized_name: string;
+  status: TopicStatus;
+  unit_id: number | null;
+}
+
+export interface DependencyEdge {
+  id: number;
+  prereq_topic_id: number;
+  postreq_topic_id: number;
+  weight: number;
+  provenance: string;
+}
+
+export interface DependencyGraph {
+  subject_id: number;
+  topics: DependencyGraphTopic[];
+  edges: DependencyEdge[];
+}
+
+export interface RoadmapWeek {
+  week: number;
+  topic_ids: number[];
+  topics: string[];
+  est_mins: number;
+}
+
+export interface RoadmapItem {
+  id: number;
+  subject_id: number;
+  version: number;
+  status: string;
+  plan: { weekly_budget_minutes: number; weeks: RoadmapWeek[] };
+  created_at: string | null;
+}
+
+export interface TimeBudgetResponse {
+  items: TopicItem[];
+  pacing_multiplier: number;
+  total_first_pass_mins: number;
+  total_mins: number;
+}
+
+// ----- Second Brain Phase 8 types (Personalization & Learning Memory, Ideas 71-80) -----
+export interface UserPreference {
+  depth: 'overview' | 'deep_dive';
+  examples_vs_theory: number;
+  style: 'concise' | 'detailed';
+  session_length_mins: number;
+  explanation_style: 'plain' | 'analogy' | 'formal';
+  onboarding_completed: boolean;
+  updated_at?: string | null;
+}
+
+export interface KbConceptGap {
+  concept_id: number;
+  concept: string;
+  definition: string | null;
+  score: number;
+  evidence: {
+    strength: number;
+    exposure_count: number;
+    quiz_errors: number;
+    retrieval_misses: number;
+  };
+  sources: { document_id: number; title: string }[];
+}
+
+export interface KbMemoryItem {
+  concept_id: number;
+  concept: string;
+  strength: number;
+  exposure_count: number;
+  last_seen: string | null;
+  source: string;
+}
+
+export interface KbRecommendItem {
+  topic_id: number;
+  topic_name: string;
+  subject_id: number;
+  score: number;
+  ready: boolean;
+  blocked_by: number[];
+  session_length_mins: number;
+  reasons: Record<string, number>;
+}
+
+export interface KbConnectSuggestion {
+  document_id: number;
+  title: string;
+  shared_concepts: string[];
+  reasons: string[];
+  target_status: string;
+}
+
+export interface KbConnectSuggestionsResponse {
+  items: KbConnectSuggestion[];
+  contradiction_hints: number[];
+}
+
+export interface KbMissingNoteSuggestion {
+  id: number;
+  concept_id: number | null;
+  concept: string | number;
+  reason: string;
+  outline: string[];
+  linked_material_ids: number[];
+  status: 'suggested' | 'accepted' | 'dismissed';
+}
+
+export interface KbOutdatedNote {
+  id: number;
+  document_id: number;
+  title: string;
+  reason: 'contradiction' | 'stale' | 'material_changed';
+  evidence: Record<string, unknown> | null;
+  status: 'open' | 'updated' | 'archived' | 'dismissed';
+  created_at: string | null;
+}
+
+export interface KbPersonalizedExplainResponse extends KbExplainResponse {
+  anchors: string[];
+  personalized: boolean;
+}
+
+export interface KbAdaptation {
+  roadmap_id: number | null;
+  version: number | null;
+  status: string | null;
+  topic_ids: number[];
+  diff: {
+    added_reviews: number;
+    added_topic_ids: number[];
+    removed_topics: number[];
+    removed_topic_ids: number[];
+    reordered: number[];
+    reason: string;
+    reasons: string[];
+  };
+}
+
+// ----- Second Brain Phase 9 types (Automation, Ideas 81-90) -----
+export interface KbAutomationJob {
+  name: string;
+  enabled: boolean;
+  toggle: string;
+  cap: number | null;
+  budget_kind: string | null;
+  description: string;
+}
+
+export interface KbAutomationRunResult {
+  job?: string;
+  job_id?: number;
+  status?: string;
+  skipped?: boolean;
+  reason?: string;
+  results?: { job: string; skipped?: boolean; reason?: string }[];
+  count?: number;
+}
+
+export interface KbSourceSyncResult {
+  source_id: number;
+  sync_type?: string;
+  changes?: number;
+  imported?: number;
+  unchanged?: number;
+  skipped_stale?: number;
+  failed?: number;
+  skipped?: boolean;
+  reason?: string;
+}
+
+export interface KbSourceSyncStatus {
+  source_id: number;
+  name: string;
+  sync_type: string;
+  last_scanned_at: string | null;
+  cursor: Record<string, unknown>;
+}
+
+// ----- Second Brain Phase 10 types (Advanced AI, Analytics & Platform, Ideas 91-100) -----
+export interface KbAgentStep {
+  agent: string;
+  status?: string;
+  output?: Record<string, unknown>;
+  error?: string | null;
+  latency_ms?: number;
+}
+
+export interface KbAgentRun {
+  id?: number;
+  run_id?: number;
+  request: string;
+  status?: string;
+  plan?: { agent: string; inputs: Record<string, unknown>; expected_output?: string; budget?: number }[];
+  steps?: KbAgentStep[];
+  result?: string | null;
+  latency_ms?: number;
+  cost_estimate?: number;
+  created_at?: string | null;
+}
+
+export interface KbMemoryEpisode {
+  id: number;
+  event_type: string;
+  summary: string;
+  refs: Record<string, unknown> | null;
+  created_at: string | null;
+}
+
+export interface KbMemoryTimeline {
+  episodes: KbMemoryEpisode[];
+  durable_facts: { concept: string; strength: number }[];
+  total: number;
+}
+
+export interface KbContextBundle {
+  active_subject: { subject_id: number | null; subject_name: string | null } | null;
+  upcoming_exams: { exam_id: number; title: string; subject_id: number; days_until: number; date: string }[];
+  recent_topics: { topic_id: number; topic_name: string; subject_id: number | null }[];
+  question_history: { attempts_7d: number; avg_accuracy_7d: number | null };
+  session_length_mins: number;
+  memory: { concepts_known: number; anchors: number; concept_rows: number };
+  override: Record<string, unknown>;
+}
+
+export interface KbResearchContribution {
+  statement: string;
+  novelty?: string;
+  limitation?: string;
+}
+
+export interface KbRelatedPaper {
+  document_id: number;
+  title: string | null;
+  doc_type: string;
+  score: number;
+  signals: { shared_concepts: number; title_overlap: number; shared_citations: number };
+}
+
+export interface KbResearchExplainResult {
+  document_id: number;
+  title: string | null;
+  summary: { content: string; key_points: string[]; definitions: unknown[]; open_questions: string[] } | null;
+  cached?: boolean;
+  contributions: KbResearchContribution[];
+  related: KbRelatedPaper[];
+  synthesis: {
+    answer: string;
+    faithfulness_score: number;
+    ai_used: boolean;
+    citations: { chunk_id: number; document_id: number | null; title: string | null; source_path: string | null }[];
+    grounded: boolean;
+  } | null;
+}
+
+export type KbRecommendationDomain = 'study' | 'revisit' | 'read' | 'practice';
+
+export interface KbRecommendationItem {
+  id: string;
+  domain: KbRecommendationDomain;
+  target: number;
+  title: string;
+  reason: string;
+  score: number;
+  urgency: number;
+  weakness: number;
+  readiness: number;
+}
+
+export interface KbReflection {
+  id: number;
+  week_start: string;
+  content: string;
+  insights: { worked: string[]; struggled: string[]; change: string[]; insights: string[] };
+  created_at: string | null;
+  pushed?: boolean;
+}
+
+export interface KbDerivedGoal {
+  subject_id: number;
+  title: string;
+  quarter: string;
+  year: number;
+  target_date: string;
+  roadmap_id?: number | null;
+}
+
+export interface KbGoalItem {
+  id: number;
+  title: string;
+  quarter: string;
+  year: number;
+  subject_id: number | null;
+  roadmap_id: number | null;
+  target_date: string | null;
+  progress_percentage: number;
+  is_completed: boolean;
+}
+
+export interface KbForecastPoint {
+  date: string;
+  value: number;
+  events: number;
+  ewma?: number;
+}
+
+export interface KbForecast {
+  subject_id: number;
+  points: KbForecastPoint[];
+  model: string;
+  forecast: number;
+  readiness: number;
+  at_risk: boolean;
+  risk_threshold?: number;
+  exam_days_until: number | null;
+  series_points: number;
+}
+
+export interface KbObservabilityPayload {
+  total: number;
+  cost_estimate: number;
+  tokens: number;
+  avg_latency_ms: number;
+  p95_latency_ms: number;
+  feedback: { positive: number; negative: number; neutral: number };
+  avg_faithfulness: number | null;
+  by_feature: Record<string, { count: number; cost_estimate: number; avg_latency_ms: number; feedback: number }>;
+  recent?: { id: number; feature: string; request: string | null; latency_ms: number; feedback: number; created_at: string | null }[];
+}
+
+export interface KbPromptVersion {
+  id: number;
+  feature: string;
+  version: number;
+  is_active: boolean;
+  template: string;
+  created_at: string | null;
+}
+
 // ----- API endpoint helpers -----
 export const endpoints = {
+  // LEGACY BOOT ONLY — no-body login returns the FIRST user and calls
+  // setToken(), overwriting any logged-in user's token. Do NOT use this in
+  // components; read the authenticated user from useAuth() instead.
   login: () => authApi.login().then((r) => ({ user: r.user })),
   curriculum: {
     institutions: () => api.get<Institution[]>('/curriculum/institutions'),
@@ -1118,6 +2132,21 @@ export const endpoints = {
       api.put<Flashcard>(`/flashcard-decks/${deckId}/cards/${cardId}`, d),
     deleteCard: (deckId: number, cardId: number) =>
       api.del<{ ok: boolean }>(`/flashcard-decks/${deckId}/cards/${cardId}`),
+    // FSRS spaced repetition (Idea 52 — vendored py-fsrs).
+    due: (deckId?: number) =>
+      api.get<{ items: DueFlashcard[]; count: number }>(
+        `/flashcard-decks/due${deckId ? `?deck_id=${deckId}` : ''}`,
+      ),
+    dueCounts: () => api.get<{ counts: Record<string, number> }>('/flashcard-decks/due-counts'),
+    review: (deckId: number, cardId: number, grade: number) =>
+      api.post<{ ok: boolean; schedule: FlashcardSchedule }>(
+        `/flashcard-decks/${deckId}/cards/${cardId}/review`,
+        { grade },
+      ),
+  },
+  // Leaderboard (adapted from Shiori-v1 / QuestLog).
+  leaderboard: {
+    list: (limit = 20) => api.get<LeaderboardResponse>(`/leaderboard?limit=${limit}`),
   },
   grades: {
     list: () => api.get<Grade[]>('/grades'),
@@ -1147,6 +2176,37 @@ export const endpoints = {
     gradeAnswer: (d: { question: string; expected: string; answer: string }) =>
       api.post<AIGradeAnswerResponse>('/ai/grade-answer', d),
     chat: (d: { message: string }) => api.post<AIChatResponse>('/ai/chat', d),
+    // QuestLog (Idea 95): cached productivity insights from real user stats.
+    insights: () => api.post<AIInsightsResponse>('/ai/insights'),
+    // Local-first provider registry (configurable AI models).
+    providers: {
+      list: () => api.get<AIProvidersResponse>('/ai/providers'),
+      create: (d: {
+        name: string;
+        provider_type: AIProviderType;
+        base_url?: string | null;
+        api_key?: string | null;
+        model?: string | null;
+        enabled?: boolean;
+        is_default?: boolean;
+      }) => api.post<AIProviderConfig>('/ai/providers', d),
+      update: (
+        id: string,
+        d: {
+          name?: string | null;
+          provider_type?: AIProviderType | null;
+          base_url?: string | null;
+          api_key?: string | null; // empty/None → leave unchanged
+          model?: string | null;
+          enabled?: boolean | null;
+          is_default?: boolean | null;
+        },
+      ) => api.put<AIProviderConfig>(`/ai/providers/${id}`, d),
+      remove: (id: string) => api.del<{ ok: boolean }>(`/ai/providers/${id}`),
+      test: (id: string) => api.post<AIProviderTestResult>(`/ai/providers/${id}/test`),
+      refreshModels: (id: string) => api.post<AIProviderConfig>(`/ai/providers/${id}/refresh-models`),
+      setDefault: (id: string) => api.post<AIProviderConfig>(`/ai/providers/${id}/default`),
+    },
   },
   courses: {
     list: () => api.get<Course[]>('/courses/'),
@@ -1399,7 +2459,662 @@ export const endpoints = {
     calendar: () => api.get<VaultCalendar>('/vault/calendar'),
     database: () => api.get<DatabaseCounts>('/vault/database'),
   },
+  // ----- Global unified search (Phase 3, Idea 30) -----
+  search: {
+    global: (q: string, domains?: string[]) =>
+      api.post<GlobalSearchResponse>('/search', { query: q, domains }),
+  },
+  // ----- Second Brain / Knowledge Base (Phase 1) -----
+  kb: {
+    sources: {
+      list: () => api.get<{ items: KbSource[]; total: number }>('/kb/sources'),
+      get: (id: number) => api.get<KbSource>(`/kb/sources/${id}`),
+      create: (d: { name: string; source_type?: string; root_path: string; enabled?: boolean; sync_type?: string }) =>
+        api.post<KbSource>('/kb/sources', d),
+      update: (id: number, d: { name?: string; source_type?: string; root_path?: string; enabled?: boolean; sync_type?: string }) =>
+        api.put<KbSource>(`/kb/sources/${id}`, d),
+      remove: (id: number) => api.del<{ ok: boolean; deleted_documents: number }>(`/kb/sources/${id}`),
+      scan: (id: number) => api.post<KbScanResult>(`/kb/sources/${id}/scan`),
+      // Phase 9 (Idea 89): external repo sync.
+      sync: (id: number) => api.post<KbSourceSyncResult>(`/kb/sources/${id}/sync`),
+      syncStatus: (id: number) => api.get<KbSourceSyncStatus>(`/kb/sources/${id}/sync-status`),
+    },
+    documents: {
+      list: (params?: { source_id?: number; status?: string; q?: string; page?: number; page_size?: number }) => {
+        const qs = new URLSearchParams();
+        if (params?.source_id) qs.set('source_id', String(params.source_id));
+        if (params?.status) qs.set('status', params.status);
+        if (params?.q) qs.set('q', params.q);
+        if (params?.page) qs.set('page', String(params.page));
+        if (params?.page_size) qs.set('page_size', String(params.page_size));
+        const q = qs.toString();
+        return api.get<KbDocumentListResponse>(`/kb/documents${q ? `?${q}` : ''}`);
+      },
+      get: (id: number) => api.get<KbDocument>(`/kb/documents/${id}`),
+      remove: (id: number) => api.del<{ ok: boolean }>(`/kb/documents/${id}`),
+      upload: (file: File, sourceId?: number) => {
+        const form = new FormData();
+        form.append('file', file);
+        return fetch(`${BASE}/kb/documents/upload${sourceId ? `?source_id=${sourceId}` : ''}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: form,
+        }).then((r) => {
+          if (!r.ok) throw new Error(`Upload ${r.status}: ${r.statusText}`);
+          return r.json();
+        }) as Promise<KbUploadResult>;
+      },
+      chunks: (id: number) => api.get<KbChunk[]>(`/kb/documents/${id}/chunks`),
+      versions: (id: number) => api.get<KbVersion[]>(`/kb/documents/${id}/versions`),
+      restore: (id: number, versionId: number) =>
+        api.post<{ document: KbDocument; new_version_seq: number }>(`/kb/documents/${id}/restore?version_id=${versionId}`),
+      diff: (id: number, fromVersion: number, toVersion: number) =>
+        api.get<KbDiffResponse>(`/kb/documents/${id}/diff?from_version=${fromVersion}&to_version=${toVersion}`),
+      reindex: (id: number) => api.post<KbJob>(`/kb/documents/${id}/reindex`),
+      // Phase 4 (Idea 40): file a braindump draft (title/source/tags → new).
+      file: (id: number, d: { title?: string; source_id?: number | null; tags?: string[] }) =>
+        api.post<KbDocument>(`/kb/documents/${id}/file`, d),
+      // Phase 4 (Idea 40): AI-assisted section splitting of a draft.
+      split: (id: number) =>
+        api.post<{ document_id: number; sections_applied: number; fallback: boolean; sections: { title: string; char_start: number }[] }>(
+          `/kb/documents/${id}/split`,
+        ),
+      // Phase 4 (Idea 37): aggregated concepts + related notes for the reader sidebar.
+      links: (id: number) => api.get<KbLinksResponse>(`/kb/documents/${id}/links`),
+    },
+    papers: {
+      import: (arxivId: string, sourceId?: number) =>
+        api.post<{ document: KbDocument; metadata_fetched: boolean }>('/kb/papers/import', {
+          arxiv_id: arxivId,
+          source_id: sourceId ?? null,
+        }),
+    },
+    jobs: {
+      list: () => api.get<{ items: KbJob[]; total: number }>('/kb/jobs'),
+      get: (id: number) => api.get<KbJob>(`/kb/jobs/${id}`),
+    },
+    graph: {
+      list: (params?: { source?: string; tag?: string; concept?: string; relation?: string; limit?: number }) => {
+        const qs = new URLSearchParams();
+        if (params?.source) qs.set('source', params.source);
+        if (params?.tag) qs.set('tag', params.tag);
+        if (params?.concept) qs.set('concept', params.concept);
+        if (params?.relation) qs.set('relation', params.relation);
+        if (params?.limit !== undefined) qs.set('limit', String(params.limit));
+        const q = qs.toString();
+        return api.get<KbGraphResponse>(`/kb/graph${q ? `?${q}` : ''}`);
+      },
+    },
+    stats: () => api.get<KbStats>('/kb/stats'),
+    related: {
+      list: (documentId: number, relation?: string, infer = true) => {
+        const qs = new URLSearchParams();
+        if (relation) qs.set('relation', relation);
+        qs.set('infer', String(infer));
+        return api.get<KbRelatedResponse>(`/kb/documents/${documentId}/related?${qs.toString()}`);
+      },
+    },
+    tags: {
+      forDocument: (documentId: number) => api.get<KbDocumentTagsResponse>(`/kb/documents/${documentId}/tags`),
+      apply: (documentId: number, tagIds: number[]) =>
+        api.post<KbDocumentTagsResponse>(`/kb/documents/${documentId}/tags`, {
+          document_id: documentId,
+          tag_ids: tagIds,
+        }),
+      reject: (documentId: number, tagId: number) =>
+        api.del<{ ok: boolean; removed: number }>(`/kb/documents/${documentId}/tags/${tagId}`),
+    },
+    concepts: {
+      list: (q = '', page = 1, pageSize = 50) =>
+        api.get<{ items: KbConcept[]; total: number; page: number; page_size: number }>(
+          `/kb/concepts?q=${encodeURIComponent(q)}&page=${page}&page_size=${pageSize}`,
+        ),
+    },
+    metadata: {
+      update: (documentId: number, d: KbMetadataUpdate) =>
+        api.put<Record<string, unknown>>(`/kb/documents/${documentId}/metadata`, d),
+    },
+    duplicates: {
+      list: () => api.get<KbDuplicatesResponse>('/kb/duplicates'),
+      scan: () => api.post<KbDuplicatesResponse>('/kb/duplicates/scan'),
+      merge: (keepId: number, mergeIds: number[]) =>
+        api.post<{ ok: boolean; merged: number }>('/kb/duplicates/merge', {
+          keep_id: keepId,
+          merge_ids: mergeIds,
+        }),
+      archive: (documentId: number) => api.post<{ ok: boolean }>(`/kb/duplicates/${documentId}/archive`),
+    },
+    reindex: {
+      source: (sourceId: number) => api.post<KbJob>(`/kb/admin/reindex?source_id=${sourceId}`),
+      documents: (documentIds: number[]) =>
+        api.post<KbJob>(`/kb/admin/reindex?document_ids=${documentIds.join(',')}`),
+      backfill: (sourceId?: number) =>
+        api.post<KbJob>(`/kb/admin/backfill${sourceId ? `?source_id=${sourceId}` : ''}`),
+    },
+    // ----- Phase 3: search & retrieval (Ideas 21-25, 29) -----
+    search: {
+      run: (q: string, opts?: { mode?: KbSearchMode; page?: number; page_size?: number }) =>
+        api.post<KbSearchResponse>('/kb/search', {
+          query: q,
+          mode: opts?.mode ?? 'hybrid',
+          page: opts?.page ?? 1,
+          page_size: opts?.page_size ?? 20,
+        }),
+      feedback: (d: { query: string; mode?: string; chunk_id?: number; clicked?: boolean; rating?: number }) =>
+        api.post<{ ok: boolean; event_id: number }>('/kb/search/feedback', d),
+      events: () => api.get<{ items: KbSearchEventItem[]; total: number }>('/kb/search/events'),
+      purge: () => api.del<{ ok: boolean; deleted: number }>('/kb/search/events'),
+    },
+    // ----- Phase 3: knowledge health & gaps (Ideas 27-28) -----
+    health: () => api.get<KbHealth>('/kb/health'),
+    gaps: {
+      all: () => api.get<KbGapsResponse>('/kb/gaps'),
+      concepts: (limit = 20) => api.get<{ items: KbConceptGap[] }>(`/kb/gaps/concepts?limit=${limit}`),
+    },
+    // ----- Phase 4: note intelligence & content generation (Ideas 31-40) -----
+    summaries: {
+      get: (documentId: number) => api.get<KbSummaryResponse>(`/kb/documents/${documentId}/summary`),
+      regenerate: (documentId: number) => api.post<KbSummaryResponse>(`/kb/documents/${documentId}/summary`),
+    },
+    explain: {
+      run: (d: { concept: string; depth?: string; document_ids?: number[] }) =>
+        api.post<KbExplainResponse>('/kb/explain', d),
+      personalized: (d: { concept: string; depth?: string; document_ids?: number[] }) =>
+        api.post<KbPersonalizedExplainResponse>('/kb/explain/personalized', d),
+    },
+    quizzes: {
+      generate: (documentId: number, numQuestions = 10, difficulty = 'medium') =>
+        api.post<Quiz & { document_id: number }>('/kb/quizzes', {
+          document_id: documentId,
+          num_questions: numQuestions,
+          difficulty,
+        }),
+      sourceDocument: (quizId: number) => api.get<KbDocument>(`/kb/quizzes/${quizId}/document`),
+    },
+    flashcards: {
+      generate: (documentId: number) =>
+        api.post<KbFlashcardGenerateResult>(`/kb/documents/${documentId}/flashcards`),
+      candidates: (status = 'pending') =>
+        api.get<{ items: KbFlashcardCandidate[] }>(`/kb/flashcards/candidates?status=${status}`),
+      review: (d: { approve?: number[]; reject?: number[]; deck_id?: number }) =>
+        api.post<{ approved: number; rejected: number; deck_id: number | null }>('/kb/flashcards/review', d),
+    },
+    dailyNotes: {
+      get: (date: string) => api.get<KbDailyNotes>(`/kb/daily-notes?date=${encodeURIComponent(date)}`),
+      today: () => api.get<KbDailyNotes>('/kb/daily-notes/today'),
+    },
+    citations: {
+      list: (params?: { year?: number; venue?: string }) => {
+        const qs = new URLSearchParams();
+        if (params?.year) qs.set('year', String(params.year));
+        if (params?.venue) qs.set('venue', params.venue);
+        const q = qs.toString();
+        return api.get<{ items: KbCitation[]; total: number }>(`/kb/citations${q ? `?${q}` : ''}`);
+      },
+      forDocument: (documentId: number) =>
+        api.get<{ items: KbCitation[]; total: number }>(`/kb/documents/${documentId}/citations`),
+      exportUrl: () => `${BASE}/kb/citations/export?format=bibtex`,
+    },
+    edges: {
+      create: (d: { source_document_id: number; target_id: number; relation?: string; target_type?: string }) =>
+        api.post<{ id: number; ok: boolean }>('/kb/edges', d),
+      remove: (edgeId: number) => api.del<{ ok: boolean }>(`/kb/edges/${edgeId}`),
+    },
+    mindmap: {
+      get: (documentId: number) => api.get<KbMindMapNode>(`/kb/documents/${documentId}/mindmap`),
+      exportUrl: (documentId: number, format: 'markdown' | 'opml') =>
+        `${BASE}/kb/documents/${documentId}/mindmap?format=${format}`,
+    },
+    quality: {
+      document: (documentId: number) => api.get<KbQualityResult>(`/kb/documents/${documentId}/quality`),
+      list: () => api.get<{ items: KbQualityItem[]; total: number }>('/kb/quality'),
+      generateSuggestions: (documentId: number) =>
+        api.post<{ document_id: number; generated: number; items: KbQualitySuggestion[] }>(
+          `/kb/documents/${documentId}/quality/suggestions`,
+        ),
+      dismissSuggestion: (suggestionId: number) =>
+        api.post<{ ok: boolean }>(`/kb/quality/suggestions/${suggestionId}/dismiss`),
+    },
+    // ----- Phase 7: AI Tutor & Assessment (Ideas 61-70) -----
+    tutor: {
+      chat: (d: { message: string; session_id?: number | null }) =>
+        api.post<TutorChatResponse>('/kb/tutor/chat', d),
+      doubt: (d: { question: string; step_where_stuck?: string | null }) =>
+        api.post<TutorDoubtResponse>('/kb/tutor/doubt', d),
+      sessions: () => api.get<{ items: TutorSessionItem[] }>('/kb/tutor/sessions'),
+    },
+    practice: {
+      generate: (d: { topic_id: number; count?: number; difficulty?: string }) =>
+        api.post<PracticeGenerateResponse>('/kb/practice/generate', d),
+      questions: (params?: { topic_id?: number; status?: string }) => {
+        const qs = new URLSearchParams();
+        if (params?.topic_id) qs.set('topic_id', String(params.topic_id));
+        if (params?.status) qs.set('status', params.status);
+        const q = qs.toString();
+        return api.get<{ items: PracticeQuestionItem[] }>(`/kb/practice/questions${q ? `?${q}` : ''}`);
+      },
+      approve: (id: number) => api.post<{ ok: boolean; question: PracticeQuestionItem }>(`/kb/practice/${id}/approve`),
+      reject: (id: number) => api.post<{ ok: boolean; question: PracticeQuestionItem }>(`/kb/practice/${id}/reject`),
+      session: (topicId: number) =>
+        api.post<PracticeSessionResponse>('/kb/practice/session', { topic_id: topicId }),
+      answer: (d: { topic_id: number; tier: string; correct: boolean }) =>
+        api.post<PracticeAnswerResponse>('/kb/practice/answer', d),
+      mistakeAnalysis: (d: { question_id: number; student_answer: string }) =>
+        api.post<MistakeAnalysisResponse>('/kb/practice/mistake-analysis', d),
+    },
+    mocks: {
+      build: (d: { subject_id: number; title?: string; question_count?: number; duration_mins?: number }) =>
+        api.post<{ mock: MockTestItem }>('/kb/mocks/build', d),
+      list: () => api.get<{ items: MockTestItem[] }>('/kb/mocks'),
+      start: (mockId: number) => api.post<{ attempt: MockAttemptItem }>(`/kb/mocks/${mockId}/start`),
+      submit: (attemptId: number, answers: Record<number, string>) =>
+        api.post<MockSubmitResponse>(`/kb/mocks/attempts/${attemptId}/submit`, { answers }),
+      attempts: (mockId: number) => api.get<{ items: MockAttemptItem[] }>(`/kb/mocks/${mockId}/attempts`),
+    },
+    interview: {
+      start: (d: { skill: string; level?: string }) =>
+        api.post<{ session: InterviewSession }>('/kb/interview/start', d),
+      answer: (sessionId: number, index: number, answer: string) =>
+        api.post<InterviewAnswerResponse>(`/kb/interview/${sessionId}/answer`, { index, answer }),
+      finish: (sessionId: number) =>
+        api.post<InterviewFinishResponse>(`/kb/interview/${sessionId}/finish`),
+    },
+    skills: {
+      map: (subjectId: number) => api.post<SkillsResponse>('/kb/skills/map', { subject_id: subjectId }),
+      profile: () => api.get<SkillsResponse>('/kb/skills'),
+      export: (fmt: 'markdown' | 'json' = 'markdown') =>
+        api.get<SkillsExportResponse>(`/kb/skills/export?fmt=${fmt}`),
+    },
+    // ----- Phase 8: Personalization & Learning Memory (Ideas 71-80) -----
+    preferences: {
+      get: () => api.get<UserPreference>('/users/me/preferences'),
+      update: (d: Partial<UserPreference>) => api.put<UserPreference>('/users/me/preferences', d),
+      nudge: (feedback: string) =>
+        api.post<{ provenance: string; changed: Record<string, unknown> }>('/kb/preferences/nudge', { feedback }),
+    },
+    memory: {
+      get: (limit = 200) => api.get<{ items: KbMemoryItem[] }>(`/kb/memory?limit=${limit}`),
+      bump: (d: { concept_ids: number[]; delta?: number; source?: string }) =>
+        api.post<{ touched: number[] }>('/kb/memory/bump', d),
+      decay: () => api.post<{ decayed: number }>('/kb/memory/decay'),
+      // Phase 10 (Idea 92): episodic long-term memory (timeline + consolidation).
+      timeline: (limit = 50) => api.get<KbMemoryTimeline>(`/kb/memory/timeline?limit=${limit}`),
+      consolidate: () => api.post<{ appended: number; episodes: number; facts: number; folded: number }>('/kb/memory/consolidate'),
+    },
+    recommend: {
+      next: (limit = 1) => api.get<{ items: KbRecommendItem[] }>(`/kb/recommend/next?limit=${limit}`),
+    },
+    connect: {
+      suggestions: (documentId: number) =>
+        api.get<KbConnectSuggestionsResponse>(`/kb/documents/${documentId}/connect-suggestions`),
+      confirm: (documentId: number, targetDocumentId: number, relation = 'RELATED') =>
+        api.post<{ edge_id: number | null; source_document_id: number; target_document_id: number; relation: string; provenance: string }>(
+          `/kb/documents/${documentId}/connect`,
+          { target_document_id: targetDocumentId, relation },
+        ),
+    },
+    missingNotes: {
+      list: (status = 'suggested') =>
+        api.get<{ items: KbMissingNoteSuggestion[] }>(`/kb/suggestions/missing-notes?status=${status}`),
+      generate: (limit = 10) =>
+        api.post<{ items: KbMissingNoteSuggestion[] }>(`/kb/suggestions/missing-notes?limit=${limit}`),
+      accept: (id: number) =>
+        api.post<{ suggestion_id: number; document_id: number; title: string; status: string }>(
+          `/kb/suggestions/${id}/accept`,
+        ),
+      dismiss: (id: number) => api.post<{ id: number; status: string }>(`/kb/suggestions/${id}/dismiss`),
+    },
+    outdated: {
+      scan: () => api.post<{ scanned: boolean; created: number; items: { id: number; document_id: number; reason: string; evidence: Record<string, unknown> }[] }>(
+        '/kb/outdated/scan',
+      ),
+      review: (status = 'open') =>
+        api.get<{ items: KbOutdatedNote[] }>(`/kb/outdated/review?status=${status}`),
+      resolve: (noteId: number, action: 'updated' | 'archived' | 'dismissed') =>
+        api.post<{ id: number; document_id: number; status: string }>(`/kb/outdated/${noteId}/resolve`, { action }),
+    },
+    adapt: {
+      // Backend AdaptRoadmapRequest accepts null for both fields.
+      roadmap: (profileId: number, d?: { weekly_budget?: number | null; deadline?: string | null }) =>
+        api.post<{ adaptation: KbAdaptation }>(`/subjects-ai/${profileId}/roadmap/adapt`, d ?? {}),
+    },
+    // ----- Phase 9: Automation (Ideas 81-90) -----
+    automation: {
+      jobs: () => api.get<{ jobs: KbAutomationJob[] }>('/kb/automation/jobs'),
+      run: (d: { mode: 'one' | 'all'; name?: string | null; force?: boolean }) =>
+        api.post<KbAutomationRunResult>('/kb/automation/run', d),
+    },
+    // ----- Phase 10: Advanced AI, Analytics & Platform (Ideas 91-100) -----
+    agents: {
+      run: (request: string) => api.post<KbAgentRun>('/kb/agents/run', { request }),
+      runs: () => api.get<{ items: KbAgentRun[] }>('/kb/agents/runs'),
+    },
+    context: {
+      get: () => api.get<KbContextBundle>('/kb/context'),
+      put: (d: { active_subject_id?: number | null; active_subject_name?: string | null }) =>
+        api.put<{ saved: Record<string, unknown>; bundle: KbContextBundle }>('/kb/context', d),
+    },
+    research: {
+      explain: (d: { document_id?: number; arxiv_id?: string; question?: string }) =>
+        api.post<KbResearchExplainResult>('/kb/research/explain', d),
+      related: (documentId: number, limit = 5) =>
+        api.get<{ document_id: number; items: KbRelatedPaper[] }>(`/kb/research/related?document_id=${documentId}&limit=${limit}`),
+    },
+    recommendations: {
+      list: (limit = 8) => api.get<{ items: KbRecommendationItem[]; total: number; weights: Record<string, number> }>(`/kb/recommendations?limit=${limit}`),
+      feedback: (itemId: string, action: 'accept' | 'skip') =>
+        api.post<{ ok: boolean; item_id: string; action: string }>(`/kb/recommendations/${itemId}/feedback`, { action }),
+    },
+    reflections: {
+      list: () => api.get<{ items: KbReflection[] }>('/kb/reflections'),
+      generate: () => api.post<KbReflection>('/kb/reflections/generate', {}),
+      adjust: () => api.post<{ applied: unknown[]; count: number }>('/kb/reflections/adjust'),
+      derivedGoals: () => api.get<{ items: KbDerivedGoal[] }>('/kb/goals/derived'),
+      confirmGoal: (d: KbDerivedGoal) => api.post<{ ok: boolean; goal_id: number }>('/kb/goals/derived/confirm', d),
+      goals: () => api.get<{ items: KbGoalItem[] }>('/kb/goals'),
+      goalProgress: (goalId: number) => api.get<{ goal_id: number; title: string; progress_percentage: number; topics_mastered: number; topics_total: number }>(`/kb/goals/${goalId}/progress`),
+    },
+    forecast: {
+      get: (subjectId: number) => api.get<KbForecast>(`/kb/forecast/${subjectId}`),
+      scan: () => api.post<{ processed: number; at_risk: number; alerted: number }>('/kb/forecast/scan'),
+    },
+    observability: {
+      dashboard: () => api.get<KbObservabilityPayload>('/kb/observability'),
+      report: () => api.get<{ week_start: string; aggregate: KbObservabilityPayload; top_failures: number; generated_at: string }>('/kb/observability/report'),
+      feedback: (logId: number, feedback: -1 | 0 | 1) =>
+        api.post<{ ok: boolean; log_id: number; feedback: number }>(`/kb/observability/${logId}/feedback`, { feedback }),
+      prompts: () => api.get<{ items: KbPromptVersion[] }>('/kb/prompts'),
+      pinPrompt: (d: { feature: string; template: string; version?: number | null }) =>
+        api.post<{ ok: boolean; feature: string; version: number; is_active: boolean }>('/kb/prompts', d),
+    },
+  },
+  // ----- Phase 5: Subject Management Core (Ideas 41-50) -----
+  subjects: {
+    import: (d: { text?: string; filename?: string }) =>
+      api.post<{ profile: SubjectProfile; fallback: boolean }>('/subjects/import', d),
+    importFile: (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      return fetch(`${BASE}/subjects/import-file`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: form,
+      }).then((r) => {
+        if (!r.ok) throw new Error(`Import ${r.status}: ${r.statusText}`);
+        return r.json();
+      }) as Promise<{ profile: SubjectProfile; fallback: boolean }>;
+    },
+    proposals: (status?: SubjectProfileStatus) =>
+      api.get<{ items: SubjectProfile[]; total: number }>(
+        `/subjects/proposals${status ? `?status=${status}` : ''}`,
+      ),
+    list: (params?: { semester?: string; status?: SubjectProfileStatus }) => {
+      const qs = new URLSearchParams();
+      if (params?.semester) qs.set('semester', params.semester);
+      if (params?.status) qs.set('status', params.status);
+      const q = qs.toString();
+      return api.get<{ items: SubjectProfile[]; total: number }>(`/subjects${q ? `?${q}` : ''}`);
+    },
+    get: (profileId: number) => api.get<SubjectProfile>(`/subjects/${profileId}`),
+    confirm: (profileId: number, d: { program_id?: number | null; name?: string; code?: string; credits?: number | null }) =>
+      api.post<{ profile: SubjectProfile }>(`/subjects/${profileId}/confirm`, d),
+    reject: (profileId: number) => api.post<{ ok: boolean; profile: SubjectProfile }>(`/subjects/${profileId}/reject`),
+    topics: {
+      generate: (profileId: number) =>
+        api.post<{ generated: number; fallback: boolean }>(`/subjects/${profileId}/topics/generate`),
+      list: (profileId: number, status?: TopicStatus) =>
+        api.get<{ items: TopicItem[] }>(`/subjects/${profileId}/topics${status ? `?status=${status}` : ''}`),
+      confirm: (profileId: number, topicId: number) =>
+        api.post<{ ok: boolean; topic: TopicItem }>(`/subjects/${profileId}/topics/${topicId}/confirm`),
+      reject: (profileId: number, topicId: number) =>
+        api.post<{ ok: boolean; topic: TopicItem }>(`/subjects/${profileId}/topics/${topicId}/reject`),
+      merge: (profileId: number, topicId: number, intoTopicId: number) =>
+        api.post<{ ok: boolean }>(`/subjects/${profileId}/topics/${topicId}/merge`, {
+          into_topic_id: intoTopicId,
+        }),
+      patch: (topicId: number, d: { difficulty?: string; first_pass_mins?: number; review_mins?: number; mastery_mins?: number }) =>
+        api.patch<{ ok: boolean; topic: TopicItem }>(`/subjects/topics/${topicId}`, d),
+      recompute: (topicId: number) =>
+        api.post<{ ok: boolean; topic: TopicItem }>(`/subjects/topics/${topicId}/recompute`),
+    },
+    matchUnits: {
+      list: (profileId: number, useEmbeddings = false) =>
+        api.get<{ items: UnitMatchCandidate[] }>(
+          `/subjects/${profileId}/match-units?use_embeddings=${useEmbeddings}`,
+        ),
+      confirm: (profileId: number, mapping: Record<string, number | null>) =>
+        api.post<{ ok: boolean; topics_assigned: number }>(`/subjects/${profileId}/match-units/confirm`, {
+          mapping,
+        }),
+    },
+    dependencies: {
+      get: (profileId: number) => api.get<DependencyGraph>(`/subjects/${profileId}/dependencies`),
+      generate: (profileId: number) =>
+        api.post<{ created: number }>(`/subjects/${profileId}/dependencies/generate`),
+      add: (profileId: number, prereqTopicId: number, postreqTopicId: number) =>
+        api.post<{ ok: boolean }>(`/subjects/${profileId}/dependencies`, {
+          prereq_topic_id: prereqTopicId,
+          postreq_topic_id: postreqTopicId,
+        }),
+      remove: (depId: number) => api.del<{ ok: boolean }>(`/subjects/dependencies/${depId}`),
+    },
+    roadmap: {
+      generate: (profileId: number, d: { weekly_budget?: number | null; deadline?: string | null }) =>
+        api.post<{ roadmap: RoadmapItem }>(`/subjects/${profileId}/roadmap/generate`, d),
+      get: (profileId: number) =>
+        api.get<{ roadmap: RoadmapItem | null }>(`/subjects/${profileId}/roadmap`),
+    },
+    timeBudget: (profileId: number) => api.get<TimeBudgetResponse>(`/subjects/${profileId}/time-budget`),
+    pacing: (multiplier: number) => api.put<{ ok: boolean; pacing_multiplier: number }>('/subjects/me/pacing', { multiplier }),
+    outcomes: {
+      get: (topicId: number) => api.get<{ topic_id: number; outcomes: TopicOutcome[] }>(`/subjects/topics/${topicId}/outcomes`),
+      add: (topicId: number, text: string) =>
+        api.post<{ ok: boolean; outcomes: TopicOutcome[] }>(`/subjects/topics/${topicId}/outcomes`, { text }),
+      expand: (topicId: number) =>
+        api.post<{ ok: boolean; outcomes: TopicOutcome[] }>(`/subjects/topics/${topicId}/outcomes/expand`),
+      complete: (topicId: number, index: number) =>
+        api.post<{ ok: boolean; outcomes: TopicOutcome[] }>(`/subjects/topics/${topicId}/outcomes/${index}/complete`),
+    },
+  },
 };
+
+// ----- Second Brain Phase 7 types (AI Tutor & Assessment, Ideas 61-70) -----
+export interface TutorSource {
+  chunk_id: number | null;
+  document_id: number | null;
+  title: string | null;
+  source_path: string | null;
+  snippet: string;
+  score: number | null;
+}
+
+export interface TutorChatResponse {
+  session_id: number;
+  answer: string;
+  sources: TutorSource[];
+  empty_retrieval: boolean;
+  ai_used: boolean;
+}
+
+export interface BlockingConcept {
+  concept: string;
+  definition: string | null;
+  topic_id: number | null;
+  topic_name: string | null;
+  kind: string;
+}
+
+export interface TutorDoubtResponse extends TutorChatResponse {
+  blocking_concepts: BlockingConcept[];
+  follow_ups: string[];
+}
+
+export interface TutorSessionItem {
+  id: number;
+  created_at: string | null;
+}
+
+export interface PracticeQuestionItem {
+  id: number;
+  topic_id: number;
+  topic_name: string | null;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+  bloom_level: string;
+  difficulty: string;
+  status: string;
+  created_at: string | null;
+}
+
+export interface PracticeGenerateResponse {
+  items: PracticeQuestionItem[];
+  generated: number;
+  deduped_skipped: boolean;
+}
+
+export interface AdaptiveSession {
+  topic_id: number;
+  tier: string;
+  reason: string;
+  available_tiers: string[];
+  streak: number;
+}
+
+export interface PracticeSessionResponse {
+  session: AdaptiveSession;
+  question: PracticeQuestionItem | null;
+}
+
+export interface PracticeAnswerResponse {
+  topic_id: number;
+  tier: string;
+  streak: number;
+  tier_moved: boolean;
+  accuracy_at_tier: number;
+}
+
+export interface MistakeAnalysisResponse {
+  analysis_id: number;
+  divergence: string;
+  missed_points: string[];
+  recommendation: string;
+  recommended_chunk_id: number | null;
+  recommended_concept_id: number | null;
+  concept_definition: string | null;
+  revision_task_created: boolean;
+  ai_used: boolean;
+}
+
+export interface MockSection {
+  title: string;
+  question_ids: number[];
+}
+
+export interface MockTestItem {
+  id: number;
+  subject_id: number;
+  title: string;
+  duration_mins: number;
+  status: string;
+  sections: MockSection[];
+  question_count: number;
+  // Exam-run surface: answers + explanations are stripped server-side.
+  questions?: MockQuestionItem[];
+  created_at: string | null;
+}
+
+export interface MockQuestionItem {
+  id: number;
+  topic_id: number | null;
+  question: string;
+  options: string[];
+  difficulty: string;
+}
+
+export interface MockAttemptItem {
+  id: number;
+  mock_test_id: number;
+  started_at: string | null;
+  finished_at: string | null;
+  score: number;
+  total: number;
+  per_topic: Record<string, { correct: number; total: number }>;
+}
+
+export interface MockSubmitResponse {
+  attempt_id: number;
+  mock_test_id: number;
+  score: number;
+  total: number;
+  percentage: number;
+  late_submission: boolean;
+  per_topic: Record<string, { correct: number; total: number }>;
+}
+
+export interface InterviewQuestion {
+  question: string;
+  topic_id: number | null;
+  expected: string;
+  model_solution: string;
+}
+
+export interface InterviewSession {
+  id: number;
+  skill: string;
+  level: string;
+  questions: InterviewQuestion[];
+  answers: Record<string, { answer: string; score: number; strengths: string[]; misconceptions: string[]; action_items: string[] }>;
+  total_score: number;
+  status: string;
+  created_at: string | null;
+}
+
+export interface InterviewAnswerResponse {
+  index: number;
+  score: number;
+  strengths: string[];
+  misconceptions: string[];
+  action_items: string[];
+  ai_used: boolean;
+}
+
+export interface InterviewFinishResponse {
+  session_id: number;
+  skill: string;
+  level: string;
+  answered: number;
+  total_score: number;
+  status: string;
+}
+
+export interface GradeAnswerAdvancedResponse {
+  score: number;
+  strengths: string[];
+  misconceptions: string[];
+  action_items: string[];
+  ai_used: boolean;
+  mode: string;
+}
+
+export interface UserSkillItem {
+  skill_id: string;
+  name: string;
+  level: number;
+  mastery: number;
+  contributing_topics: { topic_id: number; topic_name: string; score: number }[];
+  updated_at: string | null;
+}
+
+export interface SkillsResponse {
+  skills: UserSkillItem[];
+}
+
+export interface SkillsExportResponse {
+  format: string;
+  content: string;
+}
 
 // ===== STUDENT-PLANAR domains: reading tracker, brain dump, daily schedule, notifications =====
 
@@ -1436,6 +3151,8 @@ export interface BrainDump {
   user_id: number;
   content: string | null;
   updated_at: string | null;
+  // Phase 4 (Idea 40): the draft KbDocument this dump upserts, if any.
+  linked_document_id?: number | null;
 }
 
 export type DailyCategory = 'School' | 'Study Time' | 'Break';
@@ -1503,7 +3220,7 @@ export const bookApi = {
 };
 
 export const brainDumpApi = {
-  get: () => api.get<{ content: string | null }>('/braindumps'),
+  get: () => api.get<{ content: string | null; linked_document_id?: number | null }>('/braindumps'),
   save: (content: string) => api.put<BrainDump>('/braindumps', { content }),
 };
 

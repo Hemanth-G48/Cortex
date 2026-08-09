@@ -20,7 +20,7 @@ export const DayProgressWidget = ({ className = '' }: DayProgressWidgetProps) =>
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [today]);
 
   useEffect(() => {
     void load();

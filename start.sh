@@ -27,6 +27,22 @@ DO_INSTALL=0
 OPEN_BROWSER=1
 BACKEND_PID=""
 
+# ── Local embeddings (fastembed/ONNX, offline — no PyTorch) ──
+# EMBEDDINGS_DIM must match the local model (BAAI/bge-small-en-v1.5 = 384).
+# Set EMBEDDINGS_BACKEND=provider to go back to the API /embeddings path.
+# On NVIDIA GPUs, fastembed-gpu + onnxruntime-gpu run the model on CUDA
+# automatically (embeddings.py preloads the venv-shipped CUDA libs).
+export EMBEDDINGS_BACKEND="${EMBEDDINGS_BACKEND:-fastembed}"
+export EMBEDDINGS_LOCAL_MODEL="${EMBEDDINGS_LOCAL_MODEL:-BAAI/bge-small-en-v1.5}"
+export EMBEDDINGS_DIM="${EMBEDDINGS_DIM:-384}"
+# Make the pip-shipped CUDA runtime libs resolvable for onnxruntime-gpu
+# (belt-and-braces; embeddings.py preloads them via ctypes as the primary path).
+NVIDIA_DIR="$BACKEND_DIR/.venv/lib/python3.12/site-packages/nvidia"
+if [ -d "$NVIDIA_DIR" ]; then
+  NV_LIBS="$(find "$NVIDIA_DIR" -type d -name lib 2>/dev/null | paste -sd:)"
+  export LD_LIBRARY_PATH="$NV_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
 # ── Flag parsing ──
 while [[ $# -gt 0 ]]; do
   case "$1" in

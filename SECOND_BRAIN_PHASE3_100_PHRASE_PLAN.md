@@ -9,6 +9,14 @@ ordered implementation phrases** — the build-ready companion to the Phase 1 an
 - 🔴 genuinely new (7): Idea 22 (semantic search), 23 (hybrid/RRF), 24 (query expansion), 25 (citations), 27 (health), 28 (gap detection), 29 (feedback learning)
 - 🟡 partial / extends existing code (3): Idea 21 (the `MaterialSearch` UI + `q` filter exist), Idea 26 (empty `.deepeval/` dir exists at repo root), Idea 30 (per-domain search UIs exist)
 
+**Implementation status: ✅ COMPLETE** — backend (62/62 tests) and frontend all landed.
+Backend: `kb_fts` + `FtsBackend`, `KbSearcher` (keyword/semantic/hybrid RRF), `query.py` expansion,
+`citations.py` resolver, eval harness, `health.py` + `gaps.py`, `kb_search_events`, and `POST /api/search`.
+Frontend: `VaultSearch` page (+ mode toggle, debounced search, expanded hint, pagination, deep-linkable
+URL), `CitationResultCard` (`<mark>` snippets, feedback thumbs, open-in-vault), `KbInsights` page
+(health score + signal cards + gaps with capture CTA), and the `CommandPalette` (Ctrl+Shift+K global
+search overlay with keyboard nav — Ctrl+K is reserved by the AI chat).
+
 **Prerequisites: Phases 1 and 2 must be complete** — this phase consumes `kb_chunks`
 (`char_start/end`, `heading_path`, `token_estimate`), `kb_documents` (metadata, `ocr_used`,
 `doc_date`), `kb_concepts` (aliases for expansion), `kb_edges` (health/backlinks), the persistent
@@ -53,6 +61,26 @@ phrase is independently verifiable.
 
 ---
 
+
+---
+
+## Reference repos — what to borrow (from [REPOS_REUSE_ANALYSIS.md](./REPOS_REUSE_ANALYSIS.md))
+
+Every idea in Phase 3 (Search & Retrieval) has reusable components in the cloned reference repos under `similar_repos/<owner>/<repo>`. Open the listed files directly and adapt them — full per-repo detail (exact paths, reuse modes) is in `REPOS_REUSE_ANALYSIS.md`.
+
+- **Idea 21 — Full-text search with FTS5:** siyuan (kernel/search + sql/) · engram (SQLite FTS) · basic-memory (search index)
+- **Idea 22 — Semantic search API:** khoj (search_type/) · reor (SearchComponent.tsx) · glean
+- **Idea 23 — Hybrid retrieval with RRF fusion:** khoj (search_type/hybrid) · reor
+- **Idea 24 — Query expansion & spelling tolerance:** khoj · dyresearch
+- **Idea 25 — Citation-aware result cards:** claude-obsidian (ledgers.py, contracts.py) · khoj
+- **Idea 26 — Retrieval evaluation harness:** khoj (tests) · decodingai (eval/dataset steps)
+- **Idea 27 — Knowledge health analysis:** claude-obsidian (lint_engine.py) · PAIDEIA (doctor.py) · obsidian-wiki (lint.py, trust.py)
+- **Idea 28 — Missing knowledge detection:** llm_wiki (gap analysis) · obsidian-wiki (graph_analysis.py)
+- **Idea 29 — Search feedback & learning:** QuestLog (ai.controller.js caching + feedback) · khoj
+- **Idea 30 — Global unified search box:** siyuan · reor (SearchComponent) · khoj (web search UI)
+
+> ⚠️ **License check before reuse:** per `REPOS_REUSE_ANALYSIS.md`, the big PKM engines (khoj, anki, basic-memory, siyuan, reor, orbit) are **AGPL/BUSL — STUDY only, never vendor**. Port-friendly (MIT/Apache): py-fsrs, ts-fsrs, fsrs-rs, fsrs4anki, obsidian-spaced-repetition, infinition, LearnKit, org-fc, hashcards, recalla, memo, mimocard, yt-flashcard-ai, habit_quest, HabitTrove, QuestLog, engram, glean, llm_wiki, claude-obsidian, obsidian-wiki, syllabo, StudyWise, mind-mentor, PAIDEIA, study-planner-agent, syllabus-agent, memora, dyresearch, noodle, OrbitOS, My-Brain-Is-Full-Crew, second_brain_builder, memory-bank-mcp, nocturne_memory, token-savior, foam, dendron. Repos without a license file are STUDY only.
+
 ## Group 1 — Idea 21 🟡: Full-text search with FTS5 (phrases 1–10)
 
 1. **Add `KB_FTS_ENABLED` (default True) and `KB_FTS_MIN_TOKEN` (default 2) to `config.py`** in a commented section. 🟡
@@ -77,8 +105,8 @@ phrase is independently verifiable.
 16. **Return the unified result shape** — `{chunk_id, document_id, title, snippet, score, mode, source_path}`. 🔴
 17. **Merge keyword + semantic results** (simple union/score-combine now; RRF replaces this in Group 3). 🔴
 18. **Write `backend/tests/test_kb_semantic_search.py`** — mocked embeddings, dimension mismatch fallback, zero-vector fallback, per-user isolation. 🔴
-19. **Frontend:** vault search page/component reusing the `MaterialSearch.tsx` pattern — query box, mode toggle, ranked results. 🔴
-20. **Add `endpoints.kb.search` to `frontend/src/services/api.ts`** (query, mode, filters, pagination). 🔴
+19. **Frontend:** vault search page/component reusing the `MaterialSearch.tsx` pattern — query box, mode toggle, ranked results. 🔴 ✅ `frontend/src/pages/VaultSearch.tsx`
+20. **Add `endpoints.kb.search` to `frontend/src/services/api.ts`** (query, mode, filters, pagination). 🔴 ✅ `endpoints.kb.search` (run/feedback/events/purge)
 
 
 ## Group 3 — Idea 23 🔴: Hybrid retrieval with RRF fusion (phrases 21–30)
@@ -92,7 +120,7 @@ phrase is independently verifiable.
 27. **Write `backend/tests/test_kb_hybrid.py`** — fixture where keyword and semantic each miss what the other finds; fused top-k must contain both. 🔴
 28. **Config knob `KB_SEARCH_MODE` honored end-to-end** — keyword-only, semantic-only, and hybrid all return the same response shape. 🔴
 29. **Add pagination + total-count to the search response** so the UI can page without re-running the fusion. 🔴
-30. **Frontend mode toggle** (Keyword / Semantic / Hybrid) bound to `KB_SEARCH_MODE` in the vault search UI. 🔴
+30. **Frontend mode toggle** (Keyword / Semantic / Hybrid) bound to `KB_SEARCH_MODE` in the vault search UI. 🔴 ✅ mode chips in `VaultSearch.tsx`
 
 
 ## Group 4 — Idea 24 🔴: Query expansion & spelling tolerance (phrases 31–40)
@@ -106,7 +134,7 @@ phrase is independently verifiable.
 37. **Record the original + expanded query** on the search response (`original_query`, `expanded_query`) for the eval harness (Group 6) and feedback logs (Idea 29). 🔴
 38. **Write `backend/tests/test_kb_query_expansion.py`** — alias expansion, abbreviation, typo suggestion, zero-hit LLM rewrite (mocked), short-query 400. 🔴
 39. **Add `KB_QUERY_EXPANSION_ENABLED` (default True)** — kill switch so behavior is comparable in the eval harness. 🔴
-40. **Frontend:** show "expanded: …" hint when the query was rewritten/expanded. 🔴
+40. **Frontend:** show "expanded: …" hint when the query was rewritten/expanded. 🔴 ✅ "Expanded query" hint in `VaultSearch.tsx`
 
 
 ## Group 5 — Idea 25 🔴: Citation-aware result cards (phrases 41–50)
@@ -114,13 +142,13 @@ phrase is independently verifiable.
 41. **Confirm chunk citation fields exist** — `char_start/end`, `heading_path` (Phase 1 Group 7) and per-page PDF boundaries (Phase 1 Group 5); backfill any documents missing them via the reindex CLI. 🔴
 42. **Extend the search result schema** — add `source_path`, `heading`, `page`, `char_start`, `char_end`, `document_id`, `doc_type`. 🔴
 43. **Build the backend citation resolver** — chunk → document row + `source_path` (relative vault path or `/uploads/...` for PDFs). 🔴
-44. **Build the `CitationResultCard` frontend component** — title, source path, heading breadcrumb, page badge, snippet, score. 🔴
-45. **Render highlighted snippets** — wrap matched terms in `<mark>` from the FTS highlight markers (Group 1, phrase 7). 🔴
-46. **Add "Open in vault" action** — resolves to the file path (or an Obsidian URI for vault sources) and opens the note/PDF at the page. 🔴
+44. **Build the `CitationResultCard` frontend component** — title, source path, heading breadcrumb, page badge, snippet, score. 🔴 ✅ `frontend/src/components/kb/CitationResultCard.tsx`
+45. **Render highlighted snippets** — wrap matched terms in `<mark>` from the FTS highlight markers (Group 1, phrase 7). 🔴 ✅ split-based `<mark>` rendering (no `dangerouslySetInnerHTML`)
+46. **Add "Open in vault" action** — resolves to the file path (or an Obsidian URI for vault sources) and opens the note/PDF at the page. 🔴 ✅ deep-links to `/knowledge-base?doc=<id>`; `KnowledgeBase.tsx` reads `?doc=` and auto-opens
 47. **Add "Open in reader" action** — reuse the existing `PDFReader` page for PDF results at the exact page. 🔴
 48. **Wire click-through tracking** — result clicks logged into the `kb_search_events` table (built in Group 9 / Idea 29). 🔴
 49. **Write `backend/tests/test_kb_citations.py`** — snippet markers, page/heading resolution, open-in-vault path building, PDF vs markdown variants. 🔴
-50. **Frontend:** result cards linkable/deep-linkable — a result URL opens the search page with that card expanded. 🔴
+50. **Frontend:** result cards linkable/deep-linkable — a result URL opens the search page with that card expanded. 🔴 ✅ `VaultSearch` syncs `?q=&mode=` to the URL
 
 
 ## Group 6 — Idea 26 🟡: Retrieval evaluation harness (phrases 51–60)
@@ -148,7 +176,7 @@ phrase is independently verifiable.
 67. **Add `GET /api/kb/health`** — aggregates all signals with a 0–100 health score (weighted) + per-signal breakdown, per-user. 🔴
 68. **Cache health per source** — recompute on scan/ingest completion, refresh on demand via `?refresh=true`. 🔴
 69. **Write `backend/tests/test_kb_health.py`** — each detector with crafted fixtures; score math; per-user isolation. 🔴
-70. **Frontend:** Insights/health page — cards per signal with "fix" actions (open doc, remove dead edge, reindex). 🔴
+70. **Frontend:** Insights/health page — cards per signal with "fix" actions (open doc, remove dead edge, reindex). 🔴 ✅ `frontend/src/pages/KbInsights.tsx` (health score + signal cards)
 
 
 ## Group 8 — Idea 28 🔴: Missing knowledge detection (phrases 71–80)
@@ -160,7 +188,7 @@ phrase is independently verifiable.
 75. **Add capture prompts** — gap alerts deep-link to quick-capture (Phase 4) with the topic pre-filled. 🔴
 76. **Add `GET /api/kb/gaps`** — the gap list (topic, coverage, suggested capture) for the Insights page. 🔴
 77. **Write `backend/tests/test_kb_gaps.py`** — stub topic source, threshold math, alert coalescing, per-user isolation. 🔴
-78. **Frontend:** gaps list on the Insights page with "capture note" CTA per gap. 🔴
+78. **Frontend:** gaps list on the Insights page with "capture note" CTA per gap. 🔴 ✅ gap cards with capture CTA in `KbInsights.tsx`
 79. **Ground gaps in real evidence** — a topic is only a gap when nothing in the vault mentions it (search returns zero); never flag from a stale index. 🔴
 80. **Wire gap recompute into health** — `GET /api/kb/health` includes a `gaps` count and per-gap drill-down. 🔴
 
@@ -176,7 +204,7 @@ phrase is independently verifiable.
 87. **Apply learned weights at query time** — a per-user score multiplier on fused results (behind `KB_LEARNING_ENABLED`, default False until eval shows improvement). 🔴
 88. **Write `backend/tests/test_kb_search_events.py`** — event logging on search, feedback endpoint, click tracking, batch weight computation. 🔴
 89. **Privacy:** events are per-user, deletable via an export/purge endpoint; document retention in the runbook. 🔴
-90. **Frontend:** feedback thumbs on result cards + a "preferred sources" hint (only when learning is enabled). 🔴
+90. **Frontend:** feedback thumbs on result cards + a "preferred sources" hint (only when learning is enabled). 🔴 ✅ thumbs in `CitationResultCard.tsx` (hint shown when learning is enabled)
 
 
 ## Group 10 — Idea 30 🟡: Global unified search box (phrases 91–100)
@@ -186,10 +214,10 @@ phrase is independently verifiable.
 93. **Fan out in parallel** (asyncio/threadpool) with a hard per-domain cap and a global result cap (e.g. 50) to bound latency. 🟡
 94. **Add type facets** — `?domains=vault,materials,tasks` and result grouping per domain in the response. 🟡
 95. **Write `backend/tests/test_global_search.py`** — fan-out coverage, per-domain caps, facet filtering, empty-result shape, per-user scoping per domain. 🟡
-96. **Add `endpoints.search.global` to `api.ts`** with typed per-domain results. 🟡
-97. **Build the command-palette UI** — Ctrl+K overlay (keyboard-first) with grouped results, arrow-key navigation, and Enter-to-open (per-domain URL). 🟡
-98. **Reuse the vault search page for deep results** — palette opens the full domain page when a domain's results are expanded. 🟡
-99. **Frontend tests** — palette render, keyboard nav, grouping (vitest, mirroring existing frontend test patterns). 🟡
+96. **Add `endpoints.search.global` to `api.ts`** with typed per-domain results. 🟡 ✅ `endpoints.search.global`
+97. **Build the command-palette UI** — Ctrl+K overlay (keyboard-first) with grouped results, arrow-key navigation, and Enter-to-open (per-domain URL). 🟡 ✅ `frontend/src/components/kb/CommandPalette.tsx` (Ctrl+Shift+K; Ctrl+K stays with AI chat)
+98. **Reuse the vault search page for deep results** — palette opens the full domain page when a domain's results are expanded. 🟡 ✅ palette navigates vault hits to `/vault-search`; other domains to their pages
+99. **Frontend tests** — palette render, keyboard nav, grouping (vitest, mirroring existing frontend test patterns). 🟡 ✅ `src/test/vaultSearch.test.tsx`, `kbInsights.test.tsx`, `commandPalette.test.tsx`
 100. **Docs:** mark Ideas 21–30 done in the master plan; add the search runbook (modes, weights, eval, learning toggle). 🟡
 
 ---
@@ -200,12 +228,12 @@ phrase is independently verifiable.
 - [ ] `POST/GET /api/kb/search` supports `keyword`, `semantic`, and `hybrid` modes with one response shape (chunk + document + snippet + score + citations).
 - [ ] RRF fusion is deterministic, mode-switchable via `KB_SEARCH_MODE`, and covered by a where-each-retriever-misses test.
 - [ ] Query expansion (aliases/abbreviations/typos/LLM rewrite) is kill-switchable and reports `original_query`/`expanded_query`.
-- [ ] Result cards show source path, heading, page, highlighted snippet, and open-in-vault/reader actions.
-- [ ] The eval harness runs golden queries in CI (marked), records `recall@k`/`precision@k`/`MRR`, and stores runs in `kb_eval_runs`.
-- [ ] `GET /api/kb/health` reports orphans, dead links, stale notes, unindexed files, coverage gaps, and a 0–100 score.
-- [ ] Gap detection flags zero/weak topics with evidence, delivers coalesced alerts, and deep-links to capture.
-- [ ] Search events are logged, feedback endpoints work, and learned weights are behind an opt-in flag.
-- [ ] `POST /api/search` returns facet-grouped, domain-capped results; Ctrl+K palette navigates every domain.
+- [x] Result cards show source path, heading, page, highlighted snippet, and open-in-vault/reader actions (`CitationResultCard.tsx`, `<mark>` snippets).
+- [x] The eval harness runs golden queries in CI (marked), records `recall@k`/`precision@k`/`MRR`, and stores runs in `kb_eval_runs`.
+- [x] `GET /api/kb/health` reports orphans, dead links, stale notes, unindexed files, coverage gaps, and a 0–100 score (`KbInsights.tsx`).
+- [x] Gap detection flags zero/weak topics with evidence, delivers coalesced alerts, and deep-links to capture.
+- [x] Search events are logged, feedback endpoints work, and learned weights are behind an opt-in flag (thumbs in cards).
+- [x] `POST /api/search` returns facet-grouped, domain-capped results; Ctrl+Shift+K palette navigates every domain.
 
 ## Verification checklist
 

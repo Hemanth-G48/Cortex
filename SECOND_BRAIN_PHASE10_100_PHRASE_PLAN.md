@@ -9,6 +9,19 @@ ordered implementation phrases** — the **capstone** of the ten-phase plan set
 - 🔴 genuinely new (4): Idea 91 (multi-agent), 92 (long-term memory), 94 (graph+vector fusion), 97 (recommendation engine)
 - 🟡 partial / extends existing code (6): Ideas 93, 95, 96, 98, 99, 100 harden and coordinate machinery built in Phases 1–9
 
+**Implementation status: ✅ COMPLETE** — backend, frontend, and tests all landed.
+Backend: `agents.py` (registry + orchestrator + `AgentRun`), `memory_longterm.py` (`EpisodicMemory`
++ consolidation + fact folding), `rag.py` (rewrite → multi-stage retrieve → rerank → verify →
+faithfulness), `fusion.py` (`mode=graph_fused` search), `context.py` (bundle + overrides), `research.py`
+(explain/related), `recommendations.py` (ranked explainable items + feedback), `reflections.py`
+(weekly reflection + goal↔roadmap linkage), `forecast.py` (EWMA trajectory + at-risk alerts),
+and `ai_log.py` (`AiLog` observability + `prompt_versions` + weekly report) — with 8 routers
+(`kb_agents/memory/context/research/recommendations/reflections/forecast/observability`)
+registered in `main.py`. Tutor prompts inject the context bundle + durable-memory block.
+Frontend: `endpoints.kb.*` in `api.ts` + the `Phase10Panel` (agents · memory · research ·
+recommendations · forecast · observability) mounted in the Knowledge Base page.
+Tests: 10 new files covering every idea (62 Phase 10 tests).
+
 **Prerequisites: Phases 1–9 must be complete** — this phase *orchestrates* the existing services:
 the tutor (Phase 7), search/RRF + eval harness (Phase 3), summaries/flashcards (Phase 4),
 roadmaps (Phase 5), `revision_schedule`/`mastery`/`learning_events` (Phase 6), `user_memory` +
@@ -59,6 +72,26 @@ Phrases are numbered 1–100 and grouped 10-per-idea. Later groups depend on ear
 phrase is independently verifiable.
 
 ---
+
+
+---
+
+## Reference repos — what to borrow (from [REPOS_REUSE_ANALYSIS.md](./REPOS_REUSE_ANALYSIS.md))
+
+Every idea in Phase 10 (Advanced AI, Analytics & Platform) has reusable components in the cloned reference repos under `similar_repos/<owner>/<repo>`. Open the listed files directly and adapt them — full per-repo detail (exact paths, reuse modes) is in `REPOS_REUSE_ANALYSIS.md`.
+
+- **Idea 91 — Multi-agent architecture:** Multi-Agent-Study-Assistant (study_agents.py) · My-Brain-Is-Full-Crew (8 agents) · dyresearch (ADK agents) · obsidian-second-brain (46 commands) · mind-mentor (mind-mentor-agents) · phantom · arscontexta
+- **Idea 92 — Long-term memory system:** engram · nocturne_memory · basic-memory · token-savior · memory-bank-mcp
+- **Idea 93 — Full RAG pipeline hardening:** khoj · decodingai · reor · obsidian-wiki (graphrag.py)
+- **Idea 94 — Knowledge-graph + vector fusion:** knowledge-nexus (Neo4j GraphRAG) · llm_wiki · obsidian-wiki (graphrag.py) · basic-memory
+- **Idea 95 — Context-aware responses:** QuestLog (AI controller w/ user stats) · mind-mentor · EduAI
+- **Idea 96 — Research assistant:** dyresearch · knowledge-nexus (notion/pocket providers) · decodingai · claude-obsidian (autoresearch skill)
+- **Idea 97 — Intelligent recommendation engine:** syllabo (content_recommender.py) · QuestLog · StudyWise
+- **Idea 98 — Goal planning & reflection:** obsidian-claude-pkm (3-year vision → daily) · OrbitOS · My-Brain-System · obsidian-second-brain (obsidian-challenge)
+- **Idea 99 — Predictive analytics & trajectory forecasting:** QuestLog (analytics) · syllabo (prediction) · StudyWise
+- **Idea 100 — Self-improving assistant + observability:** claude-obsidian (ledgers.py) · token-savior · QuestLog (analytics) · decodingai (Opik integration)
+
+> ⚠️ **License check before reuse:** per `REPOS_REUSE_ANALYSIS.md`, the big PKM engines (khoj, anki, basic-memory, siyuan, reor, orbit) are **AGPL/BUSL — STUDY only, never vendor**. Port-friendly (MIT/Apache): py-fsrs, ts-fsrs, fsrs-rs, fsrs4anki, obsidian-spaced-repetition, infinition, LearnKit, org-fc, hashcards, recalla, memo, mimocard, yt-flashcard-ai, habit_quest, HabitTrove, QuestLog, engram, glean, llm_wiki, claude-obsidian, obsidian-wiki, syllabo, StudyWise, mind-mentor, PAIDEIA, study-planner-agent, syllabus-agent, memora, dyresearch, noodle, OrbitOS, My-Brain-Is-Full-Crew, second_brain_builder, memory-bank-mcp, nocturne_memory, token-savior, foam, dendron. Repos without a license file are STUDY only.
 
 ## Group 1 — Idea 91 🔴: Multi-agent architecture (phrases 1–10)
 
@@ -203,17 +236,17 @@ phrase is independently verifiable.
 
 ## Definition of Done — Phase 10
 
-- [ ] The orchestrator composes specialist agents (retriever, summarizer, quizzer, tutor, scheduler, health-checker) with budget guardrails; `agent_runs` is recorded.
-- [ ] Episodic memory appends from `learning_events`, consolidates weekly into durable facts, and folds into `user_memory`.
-- [ ] RAG runs as composable stages (rewrite → multi-stage retrieve → rerank → verify citations → faithfulness), with a "not found" fallback when ungrounded.
-- [ ] Graph+vector fusion expands vector hits via graph neighbors, reranks, and feeds prerequisite chains into prompts.
-- [ ] A per-user context bundle (subject, deadlines, recent topics) is injected and user-overridable.
-- [ ] The research assistant summarizes papers, extracts contributions, suggests related papers, and answers with citations.
-- [ ] The recommendation engine ranks cross-domain candidates with explainable reasons; feedback is logged.
-- [ ] Goals link to roadmaps; weekly reflections are generated, pushed, and can trigger plan adjustments.
-- [ ] Per-subject trajectories forecast readiness with early at-risk alerts.
-- [ ] Every AI interaction logs to `ai_logs`; weekly reports + A/B prompt versions drive improvement.
-- [ ] All steps respect `KB_DAILY_GEN_LIMIT`; deterministic fallbacks work with `AI_ENABLED=false`; every query is user-scoped.
+- [x] The orchestrator composes specialist agents (retriever, summarizer, quizzer, tutor, scheduler, health-checker) with budget guardrails; `agent_runs` is recorded.
+- [x] Episodic memory appends from `learning_events`, consolidates weekly into durable facts, and folds into `user_memory`.
+- [x] RAG runs as composable stages (rewrite → multi-stage retrieve → rerank → verify citations → faithfulness), with a "not found" fallback when ungrounded.
+- [x] Graph+vector fusion expands vector hits via graph neighbors, reranks, and feeds prerequisite chains into prompts.
+- [x] A per-user context bundle (subject, deadlines, recent topics) is injected and user-overridable.
+- [x] The research assistant summarizes papers, extracts contributions, suggests related papers, and answers with citations.
+- [x] The recommendation engine ranks cross-domain candidates with explainable reasons; feedback is logged.
+- [x] Goals link to roadmaps; weekly reflections are generated, pushed, and can trigger plan adjustments.
+- [x] Per-subject trajectories forecast readiness with early at-risk alerts.
+- [x] Every AI interaction logs to `ai_logs`; weekly reports + A/B prompt versions drive improvement.
+- [x] All steps respect `KB_DAILY_GEN_LIMIT`; deterministic fallbacks work with `AI_ENABLED=false`; every query is user-scoped.
 
 ## Verification checklist
 

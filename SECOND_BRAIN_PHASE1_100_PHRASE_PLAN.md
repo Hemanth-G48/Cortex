@@ -4,6 +4,10 @@
 [`SECOND_BRAIN_AI_INTEGRATION_PLAN.md`](./SECOND_BRAIN_AI_INTEGRATION_PLAN.md) as **100 concrete,
 ordered implementation phrases** — a build-ready checklist.
 
+**Implementation status: ✅ COMPLETE** — backend (9 KB test files: models, scanner, markdown,
+chunker, dedupe, versions, jobs, OCR, arXiv) and frontend (Sources page, document list,
+uploads, arXiv import, jobs UI) all landed.
+
 **Audit status (from §2 of the master plan):**
 - 🔴 genuinely new (5): Idea 1 (data model), Idea 6 (OCR), Idea 7 (chunking), Idea 8 (dedupe), Idea 10 (job queue)
 - 🟡 partial / extends existing code (5): Ideas 2–5 and Idea 9 build on existing patterns and code
@@ -45,6 +49,26 @@ Phrases are numbered 1–100 and grouped 10-per-idea. Each is independently veri
 be built in order because later ideas depend on earlier ones.
 
 ---
+
+
+---
+
+## Reference repos — what to borrow (from [REPOS_REUSE_ANALYSIS.md](./REPOS_REUSE_ANALYSIS.md))
+
+Every idea in Phase 1 (Second Brain Foundation & Ingestion) has reusable components in the cloned reference repos under `similar_repos/<owner>/<repo>`. Open the listed files directly and adapt them — full per-repo detail (exact paths, reuse modes) is in `REPOS_REUSE_ANALYSIS.md`.
+
+- **Idea 1 — Knowledge Core data model:** basic-memory (entity/relation SQLAlchemy schema) · siyuan (block/attribute model) · dendron (note hierarchy) · engram (SQLite store)
+- **Idea 2 — Knowledge source registry:** glean (RSS sources) · khoj (content-type configs) · obsidian-wiki (session_sources.py)
+- **Idea 3 — Folder watcher & file scanning:** obsidian-wiki (sync.py) · glean · claude-obsidian (vault_ops.py) · obsidian-second-brain (adapters/)
+- **Idea 4 — Markdown parser — frontmatter & wikilinks:** basic-memory (markdown/) · foam (foam-core) · dendron (engine-server) · llm_wiki (commands/fs.ts) · claude-obsidian (obsidian-markdown skill)
+- **Idea 5 — PDF & research-paper ingestion:** khoj (processor/content/pdf) · syllabus-agent (PyPDF2 extract) · memora (processing.py) · PAIDEIA (vision_ocr.py) · recalla (flashcards/pdf route)
+- **Idea 6 — OCR for scanned documents:** PAIDEIA (vision_ocr.py + tesseract checks in doctor.py)
+- **Idea 7 — Semantic (heading-aware) chunking:** khoj (processor/content) · reor (ChunkSizeSettings.tsx) · decodingai (chunk_embed_load.py) · glean
+- **Idea 8 — Content-hash deduplication:** hashcards (content-addressable cards) · engram (content hash) · basic-memory (mtime/size columns)
+- **Idea 9 — Version history & diff:** orbit (store-fs/store-web) · engram (store) · llm_wiki (file-history-panel.tsx)
+- **Idea 10 — Ingestion job queue & status:** glean (worker) · khoj (background jobs) · decodingai (pipelines/)
+
+> ⚠️ **License check before reuse:** per `REPOS_REUSE_ANALYSIS.md`, the big PKM engines (khoj, anki, basic-memory, siyuan, reor, orbit) are **AGPL/BUSL — STUDY only, never vendor**. Port-friendly (MIT/Apache): py-fsrs, ts-fsrs, fsrs-rs, fsrs4anki, obsidian-spaced-repetition, infinition, LearnKit, org-fc, hashcards, recalla, memo, mimocard, yt-flashcard-ai, habit_quest, HabitTrove, QuestLog, engram, glean, llm_wiki, claude-obsidian, obsidian-wiki, syllabo, StudyWise, mind-mentor, PAIDEIA, study-planner-agent, syllabus-agent, memora, dyresearch, noodle, OrbitOS, My-Brain-Is-Full-Crew, second_brain_builder, memory-bank-mcp, nocturne_memory, token-savior, foam, dendron. Repos without a license file are STUDY only.
 
 ## Group 1 — Idea 1 🔴: Knowledge Core data model (phrases 1–10)
 

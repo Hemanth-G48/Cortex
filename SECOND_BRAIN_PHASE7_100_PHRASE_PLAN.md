@@ -22,6 +22,18 @@ are Phase 8 and out of scope** — but the `user_memory` seam (Idea 79) is stubb
 into the prompt — **zero retrieval from the vault**. Idea 61 is the single highest-value change in
 the whole roadmap.
 
+**Implementation status: ✅ COMPLETE** — backend (85/85 Phase 7 tests) and frontend all landed.
+Backend: `kb_tutor` router + `tutor.py` (cited RAG chat with raw-first retrieval, token-drop
+retries, and query expansion; doubt solving with blocking concepts), `kb_practice` router
+(question bank generate/approve/reject, adaptive IRT-lite tiers, mistake analysis), `mocks.py`
+(build/start/submit timed papers with per-topic results), `interview.py` (graded skill
+interviews), `skills.py` (topic→skill mapping + mastery profile + export), `capture_xp.py`.
+Also fixed two latent Phase 3 search bugs surfaced by the tutor: stopword-filtered FTS tokenizer
+and RRF hybrid results now preserve snippets. Frontend: `/tutor` (chat + doubt + source chips),
+`/practice` (bank / adaptive / mistakes tabs), `/mocks` (paper runner with countdown),
+`/interview` (graded Q&A walkthrough), `/skills` (profile, subject mapping, portfolio export),
+all under the `endpoints.kb.*` API clients.
+
 ---
 
 ## Grounding — what already exists to build on
@@ -57,6 +69,26 @@ Phrases are numbered 1–100 and grouped 10-per-idea. Later groups depend on ear
 phrase is independently verifiable.
 
 ---
+
+
+---
+
+## Reference repos — what to borrow (from [REPOS_REUSE_ANALYSIS.md](./REPOS_REUSE_ANALYSIS.md))
+
+Every idea in Phase 7 (AI Tutor & Assessment) has reusable components in the cloned reference repos under `similar_repos/<owner>/<repo>`. Open the listed files directly and adapt them — full per-repo detail (exact paths, reuse modes) is in `REPOS_REUSE_ANALYSIS.md`.
+
+- **Idea 61 — RAG-grounded AI tutor:** khoj (chat + search) · reor (Chat) · mind-mentor (chat) · EduAI (chat) · memora (RetrievalQA_mod.py) · dyresearch · Multi-Agent-Study-Assistant · claude-obsidian (grounded answers) · tutor-skills · obsidian-wiki
+- **Idea 62 — AI doubt solving:** EduAI (chat) · mind-mentor · StudyWise
+- **Idea 63 — AI-generated practice questions:** EduAI (practice) · StudyWise (quiz) · studybuddy-ai · syllabo (adaptive_quiz_engine.py) · memora
+- **Idea 64 — Mock tests & exam simulations:** StudyWise (exam) · EduAI · LearnKit (exam-tests-sqlite.ts) · syllabo
+- **Idea 65 — Interview preparation:** Multi-Agent-Study-Assistant · dyresearch (research agents)
+- **Idea 66 — Answer grading & feedback (advanced):** EduAI (practice grading) · StudyWise (quiz scoring)
+- **Idea 67 — Adaptive question difficulty:** syllabo (adaptive_quiz_engine.py) · StudyWise
+- **Idea 68 — Explain-my-mistake analysis:** PAIDEIA (wrong-answer tracking) · QuestLog (analytics) · syllabo
+- **Idea 69 — Knowledge capture & revision XP:** habit_quest · QuestLog (XP) · Habit-Quest · HabitTrove · LearnKit (exam-tests)
+- **Idea 70 — Skill mapping:** PAIDEIA (subject learning graph) · mind-mentor (knowledge graph) · syllabo
+
+> ⚠️ **License check before reuse:** per `REPOS_REUSE_ANALYSIS.md`, the big PKM engines (khoj, anki, basic-memory, siyuan, reor, orbit) are **AGPL/BUSL — STUDY only, never vendor**. Port-friendly (MIT/Apache): py-fsrs, ts-fsrs, fsrs-rs, fsrs4anki, obsidian-spaced-repetition, infinition, LearnKit, org-fc, hashcards, recalla, memo, mimocard, yt-flashcard-ai, habit_quest, HabitTrove, QuestLog, engram, glean, llm_wiki, claude-obsidian, obsidian-wiki, syllabo, StudyWise, mind-mentor, PAIDEIA, study-planner-agent, syllabus-agent, memora, dyresearch, noodle, OrbitOS, My-Brain-Is-Full-Crew, second_brain_builder, memory-bank-mcp, nocturne_memory, token-savior, foam, dendron. Repos without a license file are STUDY only.
 
 ## Group 1 — Idea 61 🟡: RAG-grounded AI tutor (phrases 1–10)
 

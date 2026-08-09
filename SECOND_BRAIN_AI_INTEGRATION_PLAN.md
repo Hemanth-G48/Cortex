@@ -362,7 +362,7 @@ Each idea lists: **Objective**, **Why**, **Approach**, **Dependencies**, **Prior
 
 ---
 
-### Phase 1 — Second Brain Foundation & Ingestion (Ideas 1–10)
+### Phase 1 — Second Brain Foundation & Ingestion (Ideas 1–10)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE1_100_PHRASE_PLAN.md`
 
 ### Idea 1 🔴 — Knowledge Core data model
 - **Objective:** Add `kb_sources`, `kb_documents`, `kb_chunks`, `kb_embeddings`, `kb_concepts`, `kb_edges`, `kb_tags`, `kb_versions` tables plus a `kb` service layer.
@@ -378,7 +378,7 @@ Each idea lists: **Objective**, **Why**, **Approach**, **Dependencies**, **Prior
 - **Dependencies:** Idea 1.
 - **Priority:** Critical | **Complexity:** S
 
-### Idea 3 🟡 — Folder watcher & file scanning
+### Idea 3 🟡 ✅ — Folder watcher & file scanning
 - **Objective:** Scan source folders for markdown/PDF/DOCX/TXT; detect new, changed, and deleted files via mtime + content hash.
 - **Why:** The vault is a live system of notes; the app must mirror it continuously without manual import.
 - **Approach:** `watchdog` (or a polling fallback) producing file events; an idempotent scanner that upserts `kb_documents` and enqueues changed files for re-chunking.
@@ -434,7 +434,7 @@ Each idea lists: **Objective**, **Why**, **Approach**, **Dependencies**, **Prior
 - **Dependencies:** Ideas 1–3.
 - **Priority:** High | **Complexity:** M
 
-### Phase 2 — Embeddings, Indexing & Knowledge Graph (Ideas 11–20)
+### Phase 2 — Embeddings, Indexing & Knowledge Graph (Ideas 11–20)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE2_100_PHRASE_PLAN.md`
 
 ### Idea 11 🔴 — Embeddings service
 - **Objective:** OpenAI-compatible embeddings client (`POST {AI_BASE_URL}/embeddings`) with batch support, caching, and a deterministic local fallback.
@@ -506,7 +506,7 @@ Each idea lists: **Objective**, **Why**, **Approach**, **Dependencies**, **Prior
 - **Dependencies:** Ideas 10, 12.
 - **Priority:** Medium | **Complexity:** M
 
-### Phase 3 — Search & Retrieval (Ideas 21–30)
+### Phase 3 — Search & Retrieval (Ideas 21–30)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE3_100_PHRASE_PLAN.md`
 
 ### Idea 21 🟡 — Full-text search (FTS5)
 - **Objective:** Keyword full-text search across `kb_documents`/`kb_chunks` with highlight snippets.
@@ -571,158 +571,158 @@ Each idea lists: **Objective**, **Why**, **Approach**, **Dependencies**, **Prior
 - **Dependencies:** Ideas 23, 26.
 - **Priority:** Low | **Complexity:** L
 
-### Idea 30 🟡 — Global unified search box
+### Idea 30 🟡 ✅ — Global unified search box
 - **Objective:** One search UI across vault, materials, subjects, tasks, and assignments, with type facets.
 - **Why:** Users shouldn't guess which silo their knowledge lives in; one box makes the KB the front door.
 - **Approach:** Aggregating endpoint fanning out to per-domain search; frontend command-palette style search (Ctrl+K) with keyboard navigation.
 - **Dependencies:** Ideas 22, 21; existing tasks/materials search.
 - **Priority:** High | **Complexity:** M
 
-### Phase 4 — Note Intelligence & Content Generation (Ideas 31–40)
+### Phase 4 — Note Intelligence & Content Generation (Ideas 31–40)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE4_100_PHRASE_PLAN.md`
 
-### Idea 31 🟡 — AI summaries of notes & papers
+### Idea 31 🟡 ✅ — AI summaries of notes & papers
 - **Objective:** Generate structured summaries (TL;DR, key points, definitions, open questions) for any document, cached and versioned.
 - **Why:** Summaries turn raw vault content into quickly re-consumable knowledge and feed the subject layer.
 - **Approach:** Extend the existing `summaries` service pattern to `kb_documents`; budget-capped (`KB_DAILY_GEN_LIMIT`); store in `kb_summaries`; regenerate on content change.
 - **Dependencies:** Ideas 7, 11; existing `summaries.py`.
 - **Priority:** High | **Complexity:** M
 
-### Idea 32 🟡 — AI explanations (ELI5, analogies, derivations)
+### Idea 32 🟡 ✅ — AI explanations (ELI5, analogies, derivations)
 - **Objective:** Explain any vault concept at chosen depth (overview → deep dive) grounded in the user's own notes, with citations.
 - **Why:** The best explanations build on what the user already knows — which only their vault contains.
 - **Approach:** RAG over chunks covering the concept + `user_memory` strengths; prompt registry variants; citations mandatory.
 - **Dependencies:** Ideas 15, 23, 79.
 - **Priority:** High | **Complexity:** M
 
-### Idea 33 🟡 — AI quizzes generated from notes
+### Idea 33 🟡 ✅ — AI quizzes generated from notes
 - **Objective:** Generate quiz questions from selected chunks/notes, reusing the existing quiz schema and `Quiz` UI.
 - **Why:** Testing yourself against your own notes is the fastest feedback loop; the quiz machinery already exists.
 - **Approach:** New endpoint maps `kb_document_id`/chunk set → existing quiz generation service; store `kb_quiz_links` for traceability.
 - **Dependencies:** Ideas 7, 31; existing quizzes router.
 - **Priority:** High | **Complexity:** M
 
-### Idea 34 🟡 — Flashcards generated from notes
+### Idea 34 🟡 ✅ — Flashcards generated from notes
 - **Objective:** Auto-create Q/A flashcards from concepts and key statements in notes, into the existing flashcard-deck model.
 - **Why:** Spaced repetition over one's own notes is a proven retention technique; avoids manual card creation.
 - **Approach:** Extract candidate statement/answer pairs via `generate_json`; user review queue before committing to decks; dedupe against existing cards.
 - **Dependencies:** Ideas 15, 31; existing flashcards router.
 - **Priority:** High | **Complexity:** M
 
-### Idea 35 🟡 — Daily notes integration
+### Idea 35 🟡 ✅ — Daily notes integration
 - **Objective:** Link Obsidian daily notes to the app's daily schedule/journal; auto-tag by day; surface "what did I capture today".
 - **Why:** Daily notes are where fleeting knowledge lands; connecting them to the study day closes the capture loop.
 - **Approach:** Detect `YYYY-MM-DD.md` pattern; join with `daily_schedule_items` and journal entries by date; today-widget shows vault captures alongside schedule.
 - **Dependencies:** Ideas 4, 3; existing daily-schedule + journal.
 - **Priority:** Medium | **Complexity:** S
 
-### Idea 36 🔴 — Citation management (BibTeX & paper citations)
+### Idea 36 🔴 ✅ — Citation management (BibTeX & paper citations)
 - **Objective:** Extract citations from papers and notes into a citation registry; answers cite sources properly.
 - **Why:** Research workflows need citations; citation-aware answers (Idea 96) are impossible without a citation registry.
 - **Approach:** Parse reference lists from paper PDFs (regex/heuristic) and `@cite` syntax in markdown; store `kb_citations`; expose export as BibTeX.
 - **Dependencies:** Ideas 5, 16.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 37 🔴 — Concept linking UI
+### Idea 37 🔴 ✅ — Concept linking UI
 - **Objective:** In the note reader/editor, show linked concepts, related notes, and one-click "link this note to concept X".
 - **Why:** Explicit user curation of graph edges dramatically improves graph quality over pure inference.
 - **Approach:** Reader sidebar panel fed by graph queries; quick-add edge endpoints; edges gain `provenance=manual`.
 - **Dependencies:** Ideas 16–17.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 38 🔴 — Mind-map generation
+### Idea 38 🔴 ✅ — Mind-map generation
 - **Objective:** Render any document or topic as a hierarchical mind map (headings + concepts) exportable to Markdown/OPML.
 - **Why:** Visual structure helps comprehension and revision; it converts unstructured notes into a glanceable map.
 - **Approach:** Heading outline → tree; concept mentions attach to nodes; frontend tree visualization; export endpoint.
 - **Dependencies:** Ideas 4, 15.
 - **Priority:** Low | **Complexity:** M
 
-### Idea 39 🔴 — Note quality scoring
+### Idea 39 🔴 ✅ — Note quality scoring
 - **Objective:** Per-note scores for completeness, clarity, recency, and link density; actionable suggestions ("split this note", "add definition of X").
 - **Why:** Quality signals help users prune and improve their Second Brain systematically.
 - **Approach:** Heuristic composite score (length, headings, links, recency, coverage) + optional LLM suggestions batch job.
 - **Dependencies:** Ideas 4, 16, 27.
 - **Priority:** Low | **Complexity:** M
 
-### Idea 40 🟡 — Brain dump → structured notes migration
+### Idea 40 🟡 ✅ — Brain dump → structured notes migration
 - **Objective:** Upgrade the existing single-row `BrainDump` widget: captured text becomes draft `kb_documents` that the user can split, tag, and file.
 - **Why:** The current brain dump is a dead-end textarea; this makes every captured thought enter the knowledge pipeline.
 - **Approach:** On save, create draft document (status `draft`) with quick-file UI (title, source folder, tags); AI-assisted splitting of long dumps into sections.
 - **Dependencies:** Ideas 1, 3, 4; existing `braindumps` router/widget.
 - **Priority:** High | **Complexity:** M
 
-### Phase 5 — Subject Management Core (Ideas 41–50)
+### Phase 5 — Subject Management Core (Ideas 41–50)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE5_100_PHRASE_PLAN.md`
 
-### Idea 41 🟡 — Automatic subject creation
+### Idea 41 🟡 ✅ — Automatic subject creation
 - **Objective:** Detect a new subject from an uploaded syllabus or enrollment change and auto-create `curriculum_subject` (+ units) with an AI draft profile.
 - **Why:** Manual subject setup is friction; the AI should own the plumbing while the user reviews.
 - **Approach:** Syllabus upload → parse → propose subject metadata → user confirms in a review screen (extend `SyllabusImport` page) → write to curriculum tables.
 - **Dependencies:** Idea 42; existing curriculum models/routers.
 - **Priority:** High | **Complexity:** M
 
-### Idea 42 🟡 — Syllabus parsing
+### Idea 42 🟡 ✅ — Syllabus parsing
 - **Objective:** Parse syllabus text (PDF/DOCX/MD) into structured fields: title, semester, credits, units, topics, outcomes, grading scheme, deadlines.
 - **Why:** Syllabi are the authoritative outline of a subject; structured parsing unlocks everything downstream.
 - **Approach:** `text_extractor` → chunked syllabus → `generate_json` with strict schema; fallback heuristic splitter when AI disabled; store raw + parsed in `subject_profiles`.
 - **Dependencies:** Ideas 1, 5; existing `ai_client`.
 - **Priority:** Critical | **Complexity:** M
 
-### Idea 43 🔴 — Semester & calendar detection
+### Idea 43 🔴 ✅ — Semester & calendar detection
 - **Objective:** Detect the academic term/semester from syllabus text and app dates; tag subjects and units with the term.
 - **Why:** Semester-aware planning lets the roadmap engine respect the real academic calendar.
 - **Approach:** Date-range + keyword heuristics, cross-checked with assignment/exam due dates; `semester` column on `subject_profiles`.
 - **Dependencies:** Idea 42.
 - **Priority:** Medium | **Complexity:** S
 
-### Idea 44 🟡 — Topic extraction & normalization
+### Idea 44 🟡 ✅ — Topic extraction & normalization
 - **Objective:** Split each unit into granular topics with normalized titles and Bloom-level tags; maintain a per-subject topic thesaurus.
 - **Why:** Topics are the unit of study planning, revision, and coverage mapping — granularity matters.
 - **Approach:** LLM extraction with synonym folding (use `kb_concepts` canonicalization); human review grid in UI; store in `topics`.
 - **Dependencies:** Ideas 15, 42.
 - **Priority:** Critical | **Complexity:** M
 
-### Idea 45 🟡 — Unit & lecture segmentation
+### Idea 45 🟡 ✅ — Unit & lecture segmentation
 - **Objective:** Auto-assign syllabus topics to lectures/units matching the app's curriculum units and materials.
 - **Why:** Ties the parsed syllabus to existing `curriculum_units` + uploaded materials so coverage is measurable.
 - **Approach:** Embedding/name matching between parsed units and existing units/materials; suggestions presented for confirmation.
 - **Dependencies:** Ideas 42, 44.
 - **Priority:** High | **Complexity:** M
 
-### Idea 46 🔴 — Topic dependency graph
+### Idea 46 🔴 ✅ — Topic dependency graph
 - **Objective:** Infer prerequisites (A before B) among topics from syllabus phrasing, concept prerequisites, and performance data.
 - **Why:** A correct dependency order is what makes roadmaps and "what to study next" trustworthy.
 - **Approach:** Seed from LLM analysis of syllabus; refine with `DEPENDS_ON` edges from `kb_edges`; adjust weights from quiz mastery (studying B before A hurts scores).
 - **Dependencies:** Ideas 16, 44.
 - **Priority:** High | **Complexity:** M
 
-### Idea 47 🟡 — Learning roadmap generation
+### Idea 47 🟡 ✅ — Learning roadmap generation
 - **Objective:** Produce an ordered, time-boxed roadmap per subject: topics in dependency order, split into weekly sessions, respecting deadlines.
 - **Why:** Turns a subject outline into an executable plan the student can follow day by day.
 - **Approach:** Topological sort over topic graph → weekly bucketing by time estimates → conflicts checked against exam/assignment dates; output versioned in `roadmaps`.
 - **Dependencies:** Ideas 44, 46, 49, 50.
 - **Priority:** High | **Complexity:** M
 
-### Idea 48 🔴 — Difficulty estimation
+### Idea 48 🔴 ✅ — Difficulty estimation
 - **Objective:** Per-topic difficulty (Easy/Medium/Hard) from syllabus wording, note density, and the user's own quiz history.
 - **Why:** Difficulty drives pacing: hard topics get more sessions and earlier starts.
 - **Approach:** LLM rubric + overlap with known-difficult concepts; update with observed mastery slope from quiz attempts.
 - **Dependencies:** Ideas 44, 61.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 49 🟡 — Time estimation
+### Idea 49 🟡 ✅ — Time estimation
 - **Objective:** Estimate minutes needed per topic (first pass, review, mastery) from content volume, difficulty, and past pacing.
 - **Why:** Realistic time budgets make daily plans achievable rather than aspirational.
 - **Approach:** Volume (chunk count) × difficulty factor × user pacing multiplier (learned from `learning_events`); UI slider to calibrate.
 - **Dependencies:** Ideas 44, 48, 51.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 50 🔴 — Learning-outcome extraction
+### Idea 50 🔴 ✅ — Learning-outcome extraction
 - **Objective:** Extract measurable learning outcomes per topic ("can derive X", "can solve Y") and track them as checkable goals.
 - **Why:** Outcomes turn abstract mastery into verifiable checkboxes, making "am I done?" answerable.
 - **Approach:** Syllabus outcome lines + LLM expansion; stored on `topics`; UI checkboxes linked to mastery events and to the existing Goals model.
 - **Dependencies:** Ideas 42, 44.
 - **Priority:** Medium | **Complexity:** S
 
-### Phase 6 — Study Planning & Execution (Ideas 51–60)
+### Phase 6 — Study Planning & Execution (Ideas 51–60)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE6_100_PHRASE_PLAN.md`
 
 ### Idea 51 🟡 — Personalized study plans (AI-driven)
 - **Objective:** Upgrade the existing `study-plans` router: plans generated from the roadmap, vault coverage, and user availability, not just syllabus text.
@@ -794,288 +794,288 @@ Each idea lists: **Objective**, **Why**, **Approach**, **Dependencies**, **Prior
 - **Dependencies:** Ideas 51, 59; existing pomodoro + dailyschedule.
 - **Priority:** Medium | **Complexity:** M
 
-### Phase 7 — AI Tutor & Assessment (Ideas 61–70)
+### Phase 7 — AI Tutor & Assessment (Ideas 61–70)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE7_100_PHRASE_PLAN.md`
 
-### Idea 61 🟡 — RAG-grounded AI tutor
+### Idea 61 🟡 ✅ — RAG-grounded AI tutor
 - **Objective:** A chat tutor (extending the existing `AIChat`) that answers from the user's vault + subject materials, always citing sources.
 - **Why:** A tutor grounded in the user's own knowledge answers in their context — and refuses to invent knowledge the vault lacks.
 - **Approach:** Query → retrieval (Idea 23) → context assembly with user memory → `ai_client` chat; answer includes `[source: path]` markers; empty-retrieval → "not found in your Second Brain" with capture prompt.
 - **Dependencies:** Ideas 23, 25, 79; existing `AIChat.tsx`.
 - **Priority:** Critical | **Complexity:** L
 
-### Idea 62 🔴 — AI doubt solving
+### Idea 62 🔴 ✅ — AI doubt solving
 - **Objective:** A focused doubt-ask flow: student pastes a question/step where stuck; the tutor identifies the blocking concept and re-explains from their notes.
 - **Why:** Doubts usually sit at specific prerequisite gaps; fixing the gap fixes the doubt.
 - **Approach:** Analyze doubt → find candidate blocking concepts via graph + retrieval → explain gap + re-walk the problem; logs to `learning_events`.
 - **Dependencies:** Ideas 46, 61.
 - **Priority:** High | **Complexity:** M
 
-### Idea 63 🟡 — AI-generated practice questions
+### Idea 63 🟡 ✅ — AI-generated practice questions
 - **Objective:** On-demand practice sets per topic with difficulty tiers and worked solutions, stored for reuse.
 - **Why:** Practice is the highest-yield study activity; auto-generation removes the biggest friction.
 - **Approach:** Topic context → `generate_json` question bank (schema: q, options, answer, explanation, bloom level); UI review + save; dedupe by question hash.
 - **Dependencies:** Ideas 33, 44.
 - **Priority:** High | **Complexity:** M
 
-### Idea 64 🔴 — Mock tests & exam simulations
+### Idea 64 🔴 ✅ — Mock tests & exam simulations
 - **Objective:** Timed full-subject mock tests assembled from practice banks with a weighted paper structure from the syllabus grading scheme.
 - **Why:** Simulations train pacing and reveal whole-subject gaps that per-topic practice misses.
 - **Approach:** Paper generator (structure from grading scheme, questions by topic weight); timer + results analytics; history view.
 - **Dependencies:** Ideas 42, 63.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 65 🔴 — Interview preparation
+### Idea 65 🔴 ✅ — Interview preparation
 - **Objective:** Subject-aware interview mode: generates interview questions (conceptual + problem) and scores answers against the vault.
 - **Why:** For job/placement goals, the app should double as a mock interviewer.
 - **Approach:** Skill map (Idea 70) → question generation; answer grading via existing `grade-answer` service; feedback with cited corrections.
 - **Dependencies:** Ideas 61, 70; existing `ai/grade-answer`.
 - **Priority:** Low | **Complexity:** M
 
-### Idea 66 🟡 — Answer grading & feedback (advanced)
+### Idea 66 🟡 ✅ — Answer grading & feedback (advanced)
 - **Objective:** Grade free-text answers with partial credit, misconception detection, and next-steps, beyond today's correct/incorrect.
 - **Why:** Formative feedback is where learning actually happens; binary grading misses it.
 - **Approach:** Rubric prompt (bloom level, key points from chunks) → score + strengths + misconceptions + action items; persists to `learning_events`.
 - **Dependencies:** Ideas 61, 63; existing grade-answer service.
 - **Priority:** High | **Complexity:** M
 
-### Idea 67 🔴 — Adaptive question difficulty
+### Idea 67 🔴 ✅ — Adaptive question difficulty
 - **Objective:** Choose next question difficulty from the student's running mastery per topic (item-response style).
 - **Why:** Adaptive practice keeps challenge in the sweet spot — neither boring nor demoralizing.
 - **Approach:** Mastery estimate gates difficulty selection; track correctness per difficulty; simple IRT-lite update rule.
 - **Dependencies:** Ideas 58, 63.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 68 🔴 — Explain-my-mistake analysis
+### Idea 68 🔴 ✅ — Explain-my-mistake analysis
 - **Objective:** After a wrong answer, generate a walkthrough: where the reasoning diverged, which note to re-read, which concept to review.
 - **Why:** Mistake analysis converts every error into a targeted study action.
 - **Approach:** Compare student answer vs model solution; pinpoint divergence; recommend retrieval from vault; logs review task to revision schedule.
 - **Dependencies:** Ideas 52, 61, 66.
 - **Priority:** High | **Complexity:** M
 
-### Idea 69 🟡 — Knowledge capture & revision XP (replaces original)
+### Idea 69 🟡 ✅ — Knowledge capture & revision XP (replaces original)
 - **Objective:** Reward *knowledge capture* (new notes, filing brain dumps, daily-note creation) and *revision completion* through the existing XP/habit/quest mechanics.
 - **Why:** Quiz-attempt XP already exists (`xp_awarded`); the missing motivation is the capture-and-review loop itself — rewarding it keeps users returning daily.
 - **Approach:** Emit XP on revision completions, daily-note creation, and brain-dump filing; surface in habit tracker/quest centre; reuse the existing `habit_xp`, quest, and character services — no new gamification system.
 - **Dependencies:** Existing `habit_xp`, quest, character services; Ideas 35, 40, 90.
 - **Priority:** Medium | **Complexity:** S
 
-### Idea 70 🔴 — Skill mapping
+### Idea 70 🔴 ✅ — Skill mapping
 - **Objective:** Map subjects/topics to a skill taxonomy (e.g., CS/ML/DSA skills); derive a user skill profile with levels per skill.
 - **Why:** Skill profiles enable interview prep, portfolio clarity, and cross-subject recommendations.
 - **Approach:** Taxonomy seed + LLM mapping from topics/outcomes; levels from mastery; profile view + export.
 - **Dependencies:** Ideas 44, 58.
 - **Priority:** Low | **Complexity:** M
 
-### Phase 8 — Personalization & Learning Memory (Ideas 71–80)
+### Phase 8 — Personalization & Learning Memory (Ideas 71–80)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE8_100_PHRASE_PLAN.md`  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE8_100_PHRASE_PLAN.md`
 
-### Idea 71 🔴 — Learning preference profile
+### Idea 71 🔴 ✅ — Learning preference profile
 - **Objective:** Explicit + inferred preferences (depth, examples vs. theory, visual vs. textual, session length, explanation style).
 - **Why:** Personalization without a profile is guesswork; even a small explicit survey sharply improves relevance.
 - **Approach:** `user_preferences` table + onboarding survey; prompts inject preferences; inferred adjustments from behavior (session length, explanation depth toggles).
 - **Dependencies:** Idea 1.
 - **Priority:** High | **Complexity:** S
 
-### Idea 72 🔴 — Knowledge-gap detection (concept level)
+### Idea 72 🔴 ✅ — Knowledge-gap detection (concept level)
 - **Objective:** Concept-level gaps from combining quiz errors, retrieval misses, and missing vault coverage (beyond topic-level Idea 28).
 - **Why:** Topic-level gaps hide concept-level holes; concept granularity drives precise recommendations.
 - **Approach:** Map quiz errors to `kb_concepts`; gap = low mastery + low exposure; report with suggested source chunks to capture.
 - **Dependencies:** Ideas 15, 28, 58.
 - **Priority:** High | **Complexity:** M
 
-### Idea 73 🔴 — Personalized explanations
+### Idea 73 🔴 ✅ — Personalized explanations
 - **Objective:** Explanations adapt to the user: start from concepts they already know (from `user_memory`), use their preferred style, at the right depth.
 - **Why:** Explanations that build on known anchors are dramatically easier to understand.
 - **Approach:** Retrieval includes known-adjacent concepts; prompt template renders "link to what you know" + style; track follow-up acceptance implicitly.
 - **Dependencies:** Ideas 32, 71, 79.
 - **Priority:** High | **Complexity:** M
 
-### Idea 74 🔴 — Remember previously learned concepts
+### Idea 74 🔴 ✅ — Remember previously learned concepts
 - **Objective:** The tutor references what the user has already studied/mastered when answering ("as you saw in your notes on X…").
 - **Why:** Continuity makes the assistant feel like it knows the student, which is the whole point of a learning memory.
 - **Approach:** `user_memory` (concept, strength, last_seen) updated on every interaction; injected into tutor system prompt as "known context".
 - **Dependencies:** Ideas 61, 79.
 - **Priority:** High | **Complexity:** M
 
-### Idea 75 🔴 — Recommend what to study next
+### Idea 75 🔴 ✅ — Recommend what to study next
 - **Objective:** "Next up" recommendations across subjects: readiness (deps mastered), due reviews, weakness, and upcoming exams.
 - **Why:** The app should tell the student the single best next action every day.
 - **Approach:** Composite scoring over graph + schedule (similar to Idea 59 but cross-subject); rendered on dashboard + daily schedule; explainable reasons shown.
 - **Dependencies:** Ideas 46, 52, 58, 59.
 - **Priority:** High | **Complexity:** M
 
-### Idea 76 🔴 — Connect new concepts to existing notes
+### Idea 76 🔴 ✅ — Connect new concepts to existing notes
 - **Objective:** When a new document is ingested, suggest links to existing notes/concepts it extends or contradicts.
 - **Why:** New knowledge lands better when wired into what's already known; it also enriches the graph automatically.
 - **Approach:** After ingestion, retrieve top similar docs + shared concepts; present "connect?" suggestions; user accepts → edges with provenance.
 - **Dependencies:** Ideas 16, 17.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 77 🔴 — Suggest missing notes
+### Idea 77 🔴 ✅ — Suggest missing notes
 - **Objective:** Propose notes the user should create ("you study X but have no note on it; your recent quiz exposed a gap").
 - **Why:** Turns detected gaps into actionable capture, closing the know/capture loop.
 - **Approach:** Gap list (Idea 72) + topic coverage (Idea 28) → ranked suggestions with outline template + linked materials; one-tap create draft note.
 - **Dependencies:** Ideas 28, 40, 72.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 78 🔴 — Detect outdated notes
+### Idea 78 🔴 ✅ — Detect outdated notes
 - **Objective:** Flag notes that contradict newer notes, are stale, or whose referenced materials changed.
 - **Why:** Outdated knowledge actively misleads study plans and answers; detection keeps the vault honest.
 - **Approach:** Contradiction scan (LLM, budget-capped) on pairs flagged by similarity + recency; stale = no updates/hits in N days; UI review queue.
 - **Dependencies:** Ideas 9, 27, 39.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 79 🔴 — Long-term learning memory store
+### Idea 79 🔴 ✅ — Long-term learning memory store
 - **Objective:** A durable `user_memory` layer: concepts known, strengths, exposure counts, preferences, and interaction history, per user.
 - **Why:** This is the substrate for personalization, adaptation, and trajectory forecasting (Idea 99).
 - **Approach:** Normalized memory tables updated by event handlers (quiz, tutor, revision, notes); read side injected into prompts and recommendations.
 - **Dependencies:** Ideas 1, 58, 74.
 - **Priority:** High | **Complexity:** M
 
-### Idea 80 🔴 — Adaptive learning paths
+### Idea 80 🔴 ✅ — Adaptive learning paths
 - **Objective:** Roadmaps and daily plans adapt continuously: as mastery rises, paths shorten/skip mastered topics; as gaps appear, they insert reviews.
 - **Why:** A static plan decays; an adaptive plan stays aligned with reality.
 - **Approach:** Versioned `roadmaps` + recompute triggers on mastery/due-date events; UI shows "plan updated: +2 reviews, -1 topic" diffs.
 - **Dependencies:** Ideas 47, 58, 79.
 - **Priority:** Medium | **Complexity:** L
 
-### Phase 9 — Automation (Ideas 81–90)
+### Phase 9 — Automation (Ideas 81–90)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE9_100_PHRASE_PLAN.md`  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE9_100_PHRASE_PLAN.md`
 
-### Idea 81 🔴 — Auto-categorize new notes
+### Idea 81 🔴 ✅ — Auto-categorize new notes
 - **Objective:** On ingest, assign each document a folder/category (by source, subject, tag) with user review.
 - **Why:** Vaults grow chaotic; automatic filing keeps them navigable with minimal user effort.
-- **Approach:** Rules (folder patterns, existing taxonomy) + LLM category proposal; batch UI approve; moves logged to version history.
+- **Approach:** Rules (folder patterns, existing taxonomy) + LLM category proposal; batch UI approve; moves logged to version history. ✅ `services/kb/auto_categorize.py` + `routers/kb_categorize.py` + `CategorizeSuggestion` review queue.
 - **Dependencies:** Ideas 3, 4, 14.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 82 🔴 — Auto-tag documents (scheduled)
+### Idea 82 🔴 ✅ — Auto-tag documents (scheduled)
 - **Objective:** Background job tags new/untagged documents nightly within the daily generation budget.
 - **Why:** Tags power filtering and search facets; doing it automatically keeps tag coverage high.
-- **Approach:** Nightly job over `status=untagged` docs; tag proposals stored as `kb_tags` with provenance; UI diff-review.
+- **Approach:** Nightly job over `status=untagged` docs; tag proposals stored as `kb_tags` with provenance; UI diff-review. ✅ `services/kb/auto_tag.py` (rules first, AI/TF-IDF proposals, `tags_dirty` clearing).
 - **Dependencies:** Ideas 10, 14.
 - **Priority:** Medium | **Complexity:** S
 
-### Idea 83 🟡 — Auto-link related notes (scheduled)
+### Idea 83 🟡 ✅ — Auto-link related notes (scheduled)
 - **Objective:** Periodic background pass suggests/creates `RELATED`/`BACKLINK` edges between similar notes.
 - **Why:** Link quality improves with corpus size; scheduled passes keep the graph current without user effort.
-- **Approach:** Cluster-by-embedding job; within cluster, propose edges above threshold; auto-create low-confidence-pending review.
+- **Approach:** Cluster-by-embedding job; within cluster, propose edges above threshold; auto-create low-confidence-pending review. ✅ `services/kb/auto_link.py` (confidence split, pending-edge queue, accept/reject).
 - **Dependencies:** Ideas 10, 17.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 84 🔴 — Auto-detect duplicates (scheduled)
+### Idea 84 🔴 ✅ — Auto-detect duplicates (scheduled)
 - **Objective:** Nightly duplicate scan flags exact and near-duplicate documents for merge.
 - **Why:** Duplicates accumulate silently; periodic scanning keeps the KB clean without per-upload friction.
-- **Approach:** Hash index scan (exact) + sampled embedding pairs (near); merge workflow moves content and re-points edges.
+- **Approach:** Hash index scan (exact) + sampled embedding pairs (near); merge workflow moves content and re-points edges. ✅ `services/kb/auto_duplicates.py` + existing merge/archive endpoints.
 - **Dependencies:** Ideas 8, 19.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 85 🟡 — Auto-create flashcards from new notes
+### Idea 85 🟡 ✅ — Auto-create flashcards from new notes
 - **Objective:** New concept-bearing notes automatically get candidate flashcards queued for approval.
 - **Why:** Keeps flashcard decks growing in lockstep with the vault, where learning actually happens.
-- **Approach:** Hook after concept extraction (Idea 15); candidates → review queue → decks; dedupe by card hash.
+- **Approach:** Hook after concept extraction (Idea 15); candidates → review queue → decks; dedupe by card hash. ✅ `services/kb/auto_flashcards.py` — MENTIONS gate, `source='auto'` candidates, budget-capped, deduped.
 - **Dependencies:** Ideas 15, 34.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 86 🟡 — Auto-create summaries (scheduled)
+### Idea 86 🟡 ✅ — Auto-create summaries (scheduled)
 - **Objective:** Nightly summaries for changed/important documents within the daily generation budget.
 - **Why:** Pre-built summaries mean instant answers later and cheaper on-demand generation.
-- **Approach:** Job over docs with `dirty_summary` flag; respect `KB_DAILY_GEN_LIMIT`; cache invalidation on content change.
+- **Approach:** Job over docs with `summary_dirty` flag; respect `KB_DAILY_GEN_LIMIT`; cache invalidation on content change. ✅ `services/kb/auto_summary.py` + `summary_dirty` hook in the ingest pipeline.
 - **Dependencies:** Ideas 10, 31.
 - **Priority:** Medium | **Complexity:** S
 
-### Idea 87 🔴 — Auto-generate mind maps (scheduled)
+### Idea 87 🔴 ✅ — Auto-generate mind maps (scheduled)
 - **Objective:** Background generation of mind-map outlines for documents with rich structure; stored and rendered on demand.
 - **Why:** Visual previews make the vault browsable at a glance; pre-generation avoids render-time latency.
-- **Approach:** Same pipeline as Idea 38, run as batch job; cache outline in document row.
+- **Approach:** Same pipeline as Idea 38, run as batch job; cache outline in document row. ✅ `services/kb/auto_mindmap.py` — heading-qualified, tree cached in `metadata_json`, hash-skip idempotent, no LLM cost.
 - **Dependencies:** Ideas 10, 38.
 - **Priority:** Low | **Complexity:** M
 
-### Idea 88 🔴 — Auto-update study plans on new materials
+### Idea 88 🔴 ✅ — Auto-update study plans on new materials
 - **Objective:** When a new material/vault chunk covers a topic, the roadmap and plans re-sync (coverage improves → estimated time shrinks).
 - **Why:** Plans that ignore new resources are stale within days.
-- **Approach:** Coverage-mapper rerun on material ingest; plan revision only when deltas exceed thresholds; notify via existing notifications system.
+- **Approach:** Coverage-mapper rerun on material ingest; plan revision only when deltas exceed thresholds; notify via existing notifications system. ✅ `services/kb/auto_plan_sync.py` — coverage→estimate refresh, `KB_PLAN_DELTA_THRESHOLD` gate, Phase 8 adapt machinery, `plan_sync` notifications.
 - **Dependencies:** Ideas 38, 47, 51.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 89 🔴 — Auto-sync external repositories
+### Idea 89 🔴 ✅ — Auto-sync external repositories
 - **Objective:** Sync from Git repos, Google Drive, and web clippings; detect changed files via cursor/diff and import only deltas.
 - **Why:** Knowledge lives in many places; the Second Brain should mirror them without manual export.
-- **Approach:** Source adapters (git clone/pull, Drive API, clip service) behind the `kb_sources` registry; per-source sync cursors; conflict policy (newest wins, versioned).
+- **Approach:** Source adapters (git clone/pull, Drive API, clip service) behind the `kb_sources` registry; per-source sync cursors; conflict policy (newest wins, versioned). ✅ `services/kb/auto_sync.py` (git/drive/clip adapters, delta cursors, newest-wins + version logging) + `POST /api/kb/sources/{id}/sync` + `GET .../sync-status`.
 - **Dependencies:** Ideas 2, 3, 10.
 - **Priority:** Low | **Complexity:** L
 
-### Idea 90 🔴 — Auto-create revision tasks
+### Idea 90 🔴 ✅ — Auto-create revision tasks
 - **Objective:** Due reviews and gap-based reviews are automatically materialized as tasks/reminders on the user's calendar.
 - **Why:** Plans only work when they land on the calendar; automatic materialization removes the last manual step.
-- **Approach:** Daily job: due `revision_schedule` rows → tasks (with topic, link, estimated time); completed tasks feed back into scheduling.
+- **Approach:** Daily job: due `revision_schedule` rows → tasks (with topic, link, estimated time); completed tasks feed back into scheduling. ✅ `services/kb/auto_revision.py` — due→tasks + reminders + micro-sessions, idempotent, Phase 6 materializer reused.
 - **Dependencies:** Ideas 52, 60; existing tasks/reminders.
 - **Priority:** High | **Complexity:** M
 
-### Phase 10 — Advanced AI, Analytics & Platform (Ideas 91–100)
+### Phase 10 — Advanced AI, Analytics & Platform (Ideas 91–100)  **✅ COMPLETE** — see `SECOND_BRAIN_PHASE10_100_PHRASE_PLAN.md`
 
-### Idea 91 🔴 — Multi-agent architecture
+### Idea 91 🔴 ✅ — Multi-agent architecture
 - **Objective:** An orchestrator agent delegating to specialist sub-agents: retriever, summarizer, quizzer, tutor, scheduler, health-checker.
 - **Why:** Complex requests ("prepare me for Thursday's exam using my weakest topics") need coordinated sub-tasks that one prompt handles poorly.
 - **Approach:** Lightweight agent protocol: task objects with inputs/outputs; orchestrator plans → spawns sequential/parallel steps → composes; every agent uses the shared `ai_client` + budget guardrails.
 - **Dependencies:** Ideas 23, 31, 33, 47, 58, 61.
 - **Priority:** Medium | **Complexity:** L
 
-### Idea 92 🔴 — Long-term memory system
+### Idea 92 🔴 ✅ — Long-term memory system
 - **Objective:** Persistent cross-session memory: facts about the user's studies, preferences, recurring confusions, and goals; memory summarization over time.
 - **Why:** A tutor that forgets the user is a search engine; memory is what makes it a *personal* assistant.
 - **Approach:** `user_memory` + episodic memory journal; periodic consolidation job (summarize old events into durable facts); memory injected into prompts.
 - **Dependencies:** Ideas 79, 91.
 - **Priority:** Medium | **Complexity:** L
 
-### Idea 93 🟡 — Full RAG pipeline hardening
+### Idea 93 🟡 ✅ — Full RAG pipeline hardening
 - **Objective:** Production-grade retrieval pipeline: query rewrite, multi-stage retrieval, rerank, citation verification, answer faithfulness checks.
 - **Why:** Retrieval errors silently degrade every AI feature; hardening it is the highest-leverage investment.
 - **Approach:** Pipeline stages as composable functions; faithfulness check post-generation (groundedness score); fallback to "not found" when ungrounded.
 - **Dependencies:** Ideas 23, 26, 61.
 - **Priority:** High | **Complexity:** L
 
-### Idea 94 🔴 — Knowledge-graph + vector fusion
+### Idea 94 🔴 ✅ — Knowledge-graph + vector fusion
 - **Objective:** Graph-aware retrieval: expand a vector hit via graph neighbors (prerequisites, related concepts) before answering.
 - **Why:** Graph context adds relational knowledge pure vectors miss (e.g., prerequisite chains for explanation).
 - **Approach:** Two-stage: vector top-k → graph expansion (1–2 hops) → dedupe/rerank; graph-aware prompts for tutor/explanations.
 - **Dependencies:** Ideas 16, 23, 61.
 - **Priority:** Medium | **Complexity:** L
 
-### Idea 95 🟡 — Context-aware responses
+### Idea 95 🟡 ✅ — Context-aware responses
 - **Objective:** The assistant adapts responses to current context: active subject, upcoming exam, recent activity, and question history.
 - **Why:** Same question means different things in exam week vs. mid-semester; context makes answers relevant.
 - **Approach:** Context bundle (active subject, deadlines, recent topics) attached to requests; prompt injection + UI context chips; user can override context.
 - **Dependencies:** Ideas 61, 79.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 96 🟡 — Research assistant
+### Idea 96 🟡 ✅ — Research assistant
 - **Objective:** Paper ingestion → summary, key-contribution extraction, related-paper suggestions from the user's own library, and citation-aware synthesis answers.
 - **Why:** Research reading is time-heavy; an assistant that summarizes and connects papers to the user's existing notes pays off immediately.
 - **Approach:** arXiv metadata (Idea 5) + summary pipeline (Idea 31) + citation registry (Idea 36); "explain this paper to me given my notes" flow.
 - **Dependencies:** Ideas 5, 31, 36, 61.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 97 🔴 — Intelligent recommendation engine
+### Idea 97 🔴 ✅ — Intelligent recommendation engine
 - **Objective:** Cross-domain recommendations: what to study, which notes to revisit, which papers to read, which practice sets to take — ranked and explainable.
 - **Why:** Recommendations tie all subsystems together into one coherent assistant behavior.
 - **Approach:** Candidate generation from graph + memory + schedule; ranking by urgency × weakness × readiness; explanations ("because X is due and you missed it last week").
 - **Dependencies:** Ideas 59, 75, 79, 94.
 - **Priority:** Medium | **Complexity:** L
 
-### Idea 98 🟡 — Goal planning & reflection system
+### Idea 98 🟡 ✅ — Goal planning & reflection system
 - **Objective:** Term/quarter goals derived from subjects (e.g., "master DSA") with progress, weekly reflection prompts, and plan adjustments.
 - **Why:** Goals without reflection drift; the app already has Goals — this adds AI-driven planning and periodic reflection.
 - **Approach:** Goals ↔ roadmap alignment; weekly reflection (what worked/what didn't) generated from `learning_events`; insights pushed to user.
 - **Dependencies:** Ideas 51, 57, 79; existing goals router.
 - **Priority:** Medium | **Complexity:** M
 
-### Idea 99 🟡 — Predictive analytics & learning-trajectory forecasting
+### Idea 99 🟡 ✅ — Predictive analytics & learning-trajectory forecasting
 - **Objective:** Forecast per-subject trajectory (mastery over time, exam-readiness score) from historical events; flag at-risk subjects early.
 - **Why:** Early warning beats post-hoc analysis; "you're on track for a 72%" changes behavior before the exam.
 - **Approach:** Time-series model over mastery/exposure events (simple regression/EWMA first); readiness score = weighted forecast vs. exam date; alerts via notifications.
 - **Dependencies:** Ideas 57, 79, 98.
 - **Priority:** Low | **Complexity:** L
 
-### Idea 100 🟡 — Self-improving assistant + observability
+### Idea 100 🟡 ✅ — Self-improving assistant + observability
 - **Objective:** Closed-loop improvement: log every AI interaction, score quality (user feedback, faithfulness checks, retrieval metrics), and feed scores into prompt/retrieval tuning.
 - **Why:** The system improves only if it measures itself; this is the meta-feature that compounds all others.
 - **Approach:** `ai_logs` table (request, retrieval, response, latency, cost, feedback); weekly report; A/B-able prompt versions; automated regression suite from golden sets.
@@ -1130,7 +1130,7 @@ Estimated 14–18 months for a small team (1–2 backend, 1 frontend, part-time 
 | Phase 4 | Note intelligence & content generation (31–40) | Weeks 14–20 |
 | Phase 5 | Subject management core (41–50) | Weeks 18–26 |
 | Phase 6 | Study planning & execution (51–60) | Weeks 24–32 |
-| Phase 7 | AI tutor & assessment (61–70) | Weeks 30–38 |
+| Phase 7 | AI tutor & assessment (61–70) | Weeks 30–38 | **✅ DONE** — 85 tests, frontend `/tutor` `/practice` `/mocks` `/interview` `/skills` |
 | Phase 8 | Personalization & learning memory (71–80) | Weeks 36–44 |
 | Phase 9 | Automation (81–90) | Weeks 42–52 |
 | Phase 10 | Advanced AI, analytics & platform (91–100) | Weeks 50–70+ |

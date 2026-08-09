@@ -5,6 +5,11 @@
 ordered implementation phrases** — the build-ready companion to the Phase 1–5 plans
 (`SECOND_BRAIN_PHASE{1,2,3,4,5}_100_PHRASE_PLAN.md`).
 
+**Implementation status: ✅ COMPLETE** — backend (10 KB test files: study-plan, revision, exam-prep,
+assignment-intel, labs, attendance, progress, mastery, next-action, micro-session) and frontend
+(plan view, due-reviews list, exam-prep page, labs tab, attendance view, progress dashboard,
+mastery bars, "Study now" card, micro-session launch) all landed.
+
 **Audit status (from §2 of the master plan):**
 - 🔴 genuinely new (4): Idea 53 (exam prep mode), 55 (labs), 56 (attendance), 59 (recommended study order)
 - 🟡 partial / extends existing code (6): Ideas 51, 52, 54, 57, 58, 60 extend the existing `StudyPlan` model + `study_plans` router, `/api/ai/study-plan`, tasks/reminders/daily-schedule, the analytics service, and Pomodoro
@@ -57,6 +62,26 @@ Phrases are numbered 1–100 and grouped 10-per-idea. Later groups depend on ear
 phrase is independently verifiable.
 
 ---
+
+
+---
+
+## Reference repos — what to borrow (from [REPOS_REUSE_ANALYSIS.md](./REPOS_REUSE_ANALYSIS.md))
+
+Every idea in Phase 6 (Study Planning & Execution) has reusable components in the cloned reference repos under `similar_repos/<owner>/<repo>`. Open the listed files directly and adapt them — full per-repo detail (exact paths, reuse modes) is in `REPOS_REUSE_ANALYSIS.md`.
+
+- **Idea 51 — Personalized study plans (AI-driven):** study-planner-agent (generate_plan) · mind-mentor (study-plan) · Multi-Agent-Study-Assistant · syllabo · StudyWise
+- **Idea 52 — Revision scheduling (spaced repetition):** py-fsrs · ts-fsrs · fsrs-rs · obsidian-spaced-repetition (FSRS+SM-2) · LearnKit (fsrs.ts/lkrs.ts) · infinition (SM-2) · org-fc (SM-2 + FSRS) · hashcards · memo · orbit · fsrs4anki · anki (rslib scheduler)
+- **Idea 53 — Exam preparation mode:** StudyWise (exam page) · EduAI (practice) · syllabo · Student_Study_Planner
+- **Idea 54 — Assignment intelligence:** QuestLog (tasks) · noodle (modules) · EduAI
+- **Idea 55 — Lab tracking:** QuestLog (collaboration) · EduAI
+- **Idea 56 — Attendance monitoring:** EduAI · habit_quest (streak patterns)
+- **Idea 57 — Subject progress analytics:** QuestLog (analytics.controller.js) · StudyWise (progress) · mind-mentor (insights) · HabitTrove · syllabo
+- **Idea 58 — Weak & strong topic detection:** QuestLog (AI insights) · StudyWise · syllabo · PAIDEIA
+- **Idea 59 — Recommended study order:** syllabo (content_recommender.py) · Multi-Agent-Study-Assistant · StudyWise
+- **Idea 60 — Micro-session & focus integration:** mind-mentor (timer) · habit_quest · HabitTrove
+
+> ⚠️ **License check before reuse:** per `REPOS_REUSE_ANALYSIS.md`, the big PKM engines (khoj, anki, basic-memory, siyuan, reor, orbit) are **AGPL/BUSL — STUDY only, never vendor**. Port-friendly (MIT/Apache): py-fsrs, ts-fsrs, fsrs-rs, fsrs4anki, obsidian-spaced-repetition, infinition, LearnKit, org-fc, hashcards, recalla, memo, mimocard, yt-flashcard-ai, habit_quest, HabitTrove, QuestLog, engram, glean, llm_wiki, claude-obsidian, obsidian-wiki, syllabo, StudyWise, mind-mentor, PAIDEIA, study-planner-agent, syllabus-agent, memora, dyresearch, noodle, OrbitOS, My-Brain-Is-Full-Crew, second_brain_builder, memory-bank-mcp, nocturne_memory, token-savior, foam, dendron. Repos without a license file are STUDY only.
 
 ## Group 1 — Idea 51 🟡: Personalized study plans (AI-driven) (phrases 1–10)
 

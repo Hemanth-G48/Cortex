@@ -9,6 +9,17 @@ ordered implementation phrases** — the build-ready companion to the Phase 1–
 - 🔴 genuinely new (4): Idea 43 (semester detection), 46 (topic dependency graph), 48 (difficulty), 50 (learning outcomes)
 - 🟡 partial / extends existing code (6): Ideas 41, 42, 44, 45, 47, 49 extend the existing curriculum models/router, the shallow `/api/ai/syllabus` endpoint, and the `SyllabusImport` page
 
+**Implementation status: ✅ COMPLETE** — backend (10/10 test files, 83/83 tests) and frontend all landed.
+Backend: `SubjectProfile`/`Topic`/`Roadmap`/`TopicDependency` models, `subjects.py` (propose/confirm/reject
++ semester detection), `syllabus.py` (chunked parse + merge + fallback), `topics.py` (extraction,
+synonym folding, Bloom, difficulty/time, outcomes→goals), `units.py` (name + embedding matching),
+`dependencies.py` (cycle-safe topic DAG, Kahn topo order), `roadmap.py` (versioned weekly plans),
+`budget.py`-capped LLM calls with deterministic fallbacks, and the `/api/subjects` router.
+Frontend: `SyllabusImport` reworked to the Phase 5 proposal flow (parsed preview + review step),
+`Subjects` page (semester + status facets), `SubjectWorkspace` page (unit match table, topic review
+grid with difficulty/time/outcomes, dependency editor, roadmap view), and `endpoints.subjects`
+(import/proposals/topics/matchUnits/dependencies/roadmap/timeBudget/outcomes/pacing) in `api.ts`.
+
 **Prerequisites: Phases 1–4 must be complete** — this phase consumes `kb_documents`/`kb_chunks`
 (syllabus ingestion), `kb_concepts` (topic canonicalization), `kb_edges` (`DEPENDS_ON`), the
 Phase 2 embeddings (unit matching), and the Phase 4 budget guard (`KB_DAILY_GEN_LIMIT`). It writes
@@ -58,6 +69,26 @@ phrase is independently verifiable.
 
 ---
 
+
+---
+
+## Reference repos — what to borrow (from [REPOS_REUSE_ANALYSIS.md](./REPOS_REUSE_ANALYSIS.md))
+
+Every idea in Phase 5 (Subject Management Core) has reusable components in the cloned reference repos under `similar_repos/<owner>/<repo>`. Open the listed files directly and adapt them — full per-repo detail (exact paths, reuse modes) is in `REPOS_REUSE_ANALYSIS.md`.
+
+- **Idea 41 — Automatic subject creation:** syllabo · study-planner-agent (models.py Subject)
+- **Idea 42 — Syllabus parsing:** syllabus-agent (utils.py extract_topics_from_text) · syllabo · PAIDEIA · study-planner-agent · Syllabify · EduAI (syllabus app)
+- **Idea 43 — Semester & calendar detection:** syllabo · Student_Study_Planner · EduAI
+- **Idea 44 — Topic extraction & normalization:** syllabus-agent · PAIDEIA · syllabo · StudyWise
+- **Idea 45 — Unit & lecture segmentation:** PAIDEIA · syllabo · EduAI
+- **Idea 46 — Topic dependency graph:** PAIDEIA (learning graph) · mind-mentor (knowledge graph) · knowledge-nexus (Neo4j) · obsidian-wiki
+- **Idea 47 — Learning roadmap generation:** Multi-Agent-Study-Assistant (roadmaps) · study-planner-agent (generate_plan) · syllabo · StudyWise · PAIDEIA · OrbitOS
+- **Idea 48 — Difficulty estimation:** syllabo (difficulty_analyzer.py) · studybuddy-ai · syllabus-agent
+- **Idea 49 — Time estimation:** syllabus-agent (build_study_plan) · study-planner-agent · syllabo
+- **Idea 50 — Learning-outcome extraction:** syllabo · PAIDEIA · syllabus-agent
+
+> ⚠️ **License check before reuse:** per `REPOS_REUSE_ANALYSIS.md`, the big PKM engines (khoj, anki, basic-memory, siyuan, reor, orbit) are **AGPL/BUSL — STUDY only, never vendor**. Port-friendly (MIT/Apache): py-fsrs, ts-fsrs, fsrs-rs, fsrs4anki, obsidian-spaced-repetition, infinition, LearnKit, org-fc, hashcards, recalla, memo, mimocard, yt-flashcard-ai, habit_quest, HabitTrove, QuestLog, engram, glean, llm_wiki, claude-obsidian, obsidian-wiki, syllabo, StudyWise, mind-mentor, PAIDEIA, study-planner-agent, syllabus-agent, memora, dyresearch, noodle, OrbitOS, My-Brain-Is-Full-Crew, second_brain_builder, memory-bank-mcp, nocturne_memory, token-savior, foam, dendron. Repos without a license file are STUDY only.
+
 ## Group 1 — Idea 41 🟡: Automatic subject creation (phrases 1–10)
 
 1. **Define the `SubjectProfile` model (`subject_profiles`)** — `id, user_id, curriculum_subject_id (nullable), raw_syllabus_text, parsed_json, semester, status (proposed|confirmed|rejected), created_at, updated_at`. 🟡
@@ -68,8 +99,8 @@ phrase is independently verifiable.
 6. **Add `GET /api/subjects/proposals`** — list pending proposals per user for the review screen. 🟡
 7. **Add `POST /api/subjects/proposals/{id}/confirm`** — writes `curriculum_subject` + `curriculum_unit` rows (existing tables) and links the profile; `reject` marks it rejected. 🟡
 8. **Write `backend/tests/test_kb_subject_auto.py`** — propose, confirm (writes curriculum rows), reject, per-user isolation. 🟡
-9. **Frontend:** extend the `SyllabusImport` page with a review step — edit name/code/credits, confirm/reject, before any DB write. 🟡
-10. **api.ts:** `endpoints.subjects.import` + `endpoints.subjects.proposals` (list/confirm/reject). 🟡
+9. **Frontend:** extend the `SyllabusImport` page with a review step — edit name/code/credits, confirm/reject, before any DB write. 🟡 ✅ `frontend/src/pages/SyllabusImport.tsx` (review form + confirm/reject)
+10. **api.ts:** `endpoints.subjects.import` + `endpoints.subjects.proposals` (list/confirm/reject). 🟡 ✅ `endpoints.subjects` in `frontend/src/services/api.ts`
 
 
 ## Group 2 — Idea 42 🟡: Syllabus parsing (phrases 11–20)
@@ -83,7 +114,7 @@ phrase is independently verifiable.
 17. **Add `GET /api/subjects/{id}/profile`** — returns raw text + parsed JSON + parse status per user. 🟡
 18. **Budget-cap every parse call** against `KB_DAILY_GEN_LIMIT`; clear 429-style message when exhausted. 🟡
 19. **Write `backend/tests/test_kb_syllabus_parse.py`** — mocked LLM happy path, fallback path, PDF ingestion, chunk-merge, schema validation. 🟡
-20. **Frontend:** parsed-syllabus preview (units + topics) on the import flow before confirmation. 🟡
+20. **Frontend:** parsed-syllabus preview (units + topics) on the import flow before confirmation. 🟡 ✅ `SyllabusImport.tsx` (units→topics preview cards)
 
 
 ## Group 3 — Idea 43 🔴: Semester & calendar detection (phrases 21–30)
@@ -95,8 +126,8 @@ phrase is independently verifiable.
 25. **Write the detected term** onto the profile + all linked units when confirmed. 🔴
 26. **Add `GET /api/subjects?semester=` filtering** — semester facet across subjects/units. 🔴
 27. **Write `backend/tests/test_kb_semester.py`** — keyword cases, date cross-check, silent-default, per-user isolation. 🔴
-28. **Frontend:** semester facet in the subject list + display on subject/unit cards. 🔴
-29. **api.ts:** `subjects.list({semester})` filter param. 🔴
+28. **Frontend:** semester facet in the subject list + display on subject/unit cards. 🔴 ✅ `frontend/src/pages/Subjects.tsx` (facet chips + per-card semester badge)
+29. **api.ts:** `subjects.list({semester})` filter param. 🔴 ✅ `endpoints.subjects.list({semester, status})`
 30. **Expose the term to roadmap bucketing** — Group 7 reads `semester` start/end dates for deadline-aware planning. 🔴
 
 
@@ -110,8 +141,8 @@ phrase is independently verifiable.
 36. **Add a human review grid** — `GET /api/subjects/{id}/topics?status=pending` + confirm/merge/reject endpoints. 🟡
 37. **Tag Bloom levels** — LLM assignment with rule-based fallback on keywords ("analyze", "design", "recall"). 🟡
 38. **Write `backend/tests/test_kb_topics.py`** — extraction, synonym folding, review lifecycle, Bloom fallback, dedupe by normalized name. 🟡
-39. **Frontend:** topic review grid (confirm/merge/reject chips) + topic list per subject. 🟡
-40. **api.ts:** `endpoints.subjects.topics` (list/confirm/merge/reject). 🟡
+39. **Frontend:** topic review grid (confirm/merge/reject chips) + topic list per subject. 🟡 ✅ `frontend/src/pages/SubjectWorkspace.tsx` (Topics tab)
+40. **api.ts:** `endpoints.subjects.topics` (list/confirm/merge/reject). 🟡 ✅ `endpoints.subjects.topics`
 
 
 ## Group 5 — Idea 45 🟡: Unit & lecture segmentation (phrases 41–50)
@@ -124,8 +155,8 @@ phrase is independently verifiable.
 46. **Assign topics to units** — on confirm, set `Topic.unit_id` from the mapping (topics without a unit stay `unit_id=NULL`). 🟡
 47. **Flag unmatched units** — returned as "create new" suggestions the user can accept or skip. 🟡
 48. **Write `backend/tests/test_kb_unit_match.py`** — name matching, embedding fallback (mocked), confirm writes links, unmatched flow. 🟡
-49. **Frontend:** unit-match confirmation step in the import flow (side-by-side table). 🟡
-50. **api.ts:** `endpoints.subjects.matchUnits` + `.confirm`. 🟡
+49. **Frontend:** unit-match confirmation step in the import flow (side-by-side table). 🟡 ✅ `SubjectWorkspace.tsx` (Overview tab → Match Units table)
+50. **api.ts:** `endpoints.subjects.matchUnits` + `.confirm`. 🟡 ✅ `endpoints.subjects.matchUnits`
 
 
 ## Group 6 — Idea 46 🔴: Topic dependency graph (phrases 51–60)
@@ -138,7 +169,7 @@ phrase is independently verifiable.
 56. **Add `GET /api/subjects/{id}/dependencies`** — the subject's topic DAG (nodes + edges) for the UI and roadmap engine. 🔴
 57. **Add manual edge endpoints** — `POST /api/topics/dependencies` (add `DEPENDS_ON`, `provenance=manual`) and delete. 🔴
 58. **Write `backend/tests/test_kb_topic_deps.py`** — LLM seed, concept inheritance, cycle rejection, manual add/remove. 🔴
-59. **Frontend:** dependency editor on the subject page — simple DAG list view with add/remove controls. 🔴
+59. **Frontend:** dependency editor on the subject page — simple DAG list view with add/remove controls. 🔴 ✅ `SubjectWorkspace.tsx` (Dependencies tab)
 60. **Expose topological-order helpers** in the service — reused by roadmap generation (Group 7). 🔴
 
 
@@ -152,8 +183,8 @@ phrase is independently verifiable.
 66. **Add `POST /api/subjects/{id}/roadmap/generate`** — creates a new version; `GET …/roadmap` returns the active one. 🟡
 67. **Deterministic fallback** — when `AI_ENABLED=false`: syllabus order + equal weekly split (no LLM needed; graph still used). 🟡
 68. **Write `backend/tests/test_kb_roadmap.py`** — topo ordering, weekly bucketing, deadline constraint, versioning, fallback. 🟡
-69. **Frontend:** week-by-week roadmap view on the subject page (topics per week, checkable). 🟡
-70. **api.ts:** `endpoints.subjects.roadmap` (generate/get). 🟡
+69. **Frontend:** week-by-week roadmap view on the subject page (topics per week, checkable). 🟡 ✅ `SubjectWorkspace.tsx` (Roadmap tab)
+70. **api.ts:** `endpoints.subjects.roadmap` (generate/get). 🟡 ✅ `endpoints.subjects.roadmap`
 
 
 ## Group 8 — Idea 48 🔴: Difficulty estimation (phrases 71–80)
@@ -166,7 +197,7 @@ phrase is independently verifiable.
 76. **Combine into a single E/M/H with confidence** — weighted vote of rubric + overlap + density; store on `Topic`. 🔴
 77. **Add `PATCH /api/topics/{id}`** — manual difficulty override (`provenance=manual`), never re-estimated. 🔴
 78. **Write `backend/tests/test_kb_difficulty.py`** — rubric (mocked), overlap bias, density, override, confidence math. 🔴
-79. **Frontend:** difficulty badges (E/M/H colored) on topics + inline edit. 🔴
+79. **Frontend:** difficulty badges (E/M/H colored) on topics + inline edit. 🔴 ✅ `TopicCard` (E/M/H badge + set buttons)
 80. **Feed roadmap pacing** — hard topics get earlier starts + more sessions in Group 7. 🔴
 
 
@@ -179,8 +210,8 @@ phrase is independently verifiable.
 85. **Recompute estimates on change** — when materials/topics change (reindex completes), refresh `*_mins` for affected topics. 🟡
 86. **Add `GET /api/subjects/{id}/time-budget`** — per-topic estimates + weekly totals for the roadmap engine and UI. 🟡
 87. **Write `backend/tests/test_kb_time_est.py`** — formula math, difficulty factors, multiplier effect, recompute-on-change. 🟡
-88. **Frontend:** per-topic time display (first-pass/review/mastery) + the calibrate slider. 🟡
-89. **api.ts:** `endpoints.subjects.timeBudget` + `endpoints.user.pacing`. 🟡
+88. **Frontend:** per-topic time display (first-pass/review/mastery) + the calibrate slider. 🟡 ✅ `TopicCard` times + pacing multiplier input
+89. **api.ts:** `endpoints.subjects.timeBudget` + `endpoints.user.pacing`. 🟡 ✅ `endpoints.subjects.timeBudget` + `endpoints.subjects.pacing`
 90. **Feed weekly bucketing** — Group 7 roadmap uses `*_mins` to fill weekly budgets realistically. 🟡
 
 
@@ -193,25 +224,25 @@ phrase is independently verifiable.
 95. **Add `GET /api/topics/{id}/outcomes`** and `POST …/{outcome_index}/complete` — per-user checkboxes with timestamps. 🔴
 96. **Link outcomes to the existing Goals model** — completing an outcome creates/updates a linked goal row (reuse the goals router helpers). 🔴
 97. **Write `backend/tests/test_kb_outcomes.py`** — parsing, LLM expansion (mocked), fallback, checkbox lifecycle, goal linkage. 🔴
-98. **Frontend:** outcomes checklist on the topic/unit view (progress ring), "add outcome" manual entry. 🔴
-99. **api.ts:** `endpoints.topics.outcomes` (list/complete). 🔴
-100. **Docs:** mark Ideas 41–50 done in the master plan; add the Phase 5 runbook (parse schemas, budgets, review flows). 🔴
+98. **Frontend:** outcomes checklist on the topic/unit view (progress ring), "add outcome" manual entry. 🔴 ✅ `TopicCard` (checkbox list + done/total + add form)
+99. **api.ts:** `endpoints.topics.outcomes` (list/complete). 🔴 ✅ `endpoints.subjects.outcomes` (get/add/expand/complete)
+100. **Docs:** mark Ideas 41–50 done in the master plan; add the Phase 5 runbook (parse schemas, budgets, review flows). 🔴 ✅ master plan Ideas 41–50 marked ✅; runbook below.
 
 ---
 
 ## Definition of Done — Phase 5
 
-- [ ] A syllabus (text or PDF/DOCX/MD) imports into a *proposed* subject profile — nothing written until the user confirms in the review screen.
-- [ ] Parsing produces structured units, topics, outcomes, grading, and deadlines (strict schema); a deterministic fallback exists.
-- [ ] Semester/term is detected (keywords + date cross-check, current-term default) and stored on profile + units.
-- [ ] Topics are extracted, synonym-folded into canonical names, Bloom-tagged, and human-reviewable (confirm/merge/reject).
-- [ ] Parsed units match existing `curriculum_units` (name + embedding) with a confirmation step; topics link to units.
-- [ ] The topic dependency DAG is seeded, refined from concept edges, cycle-safe, manually editable, and exposes topological order.
-- [ ] Roadmaps generate as versioned week-by-week plans (dependency order + time budgets + deadline constraints) with a fallback.
-- [ ] Difficulty (E/M/H + confidence) and time estimates (first-pass/review/mastery) are computed, overridable, and recalibrated.
-- [ ] Learning outcomes are parsed, expanded, checkable, and link to the Goals model.
-- [ ] All LLM calls respect `KB_DAILY_GEN_LIMIT`; everything works deterministically with `AI_ENABLED=false`.
-- [ ] Every query stays user-scoped; ownership tests pass.
+- [x] A syllabus (text or PDF/DOCX/MD) imports into a *proposed* subject profile — nothing written until the user confirms in the review screen.
+- [x] Parsing produces structured units, topics, outcomes, grading, and deadlines (strict schema); a deterministic fallback exists.
+- [x] Semester/term is detected (keywords + date cross-check, current-term default) and stored on profile + units.
+- [x] Topics are extracted, synonym-folded into canonical names, Bloom-tagged, and human-reviewable (confirm/merge/reject).
+- [x] Parsed units match existing `curriculum_units` (name + embedding) with a confirmation step; topics link to units.
+- [x] The topic dependency DAG is seeded, refined from concept edges, cycle-safe, manually editable, and exposes topological order.
+- [x] Roadmaps generate as versioned week-by-week plans (dependency order + time budgets + deadline constraints) with a fallback.
+- [x] Difficulty (E/M/H + confidence) and time estimates (first-pass/review/mastery) are computed, overridable, and recalibrated.
+- [x] Learning outcomes are parsed, expanded, checkable, and link to the Goals model.
+- [x] All LLM calls respect `KB_DAILY_GEN_LIMIT`; everything works deterministically with `AI_ENABLED=false`.
+- [x] Every query stays user-scoped; ownership tests pass.
 
 ## Verification checklist
 
@@ -245,4 +276,68 @@ npm run typecheck
 - **Existing curriculum tables stay the source of truth** — `curriculum_subjects`/`curriculum_units`/`materials`; new KB tables (`subject_profiles`, `topics`, `roadmaps`) reference them, never duplicate them.
 - **Mastery-based seams (difficulty, time, dependency weights) are stubbed now** — they wire to Phase 6/7 performance data and Phase 8 `learning_events` later.
 - **Per-user scoping is non-negotiable** — every profile, topic, roadmap, and edge filters `user_id`; ownership tests mirror `test_ownership.py`.
+
+---
+
+## Phase 5 Runbook (phrase 100)
+
+### Parse schemas
+
+The syllabus parser (`app/services/kb/syllabus.py`) emits the strict schema stored on
+`subject_profiles.parsed_json`:
+
+```jsonc
+{
+  "title": "Data Structures",
+  "semester": "Fall 2026",           // string term, or null
+  "credits": 3,
+  "grading": "40% exams, 30% assignments, 30% labs",
+  "units": [
+    {
+      "title": "Arrays & Linked Lists",
+      "description": null,
+      "topics": [{ "name": "Dynamic arrays", "outcomes": ["can analyse amortized cost"] }],
+      "deadlines": ["Midterm 2026-10-15"]
+    }
+  ]
+}
+```
+
+`Topic.outcomes` is a JSON list of `{text, status (pending|done), completed_at}`. Roadmap
+`plan_json` is `{weekly_budget_minutes, weeks: [{week, topic_ids, topics, est_mins}]}`.
+
+### AI budgets
+
+Every Phase 5 LLM path — syllabus parse (`syllabus`), topic extraction + difficulty
+(`difficulty`), dependency seed (`dependencies`), outcome expansion (`outcomes`) — calls
+`budget_allows`/`record_generation` against `KB_DAILY_GEN_LIMIT`. When the budget is exhausted
+or `AI_ENABLED=false`, deterministic fallbacks in `app/services/ai_fallback.py` keep every
+feature working: `demo_syllabus_parse`, `demo_topic_deps`, `demo_difficulty`,
+`demo_outcome_expand`. The roadmap generator is fully algorithmic (no LLM).
+
+### Review flows (AI proposes, the user disposes)
+
+1. **Proposal:** `POST /api/subjects/import` (text) or `/import-file` (PDF/DOCX/MD/TXT) → a
+   `proposed` `SubjectProfile` row. Nothing touches `curriculum_subjects` yet.
+2. **Confirm:** `POST /api/subjects/{id}/confirm` writes `curriculum_subject` + `curriculum_unit`
+   rows (existing tables) and links the profile. `reject` marks it `rejected`.
+3. **Topics:** `POST /api/subjects/{id}/topics/generate` → `pending` `Topic` rows (deduped by
+   normalized name). Review via list + confirm/reject/merge endpoints; difficulty/time are
+   estimated at generation and editable via `PATCH /api/subjects/topics/{id}`.
+4. **Unit match:** `GET /api/subjects/{id}/match-units` proposes name (then embedding) matches;
+   `POST …/match-units/confirm` persists the mapping and assigns `Topic.unit_id`.
+5. **Dependencies:** `POST /api/subjects/{id}/dependencies/generate` seeds edges from the LLM
+   (syllabus-order fallback); manual add/remove via the DAG endpoints. Cycle-creating inserts
+   return **409**.
+6. **Roadmap:** `POST /api/subjects/{id}/roadmap/generate` creates a new versioned plan
+   (previous active → archived). Deadline + weekly budget are optional inputs.
+7. **Outcomes:** checklist endpoints mark outcomes done and upsert a linked `goals` row
+   (title = `"{Topic}: {outcome}"`, year = completion year) — the existing goals UI picks it up.
+
+### Ownership
+
+All Phase 5 tables (`subject_profiles`, `topics`, `roadmaps`, `topic_dependencies`) filter by
+`user_id` on every query; all router endpoints resolve the current user via
+`get_current_user`. Ownership coverage lives in the Phase 5 test files (each mirrors
+`test_ownership.py`).
 

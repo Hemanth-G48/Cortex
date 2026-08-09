@@ -5,6 +5,17 @@
 ordered implementation phrases** — the build-ready companion to the Phase 1–8 plans
 (`SECOND_BRAIN_PHASE{1,2,3,4,5,6,7,8}_100_PHRASE_PLAN.md`).
 
+**Implementation status: ✅ COMPLETE** — all ten ideas landed. Backend:
+`automation.py` registry/runner + ten feature modules (`auto_categorize`,
+`auto_tag`, `auto_link`, `auto_duplicates`, `auto_flashcards`, `auto_summary`,
+`auto_mindmap`, `auto_plan_sync`, `auto_sync`, `auto_revision`); `kb_automation`
+router (`GET /api/kb/automation/jobs`, `POST /api/kb/automation/run`); sync
+endpoints on `kb_sources` (`POST /api/kb/sources/{id}/sync`, `GET
+.../sync-status`); `source` column on flashcard candidates + `summary_dirty`
+hook in the ingest pipeline; 10 test files (Ideas 81–90). Frontend: automation
+job cards with run buttons, per-source sync status + "Sync now", and the
+Phase 9 endpoint block in `api.ts`. All `KB_AUTO_*` toggles default OFF.
+
 **Audit status (from §2 of the master plan):**
 - 🔴 genuinely new (7): Idea 81 (auto-categorize), 82 (scheduled auto-tag), 84 (scheduled dupes), 87 (scheduled mind maps), 88 (plan sync), 89 (external sync), 90 (auto revision tasks)
 - 🟡 partial / extends existing code (3): Ideas 83, 85, 86 wrap existing proposal machinery (auto-link edges, flashcard candidates, summaries) as background jobs
@@ -60,6 +71,26 @@ Phrases are numbered 1–100 and grouped 10-per-idea. Later groups depend on ear
 phrase is independently verifiable.
 
 ---
+
+
+---
+
+## Reference repos — what to borrow (from [REPOS_REUSE_ANALYSIS.md](./REPOS_REUSE_ANALYSIS.md))
+
+Every idea in Phase 9 (Automation) has reusable components in the cloned reference repos under `similar_repos/<owner>/<repo>`. Open the listed files directly and adapt them — full per-repo detail (exact paths, reuse modes) is in `REPOS_REUSE_ANALYSIS.md`.
+
+- **Idea 81 — Auto-categorize new notes:** CortX (agent structuring) · obsidian-second-brain (obsidian-board) · My-Brain-Is-Full-Crew (sorter agent) · claude-obsidian (wiki-fold skill)
+- **Idea 82 — Auto-tag documents (scheduled):** My-Brain-Is-Full-Crew (sorter/scribe) · khoj (grouping)
+- **Idea 83 — Auto-link related notes (scheduled):** llm_wiki · claude-obsidian · obsidian-second-brain (obsidian-connect) · My-Brain-Is-Full-Crew (connector)
+- **Idea 84 — Auto-detect duplicates (scheduled):** hashcards · engram
+- **Idea 85 — Auto-create flashcards from new notes:** LearnKit · mimocard · yt-flashcard-ai · StudyWise · studybuddy-ai
+- **Idea 86 — Auto-create summaries (scheduled):** memora · StudyWise · khoj
+- **Idea 87 — Auto-generate mind maps (scheduled):** second_brain_builder · StudyWise (concept-map) · mind-mentor
+- **Idea 88 — Auto-update study plans on new materials:** study-planner-agent · syllabo · OrbitOS
+- **Idea 89 — Auto-sync external repositories:** glean (RSS) · khoj (github_to_entries.py) · llm_wiki (file-sync.ts) · obsidian-wiki (sync.py)
+- **Idea 90 — Auto-create revision tasks:** obsidian-spaced-repetition · LearnKit · py-fsrs (due cards)
+
+> ⚠️ **License check before reuse:** per `REPOS_REUSE_ANALYSIS.md`, the big PKM engines (khoj, anki, basic-memory, siyuan, reor, orbit) are **AGPL/BUSL — STUDY only, never vendor**. Port-friendly (MIT/Apache): py-fsrs, ts-fsrs, fsrs-rs, fsrs4anki, obsidian-spaced-repetition, infinition, LearnKit, org-fc, hashcards, recalla, memo, mimocard, yt-flashcard-ai, habit_quest, HabitTrove, QuestLog, engram, glean, llm_wiki, claude-obsidian, obsidian-wiki, syllabo, StudyWise, mind-mentor, PAIDEIA, study-planner-agent, syllabus-agent, memora, dyresearch, noodle, OrbitOS, My-Brain-Is-Full-Crew, second_brain_builder, memory-bank-mcp, nocturne_memory, token-savior, foam, dendron. Repos without a license file are STUDY only.
 
 ## Group 1 — Idea 81 🔴: Auto-categorize new notes (phrases 1–10)
 
@@ -204,18 +235,18 @@ phrase is independently verifiable.
 
 ## Definition of Done — Phase 9
 
-- [ ] Every automation feature is a `kb_jobs` batch job behind a `KB_AUTO_*` toggle, default off.
-- [ ] Auto-categorization proposes folders (rules first, LLM for ambiguity), batches for review, and logs moves to version history.
-- [ ] The nightly tag job caps itself per night, stores provenance, and lands through a batch accept/reject queue.
-- [ ] Auto-linking creates only high-confidence edges automatically; low-confidence pairs wait in a review queue.
-- [ ] The nightly duplicate scan (exact + near) queues merges that re-point edges and preserve version history.
-- [ ] Concept-bearing notes auto-queue flashcard candidates (deduped) into the existing review flow.
-- [ ] The nightly summary job respects the daily budget, prioritizes changed/high-view docs, and never redoes unchanged ones.
-- [ ] Mind maps pre-generate into `outline_json` (no LLM cost) for structured documents only.
-- [ ] New materials re-sync plans only when deltas exceed a threshold, with notifications and versioned diffs.
-- [ ] External repos (git/Drive/clips) sync delta-only behind per-source cursors with a newest-wins conflict policy.
-- [ ] Due revision rows materialize as tasks/reminders/sessions daily; completion feeds back into SM-2 scheduling.
-- [ ] All LLM jobs respect `KB_DAILY_GEN_LIMIT`; every queue and table is user-scoped.
+- [x] Every automation feature is a `kb_jobs` batch job behind a `KB_AUTO_*` toggle, default off.
+- [x] Auto-categorization proposes folders (rules first, LLM for ambiguity), batches for review, and logs moves to version history.
+- [x] The nightly tag job caps itself per night, stores provenance, and lands through a batch accept/reject queue.
+- [x] Auto-linking creates only high-confidence edges automatically; low-confidence pairs wait in a review queue.
+- [x] The nightly duplicate scan (exact + near) queues merges that re-point edges and preserve version history.
+- [x] Concept-bearing notes auto-queue flashcard candidates (deduped, `source=auto`) into the existing review flow.
+- [x] The nightly summary job respects the daily budget, prioritizes changed/high-view docs, and never redoes unchanged ones.
+- [x] Mind maps pre-generate into a cached tree (`metadata_json`) with no LLM cost for structured documents only.
+- [x] New materials re-sync plans only when deltas exceed a threshold, with notifications and versioned roadmap diffs.
+- [x] External repos (git/Drive/clips) sync delta-only behind per-source cursors with a newest-wins conflict policy.
+- [x] Due revision rows materialize as tasks/reminders/sessions daily; completion feeds back into SM-2 scheduling.
+- [x] All LLM jobs respect `KB_DAILY_GEN_LIMIT`; every queue and table is user-scoped.
 
 ## Verification checklist
 

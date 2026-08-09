@@ -5,6 +5,10 @@
 ordered implementation phrases** — the build-ready companion to
 [`SECOND_BRAIN_PHASE1_100_PHRASE_PLAN.md`](./SECOND_BRAIN_PHASE1_100_PHRASE_PLAN.md).
 
+**Implementation status: ✅ COMPLETE** — backend (9 KB test files: embeddings, vector
+persistence, metadata, auto-tag, concepts, graph, related, near-dup, reindex) and frontend
+(metadata panel, tag chips, concept index, graph explorer, duplicates queue, reindex UI) all landed.
+
 **Audit status (from §2 of the master plan):**
 - 🔴 genuinely new (5): Idea 11 (embeddings service), Idea 14 (auto-tagging), Idea 15 (concepts), Idea 19 (near-dup), Idea 20 (re-index tooling)
 - 🟡 partial / extends existing code (5): Idea 12 (persist the existing in-memory store), Ideas 13, 16, 17, 18 build on Phase 1 output
@@ -48,6 +52,26 @@ phrase is independently verifiable.
 
 ---
 
+
+---
+
+## Reference repos — what to borrow (from [REPOS_REUSE_ANALYSIS.md](./REPOS_REUSE_ANALYSIS.md))
+
+Every idea in Phase 2 (Embeddings, Indexing & Knowledge Graph) has reusable components in the cloned reference repos under `similar_repos/<owner>/<repo>`. Open the listed files directly and adapt them — full per-repo detail (exact paths, reuse modes) is in `REPOS_REUSE_ANALYSIS.md`.
+
+- **Idea 11 — Embeddings service:** glean (embedding_factory.py + provider classes) · reor (lib/llm) · khoj (bi-encoder config) · decodingai
+- **Idea 12 — Persistent vector store:** glean (milvus_client.py) · reor (local vector DB) · khoj (pgvector) · dyresearch (pgvector/lancedb)
+- **Idea 13 — Metadata extraction & enrichment:** llm_wiki (frontmatter-panel.tsx) · claude-obsidian · khoj
+- **Idea 14 — Auto-tagging:** khoj (tag/group processors) · basic-memory (picoschema/) · llm_wiki
+- **Idea 15 — Concept extraction & canonicalization:** obsidian-wiki (ast_extractor.py, graph_analysis.py) · knowledge-nexus (entity_extraction_agent.py) · llm_wiki
+- **Idea 16 — Knowledge graph nodes & edges:** basic-memory (models + index/) · nocturne_memory (db/graph.py) · obsidian-wiki (session_graph.py) · knowledge-nexus (Neo4j)
+- **Idea 17 — Relationship & backlink inference:** foam (foam-core backlinks) · dendron · llm_wiki (page-links-panel.tsx)
+- **Idea 18 — Graph visualization & explorer:** llm_wiki (graph-view.tsx + layout worker) · dendron (dendron-viz) · obsidian-wiki (session_viz.py) · mind-mentor (insights/knowledge-graph page) · basic-memory
+- **Idea 19 — Duplicate & near-duplicate detection (chunk level):** hashcards · engram
+- **Idea 20 — Backfill & re-index tooling:** PAIDEIA (reindex.py) · obsidian-wiki (batch.py, sync.py) · decodingai (pipelines)
+
+> ⚠️ **License check before reuse:** per `REPOS_REUSE_ANALYSIS.md`, the big PKM engines (khoj, anki, basic-memory, siyuan, reor, orbit) are **AGPL/BUSL — STUDY only, never vendor**. Port-friendly (MIT/Apache): py-fsrs, ts-fsrs, fsrs-rs, fsrs4anki, obsidian-spaced-repetition, infinition, LearnKit, org-fc, hashcards, recalla, memo, mimocard, yt-flashcard-ai, habit_quest, HabitTrove, QuestLog, engram, glean, llm_wiki, claude-obsidian, obsidian-wiki, syllabo, StudyWise, mind-mentor, PAIDEIA, study-planner-agent, syllabus-agent, memora, dyresearch, noodle, OrbitOS, My-Brain-Is-Full-Crew, second_brain_builder, memory-bank-mcp, nocturne_memory, token-savior, foam, dendron. Repos without a license file are STUDY only.
+
 ## Group 1 — Idea 11 🔴: Embeddings service (phrases 1–10)
 
 1. **Add `EMBEDDINGS_MODEL` (default `text-embedding-3-small`), `EMBEDDINGS_DIM` (default 1536), and `EMBEDDINGS_BATCH_SIZE` (default 32) to `app/config.py`** in a commented section. 🔴
@@ -84,7 +108,7 @@ phrase is independently verifiable.
 24. **Compute `reading_time_seconds`** — words ÷ 200 wpm heuristic on extracted text. 🟡
 25. **Detect `language`** — deterministic heuristic (character-frequency/stopword table) before spending an LLM call. 🟡
 26. **Add `PUT /api/kb/documents/{id}/metadata`** for manual override — edited values are flagged `manual` and never overwritten by re-ingest. 🟡
-27. **Merge rule: frontmatter > manual > LLM > defaults**, persisted in `metadata_json` with per-field provenance. 🟡
+27. **Merge rule: manual > frontmatter > LLM > defaults**, persisted in `metadata_json` with per-field provenance — a user's explicit override (phrase 26) always survives re-ingest. 🟡
 28. **Write `backend/tests/test_kb_metadata.py`** — frontmatter precedence, manual-override persistence, heuristic language, reading-time math. 🟡
 29. **Frontend:** editable metadata panel on the document detail page (Phase 1 page) with source badges (frontmatter/AI/manual). 🟡
 30. **Add filtering to `GET /api/kb/documents`** — `?author=&tag=&date_from=&date_to=&language=` using the new fields. 🟡

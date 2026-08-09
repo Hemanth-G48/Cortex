@@ -20,6 +20,17 @@ new notes, missing-note suggestions, outdated-note detection, the durable `user_
 adaptive learning paths. **Automation and advanced AI are Phases 9–10 and out of scope** — but the
 memory store built here (Idea 79) is the substrate Idea 99 (trajectory forecasting) will use.
 
+**Implementation status: ✅ COMPLETE** — backend (10 test files: preferences, concept gaps,
+personalized explain, tutor memory, recommend-next, connect, missing notes, outdated, memory,
+adaptive paths) and frontend all landed. Backend: `kb_personal.py` router, `preferences.py`,
+`gaps.py`, `memory.py`, `connect.py`, `suggestions.py`, `outdated.py`, `adapt.py`; the
+`UserPreference` / `UserMemory` / `MissingNoteSuggestion` / `OutdatedNote` models; and the Phase 7
+tutor + Phase 4 explain seams now read real `user_memory` (Rule A enforced). Frontend:
+`LearningPreferences` settings section + onboarding survey, concept gaps + missing-note suggestions
++ outdated review queue on `KbInsights`, `NextUpCard` on the Dashboard, connect-suggestions panel in
+the Knowledge Base drawer, tutor "you've studied" chips, and the roadmap adapt button + "Plan
+updated" diff banner in `SubjectWorkspace`.
+
 ---
 
 ## Grounding — what already exists to build on
@@ -59,6 +70,26 @@ Phrases are numbered 1–100 and grouped 10-per-idea. Later groups depend on ear
 phrase is independently verifiable.
 
 ---
+
+
+---
+
+## Reference repos — what to borrow (from [REPOS_REUSE_ANALYSIS.md](./REPOS_REUSE_ANALYSIS.md))
+
+Every idea in Phase 8 (Personalization & Learning Memory) has reusable components in the cloned reference repos under `similar_repos/<owner>/<repo>`. Open the listed files directly and adapt them — full per-repo detail (exact paths, reuse modes) is in `REPOS_REUSE_ANALYSIS.md`.
+
+- **Idea 71 — Learning preference profile:** mind-mentor (profile/settings) · Multi-Agent-Study-Assistant (profiling) · dyresearch (config_manager.py) · glean (preference.py schema)
+- **Idea 72 — Knowledge-gap detection (concept level):** llm_wiki (gap analysis) · Multi-Agent-Study-Assistant (gap analysis) · obsidian-wiki (graph_analysis.py)
+- **Idea 73 — Personalized explanations:** mind-mentor · EduAI · StudyWise
+- **Idea 74 — Remember previously learned concepts:** engram (memory store) · nocturne_memory · basic-memory · claude-obsidian
+- **Idea 75 — Recommend what to study next:** QuestLog (AI recommendations) · syllabo (content_recommender.py) · StudyWise
+- **Idea 76 — Connect new concepts to existing notes:** llm_wiki (graph) · claude-obsidian (connect skill) · obsidian-second-brain (obsidian-connect) · obsidian-wiki
+- **Idea 77 — Suggest missing notes:** llm_wiki · obsidian-wiki (graph_analysis) · My-Brain-Is-Full-Crew
+- **Idea 78 — Detect outdated notes:** claude-obsidian (lint_engine.py) · obsidian-wiki (lint.py, trust.py)
+- **Idea 79 — Long-term learning memory store:** engram (internal/store) · nocturne_memory (db/) · basic-memory (repository/) · memory-bank-mcp · token-savior
+- **Idea 80 — Adaptive learning paths:** Multi-Agent-Study-Assistant · syllabo · StudyWise
+
+> ⚠️ **License check before reuse:** per `REPOS_REUSE_ANALYSIS.md`, the big PKM engines (khoj, anki, basic-memory, siyuan, reor, orbit) are **AGPL/BUSL — STUDY only, never vendor**. Port-friendly (MIT/Apache): py-fsrs, ts-fsrs, fsrs-rs, fsrs4anki, obsidian-spaced-repetition, infinition, LearnKit, org-fc, hashcards, recalla, memo, mimocard, yt-flashcard-ai, habit_quest, HabitTrove, QuestLog, engram, glean, llm_wiki, claude-obsidian, obsidian-wiki, syllabo, StudyWise, mind-mentor, PAIDEIA, study-planner-agent, syllabus-agent, memora, dyresearch, noodle, OrbitOS, My-Brain-Is-Full-Crew, second_brain_builder, memory-bank-mcp, nocturne_memory, token-savior, foam, dendron. Repos without a license file are STUDY only.
 
 ## Group 1 — Idea 71 🔴: Learning preference profile (phrases 1–10)
 
@@ -203,17 +234,17 @@ phrase is independently verifiable.
 
 ## Definition of Done — Phase 8
 
-- [ ] `user_preferences` exists, is editable, and is injected into tutor + explanation prompts; onboarding survey works.
-- [ ] Concept-level gaps combine quiz errors, retrieval misses, and mastery, with suggested capture sources.
-- [ ] Explanations anchor on known concepts and follow the user's style/depth preferences (with fallback).
-- [ ] The tutor references only concepts actually in `user_memory` ("as you saw in your notes on X") — never invents prior knowledge.
-- [ ] "Next up" recommends the single best cross-subject action with explainable reasons.
-- [ ] New documents get connect-suggestions (similar docs, shared concepts) with confirm → manual edges.
-- [ ] Missing-note suggestions rank by gap + coverage and create one-tap draft notes; dismissed ones stay dismissed.
-- [ ] Outdated notes are detected (contradiction / stale / changed materials) and flow through a review queue.
-- [ ] `user_memory` accumulates strength/exposure from all interactions, decays over time, and feeds every consumer.
-- [ ] Roadmaps adapt to mastery/gaps with versioned plan diffs and a visible "plan updated" notice.
-- [ ] All LLM calls respect `KB_DAILY_GEN_LIMIT`; deterministic fallbacks work with `AI_ENABLED=false`; every query is user-scoped.
+- [x] `user_preferences` exists, is editable, and is injected into tutor + explanation prompts; onboarding survey works.
+- [x] Concept-level gaps combine quiz errors, retrieval misses, and mastery, with suggested capture sources.
+- [x] Explanations anchor on known concepts and follow the user's style/depth preferences (with fallback).
+- [x] The tutor references only concepts actually in `user_memory` ("as you saw in your notes on X") — never invents prior knowledge.
+- [x] "Next up" recommends the single best cross-subject action with explainable reasons.
+- [x] New documents get connect-suggestions (similar docs, shared concepts) with confirm → manual edges.
+- [x] Missing-note suggestions rank by gap + coverage and create one-tap draft notes; dismissed ones stay dismissed.
+- [x] Outdated notes are detected (contradiction / stale / changed materials) and flow through a review queue.
+- [x] `user_memory` accumulates strength/exposure from all interactions, decays over time, and feeds every consumer.
+- [x] Roadmaps adapt to mastery/gaps with versioned plan diffs and a visible "plan updated" notice.
+- [x] All LLM calls respect `KB_DAILY_GEN_LIMIT`; deterministic fallbacks work with `AI_ENABLED=false`; every query is user-scoped.
 
 ## Verification checklist
 

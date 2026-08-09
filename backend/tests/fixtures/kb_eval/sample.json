@@ -1,0 +1,17 @@
+[
+  {
+    "query": "machine learning",
+    "subject": "ml",
+    "relevant_chunk_ids": [1, 2]
+  },
+  {
+    "query": "neural networks",
+    "subject": "ml",
+    "relevant_chunk_ids": [2]
+  },
+  {
+    "query": "gradient descent",
+    "subject": "ml",
+    "relevant_chunk_ids": [3]
+  }
+]

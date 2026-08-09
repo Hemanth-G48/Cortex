@@ -1,0 +1,48 @@
+{
+  "name": "Student Life OS",
+  "short_name": "StudentOS",
+  "description": "AI-powered student productivity suite — Second Brain, study plans, flashcards, quizzes, habits, and a gamified quest centre.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "My Assignments",
+      "url": "/assignments",
+      "description": "Jump to your assignments"
+    },
+    {
+      "name": "Study Flashcards",
+      "url": "/flashcards",
+      "description": "Review your flashcards"
+    },
+    {
+      "name": "Second Brain",
+      "url": "/knowledge-base",
+      "description": "Open the knowledge vault"
+    }
+  ]
+}

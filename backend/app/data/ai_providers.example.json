@@ -1,0 +1,70 @@
+{
+  "providers": [
+    {
+      "id": "ollama",
+      "name": "Ollama",
+      "provider_type": "ollama",
+      "base_url": "http://localhost:11434/v1",
+      "api_key": null,
+      "model": "llama3",
+      "models": [],
+      "enabled": true,
+      "is_default": true
+    },
+    {
+      "id": "lm-studio",
+      "name": "LM Studio",
+      "provider_type": "lmstudio",
+      "base_url": "http://localhost:1234/v1",
+      "api_key": null,
+      "model": "local-model",
+      "models": [],
+      "enabled": false,
+      "is_default": false
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "provider_type": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "",
+      "model": "gpt-4o-mini",
+      "models": [],
+      "enabled": false,
+      "is_default": false
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "provider_type": "anthropic",
+      "base_url": "https://api.anthropic.com",
+      "api_key": "",
+      "model": "claude-3-5-sonnet-20241022",
+      "models": [],
+      "enabled": false,
+      "is_default": false
+    },
+    {
+      "id": "google",
+      "name": "Google Gemini",
+      "provider_type": "google",
+      "base_url": "https://generativelanguage.googleapis.com",
+      "api_key": "",
+      "model": "gemini-2.5-flash",
+      "models": [],
+      "enabled": false,
+      "is_default": false
+    },
+    {
+      "id": "custom",
+      "name": "My Custom Endpoint",
+      "provider_type": "custom",
+      "base_url": "https://my-custom-endpoint.example.com/v1",
+      "api_key": "",
+      "model": "custom-model",
+      "models": [],
+      "enabled": false,
+      "is_default": false
+    }
+  ]
+}

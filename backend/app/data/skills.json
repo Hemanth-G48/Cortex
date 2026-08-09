@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": [
+    {"id": "cs_programming", "name": "Programming & Software Development", "keywords": ["python", "java", "c++", "javascript", "programming", "coding", "function", "loop", "algorithm implementation", "debugging"]},
+    {"id": "cs_data_structures", "name": "Data Structures & Algorithms", "keywords": ["data structure", "array", "linked list", "stack", "queue", "tree", "graph", "hash", "sorting", "searching", "complexity", "recursion", "dynamic programming"]},
+    {"id": "ml_foundations", "name": "Machine Learning Foundations", "keywords": ["machine learning", "regression", "classification", "clustering", "gradient descent", "overfitting", "training", "features", "model"]},
+    {"id": "ml_deep_learning", "name": "Deep Learning & Neural Networks", "keywords": ["neural network", "deep learning", "backpropagation", "activation", "cnn", "rnn", "transformer", "embedding", "layer"]},
+    {"id": "math_linear_algebra", "name": "Linear Algebra & Calculus", "keywords": ["linear algebra", "matrix", "vector", "eigenvalue", "derivative", "calculus", "gradient", "determinant", "linear transformation"]},
+    {"id": "math_probability", "name": "Probability & Statistics", "keywords": ["probability", "statistics", "distribution", "bayes", "expectation", "variance", "hypothesis", "correlation", "random"]},
+    {"id": "ds_analysis", "name": "Data Analysis & Visualization", "keywords": ["data analysis", "visualization", "pandas", "sql", "data cleaning", "dashboard", "statistics", "exploratory", "report"]},
+    {"id": "ai_nlp", "name": "Natural Language Processing", "keywords": ["nlp", "natural language", "tokenization", "language model", "text", "sentiment", "transformer", "llm"]},
+    {"id": "ai_cv", "name": "Computer Vision", "keywords": ["computer vision", "image", "object detection", "segmentation", "convolution", "vision", "optical"]},
+    {"id": "sys_databases", "name": "Databases & SQL", "keywords": ["database", "sql", "relational", "query", "schema", "index", "normalization", "transactions"]},
+    {"id": "sys_networks", "name": "Computer Networks & Security", "keywords": ["network", "protocol", "tcp", "ip", "http", "security", "encryption", "cybersecurity", "packet"]},
+    {"id": "soft_eng", "name": "Software Engineering & Architecture", "keywords": ["software engineering", "architecture", "design pattern", "testing", "agile", "refactoring", "api design", "microservices", "devops"]},
+    {"id": "math_discrete", "name": "Discrete Mathematics", "keywords": ["discrete", "logic", "proof", "set theory", "combinatorics", "graph theory", "boolean", "induction"]},
+    {"id": "domain_economics", "name": "Economics & Finance", "keywords": ["economics", "finance", "supply", "demand", "market", "inflation", "macro", "micro", "accounting"]},
+    {"id": "domain_business", "name": "Business & Management", "keywords": ["management", "business", "strategy", "marketing", "leadership", "operations", "entrepreneurship"]},
+    {"id": "science_general", "name": "Sciences (Physics, Chemistry, Biology)", "keywords": ["physics", "chemistry", "biology", "mechanics", "thermodynamics", "cell", "molecule", "reaction", "quantum"]},
+    {"id": "humanities", "name": "Humanities & Social Sciences", "keywords": ["history", "philosophy", "psychology", "sociology", "literature", "politics", "geography", "culture"]},
+    {"id": "writing_comm", "name": "Writing & Communication", "keywords": ["essay", "writing", "communication", "presentation", "argument", "report", "thesis", "rhetoric"]}
+  ]
+}

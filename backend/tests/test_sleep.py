@@ -64,7 +64,10 @@ def test_list_sleep(client, db_session):
     assert len(resp.json()) == 2
 
 
-def test_update_sleep(client):
+def test_update_sleep(client, db_session):
+    # Seed data already covers the last 7 nights — clear so the date is free.
+    db_session.query(SleepLog).delete()
+    db_session.commit()
     created = client.post("/api/sleep", json={
         "date": "2026-08-06", "bedtime": "23:00", "wake_time": "07:00", "quality": 3,
     }).json()
@@ -75,6 +78,8 @@ def test_update_sleep(client):
 
 
 def test_delete_sleep(client, db_session):
+    db_session.query(SleepLog).delete()
+    db_session.commit()
     created = client.post("/api/sleep", json={
         "date": "2026-08-07", "bedtime": "23:00", "wake_time": "07:00",
     }).json()

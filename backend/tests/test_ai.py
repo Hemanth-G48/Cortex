@@ -5,6 +5,10 @@ never touches the network regardless of ``AI_ENABLED``.
 """
 from __future__ import annotations
 
+import json
+import uuid
+from pathlib import Path
+
 import pytest
 
 from app.config import settings
@@ -159,32 +163,60 @@ def test_ai_grade_answer_exact_match(client, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# ai_client.generate with a mocked provider (Phase 2)
+# ai_client.generate through the provider registry (Phase 2)
+#
+# Generation now happens inside ``app.services.ai_providers`` (OpenAI-compatible
+# provider via httpx.Client). These tests inject an ``httpx.MockTransport`` and
+# drive the real registry path so payload shape + fallback behavior are verified.
 # ---------------------------------------------------------------------------
 
-def test_generate_success(monkeypatch):
+import httpx
+
+from app.services import ai_providers
+
+
+def _registry_with_transport(monkeypatch, handler, config_overrides=None, tmp_path=None):
+    """Point the module registry at a temp file + a mock transport."""
+    path = (tmp_path or Path("/tmp")) / f"providers-{uuid.uuid4().hex[:8]}.json"
+    reg = ai_providers.ProviderRegistry(path=path)
+    base = config_overrides or {}
+    reg.create(
+        name=base.get("name", "Test Provider"),
+        provider_type=base.get("provider_type", "custom"),
+        base_url=base.get("base_url", "http://mock.local/v1"),
+        api_key=base.get("api_key", settings.AI_API_KEY or "test-key"),
+        model=base.get("model", "test-model"),
+    )
+    monkeypatch.setattr(ai_providers, "get_registry", lambda: reg)
     monkeypatch.setattr(ai_client, "ai_available", lambda: True)
 
-    class FakeResp:
-        status_code = 200
+    def _client(config, timeout=ai_providers.DEFAULT_TIMEOUT):
+        return httpx.Client(base_url=config.base_url.rstrip("/"), timeout=timeout, transport=httpx.MockTransport(handler))
 
-        def json(self):
-            return {"choices": [{"message": {"content": "  mock answer  "}}]}
+    monkeypatch.setattr(ai_providers, "_client", _client)
+    return reg
 
+
+def test_generate_success(monkeypatch, tmp_path):
     captured = {}
 
-    def fake_post(url, headers=None, json=None, timeout=None):
-        captured["url"] = url
-        captured["headers"] = headers
-        captured["json"] = json
-        return FakeResp()
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["headers"] = dict(request.headers)
+        captured["json"] = json.loads(request.content or b"{}")
+        return httpx.Response(200, json={"choices": [{"message": {"content": "  mock answer  "}}]})
 
-    monkeypatch.setattr(ai_client.httpx, "post", fake_post)
+    _registry_with_transport(monkeypatch, handler, tmp_path=tmp_path)
     text = ai_client.generate("hello", model="test-model")
     assert text == "mock answer"
-    assert "test-model" == captured["json"]["model"]
+    assert captured["json"]["model"] == "test-model"
     assert captured["url"].endswith("/chat/completions")
-    assert captured["headers"]["Authorization"] == f"Bearer {settings.AI_API_KEY}"
+    # OmniRoute-style gateways default to SSE streaming; the client parses a
+    # single JSON body, so completions must be requested non-streamed.
+    assert captured["json"]["stream"] is False
+    # httpx normalises header names to lowercase inside MockTransport.
+    auth = captured["headers"].get("authorization") or captured["headers"].get("Authorization")
+    assert auth == f"Bearer {settings.AI_API_KEY or 'test-key'}"
 
 
 def test_generate_disabled(monkeypatch):
@@ -192,39 +224,24 @@ def test_generate_disabled(monkeypatch):
     assert ai_client.generate("hello") is None
 
 
-def test_generate_falls_back_on_404(monkeypatch):
-    monkeypatch.setattr(ai_client, "ai_available", lambda: True)
-    # Give the provider two models so the 404 retry has somewhere to go.
-    monkeypatch.setattr(settings, "AI_MODELS_FALLBACK", "fallback-model")
-    calls = []
+def test_generate_uses_configured_model(monkeypatch, tmp_path):
+    captured = {}
 
-    class FakeResp:
-        def __init__(self, status_code):
-            self.status_code = status_code
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["json"] = json.loads(request.content or b"{}")
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
 
-        def json(self):
-            return {"choices": [{"message": {"content": "ok"}}]}
-
-    def fake_post(url, headers=None, json=None, timeout=None):
-        calls.append(json)
-        if len(calls) == 1:
-            return FakeResp(404)  # model retired
-        return FakeResp(200)
-
-    monkeypatch.setattr(ai_client.httpx, "post", fake_post)
-    text = ai_client.generate("hello")
-    assert text == "ok"
-    assert len(calls) == 2
-    assert calls[0]["model"] != calls[1]["model"]
+    # No explicit model → the provider's configured model is used.
+    _registry_with_transport(monkeypatch, handler, config_overrides={"model": "configured-model"}, tmp_path=tmp_path)
+    assert ai_client.generate("hello") == "ok"
+    assert captured["json"]["model"] == "configured-model"
 
 
-def test_generate_returns_none_on_exception(monkeypatch):
-    monkeypatch.setattr(ai_client, "ai_available", lambda: True)
-
-    def boom(*args, **kwargs):
+def test_generate_returns_none_on_connection_error(monkeypatch, tmp_path):
+    def boom(request: httpx.Request) -> httpx.Response:
         raise RuntimeError("connection refused")
 
-    monkeypatch.setattr(ai_client.httpx, "post", boom)
+    _registry_with_transport(monkeypatch, boom, tmp_path=tmp_path)
     assert ai_client.generate("hello") is None
 
 

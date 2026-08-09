@@ -74,6 +74,57 @@ def test_ai_flashcards_endpoint_fallback(client, monkeypatch):
         assert c["front"] and c["back"]
 
 
+def test_flashcard_fsrs_review_and_due(client):
+    """Idea 52 — FSRS flashcard review flow (vendored py-fsrs)."""
+    deck = client.post("/api/flashcard-decks", json={"name": "SRS Deck"}).json()
+    card = client.post(f"/api/flashcard-decks/{deck['id']}/cards", json={
+        "front": "Q", "back": "A", "difficulty": "basic",
+    }).json()
+
+    # Fresh cards are due immediately (never reviewed).
+    due = client.get("/api/flashcard-decks/due").json()
+    assert any(c["id"] == card["id"] for c in due["items"])
+    counts = client.get("/api/flashcard-decks/due-counts").json()["counts"]
+    assert counts.get(str(deck["id"]), 0) >= 1  # JSON keys are strings
+
+    # Grade 5 (Easy) → schedules ~8 days out, deterministic (fuzzing off).
+    r = client.post(
+        f"/api/flashcard-decks/{deck['id']}/cards/{card['id']}/review",
+        json={"grade": 5},
+    )
+    assert r.status_code == 200, r.text
+    sched = r.json()["schedule"]
+    assert sched["interval_days"] == 8
+    assert sched["reps"] == 1
+    assert sched["streak"] == 1
+    assert sched["state"] == 2  # Review
+    assert sched["next_review"] is not None
+
+    # Now NOT due.
+    due = client.get("/api/flashcard-decks/due", params={"deck_id": deck["id"]}).json()
+    assert all(c["id"] != card["id"] for c in due["items"])
+
+    # Failure grade (0 → Again) resets streak, bumps lapses.
+    r = client.post(
+        f"/api/flashcard-decks/{deck['id']}/cards/{card['id']}/review",
+        json={"grade": 0},
+    )
+    sched = r.json()["schedule"]
+    assert sched["streak"] == 0
+    assert sched["lapses"] == 1
+    assert sched["reps"] == 1
+
+    # Grade validation: out of range → 422; unknown card → 404.
+    assert client.post(
+        f"/api/flashcard-decks/{deck['id']}/cards/{card['id']}/review",
+        json={"grade": 9},
+    ).status_code == 422
+    assert client.post(
+        f"/api/flashcard-decks/{deck['id']}/cards/99999/review",
+        json={"grade": 5},
+    ).status_code == 404
+
+
 def test_ai_grade_answer_exact_and_ai(client, monkeypatch):
     monkeypatch.setattr(ai_client, "ai_available", lambda: False)
     resp = client.post(

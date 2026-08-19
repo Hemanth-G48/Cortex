@@ -139,9 +139,9 @@ def list_profiles(db: Session, user_id: int, status: str | None = None) -> list[
 
 def _user_program(db: Session, user_id: int) -> CurriculumCourse | None:
     """The user's enrolled program (SyllabusAI enrollment), else first program."""
-    user = db.query(User).get(user_id)
+    user = db.get(User, user_id)
     if user and user.program_id:
-        program = db.query(CurriculumCourse).get(user.program_id)
+        program = db.get(CurriculumCourse, user.program_id)
         if program:
             return program
     return db.query(CurriculumCourse).order_by(CurriculumCourse.id.asc()).first()
@@ -175,7 +175,7 @@ def confirm(
     subject_credits = credits if credits is not None else parsed.get("credits")
 
     if program_id:
-        program = db.query(CurriculumCourse).get(program_id)
+        program = db.get(CurriculumCourse, program_id)
         if program is None:
             raise ValueError("Program not found")
     else:

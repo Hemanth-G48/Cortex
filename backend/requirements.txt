@@ -4,12 +4,21 @@ sqlalchemy
 pydantic
 pydantic-settings
 python-multipart
+# Test-only: password hashing used solely by the pytest auth shim
+# (app/routers/auth_test.py + app/services/security.py). The application
+# itself is single-user and tokenless. Safe to drop in production installs.
 bcrypt
 pypdf
 python-docx
 httpx
 numpy
 python-frontmatter
+# Real-browser sign-in for PortSwigger auth-gated resources (Learning Path
+# Planner). Optional: without it the httpx login flow is used (still fully
+# verified by the /users authentication gate). Chromium must be installed
+# separately (playwright install chromium) or discovered at a known path
+# (PS_CHROMIUM_PATH). Import-guarded in portswigger_session.py.
+#   playwright
 # Local embeddings (fastembed/ONNX, no PyTorch) — used when
 # EMBEDDINGS_BACKEND=fastembed. Import-guarded in embeddings.py, so the app
 # works without it (falls back to deterministic hashes).

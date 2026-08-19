@@ -170,7 +170,7 @@ def finish(db: Session, user_id: int, session_id: int) -> dict:
 
 
 def _owned(db: Session, user_id: int, session_id: int) -> InterviewSession:
-    session = db.query(InterviewSession).get(session_id)
+    session = db.get(InterviewSession, session_id)
     if session is None or session.user_id != user_id:
         raise HTTPException(404, "Interview session not found")
     return session

@@ -325,6 +325,34 @@ class TestMetadataApi:
         assert "confidence" in data
         assert "reason" in data
 
+    def test_proposal_get_never_calls_llm(self, client, monkeypatch):
+        """GET metadata-proposal is read-only — browsing must not spend an
+        LLM call (frontmatter + deterministic heuristics only)."""
+        token = _signup(client, "det-user", "det@test.com")
+
+        resp = client.post(
+            "/api/kb/documents/upload",
+            headers={AUTH: f"Bearer {token}"},
+            files={"file": ("test.md", io.BytesIO(b"# Title\n\nThe quick brown fox jumps over the lazy dog."), "text/markdown")},
+        )
+        assert resp.status_code == 201, resp.text
+        doc_id = resp.json()["document"]["id"]
+
+        # If the GET path ever reaches the LLM, fail loudly.
+        monkeypatch.setattr(
+            "app.services.kb.metadata.generate_json",
+            lambda *a, **k: (_ for _ in ()).throw(AssertionError("GET must not call the LLM")),
+        )
+        resp = client.get(
+            f"/api/kb/documents/{doc_id}/metadata-proposal",
+            headers={AUTH: f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert "author" in data
+        assert "language" in data
+        assert "reading_time_seconds" in data
+
     def test_put_metadata_manual_override(self, client, monkeypatch):
         """PUT metadata stores manual override; re-enrich preserves it."""
         monkeypatch.setattr("app.config.settings.AI_ENABLED", False)

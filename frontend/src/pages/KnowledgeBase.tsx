@@ -85,11 +85,22 @@ export const KnowledgeBase = () => {
   const [arxivId, setArxivId] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Per-source folder input for the "Update from folder" action (relative to
+  // the source root; blank = whole source).
+  const [folderInputs, setFolderInputs] = useState<Record<number, string>>({});
+  // Per-source external-vault path for the "local" sync adapter (Copy Recent
+  // Notes): the source-of-truth Obsidian vault mirrored into notes/.
+  const [syncSourcePaths, setSyncSourcePaths] = useState<Record<number, string>>({});
 
   // Phase 2: stats + panels
   const [stats, setStats] = useState<KbStats | null>(null);
   const [duplicates, setDuplicates] = useState<KbDuplicateItem[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<KbTagSuggestion[]>([]);
+  const [appliedTags, setAppliedTags] = useState<KbTagSuggestion[]>([]);
+  const [newTagName, setNewTagName] = useState('');
+  // Explicit "Suggest with AI" action state — the only path that re-runs the
+  // AI tag proposal (the GET endpoint reads persisted suggestions only).
+  const [proposingTags, setProposingTags] = useState(false);
 
   // Phase 4: manual concept/note linking autocomplete (Idea 37)
   const [linkKind, setLinkKind] = useState<'concept' | 'document'>('concept');
@@ -163,7 +174,13 @@ export const KnowledgeBase = () => {
     setAutoRunning(name);
     try {
       const res = await endpoints.kb.automation.run({ mode: 'one', name, force: true });
-      flash(`Automation “${name}” ${res.skipped ? 'skipped' : 'done'}${res.reason ? ` — ${res.reason}` : ''}`);
+      if (res.skipped) {
+        flash(`Automation “${name}” skipped${res.reason ? ` — ${res.reason}` : ''}`);
+      } else if (res.status === 'queued') {
+        flash(`Automation “${name}” queued — running in background (watch Jobs below)`);
+      } else {
+        flash(`Automation “${name}” done`);
+      }
       await Promise.all([loadAll(), loadAutoJobs()]);
     } catch (e) {
       flash(`Automation failed: ${(e as Error).message}`);
@@ -177,11 +194,36 @@ export const KnowledgeBase = () => {
     try {
       const res = await endpoints.kb.sources.sync(id);
       if (res.skipped) flash(`Sync skipped — ${res.reason ?? ''}`);
-      else flash(`Sync done — ${res.imported ?? 0} imported, ${res.unchanged ?? 0} unchanged${res.skipped_stale ? `, ${res.skipped_stale} stale` : ''}`);
+      else if (res.copied !== undefined) {
+        // "local" adapter (Copy Recent Notes): delta-copied knowledge files.
+        flash(`Copy Recent Notes — ${res.copied} copied, ${res.unchanged ?? 0} unchanged, ${res.removed ?? 0} removed`);
+      } else {
+        flash(`Sync done — ${res.imported ?? 0} imported, ${res.unchanged ?? 0} unchanged${res.skipped_stale ? `, ${res.skipped_stale} stale` : ''}`);
+      }
       await Promise.all([loadAll(), loadDocs()]);
       void loadSyncStatuses();
     } catch (e) {
       flash(`Sync failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Save the external-vault path used by the "local" adapter (Copy Recent
+  // Notes). Only a directory path is accepted; saving does not sync.
+  const saveSyncSourcePath = async (s: KbSource) => {
+    const value = (syncSourcePaths[s.id] ?? '').trim();
+    if (!value) {
+      flash('Enter the external vault folder path first');
+      return;
+    }
+    setBusy(`syncpath-${s.id}`);
+    try {
+      await endpoints.kb.sources.update(s.id, { sync_source_path: value, sync_type: 'local' });
+      flash('External vault saved — hit Copy Recent Notes to sync');
+      await Promise.all([loadAll(), loadDocs()]);
+    } catch (e) {
+      flash(`Could not save external vault: ${(e as Error).message}`);
     } finally {
       setBusy(null);
     }
@@ -259,19 +301,20 @@ export const KnowledgeBase = () => {
     }
   };
 
-  const scanSource = async (id: number) => {
+  const scanSource = async (id: number, path?: string) => {
     setBusy(`scan-${id}`);
+    const where = path ? ` from “${path}”` : '';
     try {
-      const res = await endpoints.kb.sources.scan(id);
+      const res = await endpoints.kb.sources.scan(id, path);
       const s = res.summary;
       flash(
         s
-          ? `Scan done — ${s.added ?? 0} added, ${s.changed ?? 0} changed, ${s.duplicates_found ?? 0} duplicates`
+          ? `Update${where} — ${s.added ?? 0} added, ${s.changed ?? 0} changed, ${s.duplicates_found ?? 0} duplicates`
           : 'Scan job queued',
       );
       await Promise.all([loadAll(), loadDocs()]);
     } catch (e) {
-      flash(`Scan failed: ${(e as Error).message}`);
+      flash(`Update from folder failed: ${(e as Error).message}`);
     } finally {
       setBusy(null);
     }
@@ -346,13 +389,14 @@ export const KnowledgeBase = () => {
       const [c, v, t, l, cite] = await Promise.all([
         endpoints.kb.documents.chunks(doc.id),
         endpoints.kb.documents.versions(doc.id).catch(() => [] as KbVersion[]),
-        endpoints.kb.tags.forDocument(doc.id).catch(() => ({ tags: [] as KbTagSuggestion[], document_id: doc.id })),
+        endpoints.kb.tags.forDocument(doc.id).catch(() => ({ tags: [] as KbTagSuggestion[], applied: [] as KbTagSuggestion[], document_id: doc.id })),
         endpoints.kb.documents.links(doc.id).catch(() => ({ document_id: doc.id, concepts: [], related: [] })),
         endpoints.kb.citations.forDocument(doc.id).catch(() => ({ items: [] as KbCitation[], total: 0 })),
       ]);
       setChunks(c);
       setVersions(v);
       setTagSuggestions(t.tags ?? []);
+      setAppliedTags(t.applied ?? []);
       setLinks(l);
       setCitations(cite.items ?? []);
       // Phase 8 (Idea 76): load connect-suggestions alongside the drawer.
@@ -364,6 +408,7 @@ export const KnowledgeBase = () => {
       setChunks([]);
       setVersions([]);
       setTagSuggestions([]);
+      setAppliedTags([]);
       setLinks(null);
       setCitations([]);
       setConnectItems([]);
@@ -461,11 +506,29 @@ export const KnowledgeBase = () => {
     }
   };
 
+  // Explicit user action: re-run the AI (or deterministic-fallback) tag
+  // proposal and persist the result. Never triggered by navigation.
+  const proposeTagsWithAi = async () => {
+    if (!activeDoc) return;
+    setProposingTags(true);
+    try {
+      const res = await endpoints.kb.tags.propose(activeDoc.id);
+      setTagSuggestions(res.tags ?? []);
+      setAppliedTags(res.applied ?? []);
+      flash('Tag suggestions refreshed ✓');
+    } catch (e) {
+      flash(`Suggest failed: ${(e as Error).message}`);
+    } finally {
+      setProposingTags(false);
+    }
+  };
+
   const applyTag = async (tagId: number) => {
     if (!activeDoc) return;
     try {
       const res = await endpoints.kb.tags.apply(activeDoc.id, [tagId]);
       setTagSuggestions(res.tags ?? []);
+      setAppliedTags(res.applied ?? []);
       flash('Tag applied ✓');
     } catch (e) {
       flash(`Apply failed: ${(e as Error).message}`);
@@ -477,9 +540,25 @@ export const KnowledgeBase = () => {
     try {
       await endpoints.kb.tags.reject(activeDoc.id, tagId);
       setTagSuggestions((prev) => prev.filter((t) => t.tag_id !== tagId));
-      flash('Suggestion dismissed');
+      setAppliedTags((prev) => prev.filter((t) => t.tag_id !== tagId));
+      flash('Tag removed');
     } catch (e) {
       flash(`Reject failed: ${(e as Error).message}`);
+    }
+  };
+
+  const createTag = async (rawName?: string) => {
+    if (!activeDoc) return;
+    const name = (rawName ?? newTagName).trim();
+    if (!name) return;
+    try {
+      const res = await endpoints.kb.tags.create(activeDoc.id, name);
+      setTagSuggestions(res.tags ?? []);
+      setAppliedTags(res.applied ?? []);
+      setNewTagName('');
+      flash(name.startsWith('course:') ? `Course tag added — sync Courses to see it 🧠` : 'Tag added ✓');
+    } catch (e) {
+      flash(`Add tag failed: ${(e as Error).message}`);
     }
   };
 
@@ -652,23 +731,78 @@ export const KnowledgeBase = () => {
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                 {s.document_count} docs · {s.files_seen} files · last scan {fmt(s.last_scanned_at)}
               </div>
+              {/* Knowledge-root badge: sources rooted at a `notes` folder are
+                  the knowledge area — daily-life/ is never indexed. */}
+              {s.root_path?.split(/[\\/]/).filter(Boolean).pop()?.toLowerCase() === 'notes' && (
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                  📚 knowledge root — daily-life/ excluded
+                </span>
+              )}
               {/* Phase 9 (Idea 89): external-sync badge + status */}
               {s.sync_type !== 'none' && (
                 <div style={{ fontSize: '0.72rem', color: '#7c3aed', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Chip label={s.sync_type} color="#7c3aed" />
+                  <Chip label={s.sync_type === 'local' ? 'external vault' : s.sync_type} color="#7c3aed" />
                   <span>
                     last sync {fmt(syncStatuses[s.id]?.last_scanned_at ?? null)}
                   </span>
                 </div>
               )}
+              {/* "local" adapter: external vault path editor (Copy Recent Notes). */}
+              {s.sync_type === 'local' && (
+                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    value={syncSourcePaths[s.id] ?? s.sync_source_path ?? ''}
+                    onChange={(e) => setSyncSourcePaths((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void saveSyncSourcePath(s);
+                    }}
+                    placeholder="/path/to/your/Obsidian vault (source of truth)"
+                    aria-label={`External vault path for ${s.name}`}
+                    style={{ flex: 1, minWidth: 200, fontSize: '0.72rem', padding: '0.25rem 0.55rem', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg, #fff)', color: 'var(--text)' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    disabled={busy === `syncpath-${s.id}`}
+                    title="Save this folder as the external vault that Copy Recent Notes mirrors into notes/"
+                    onClick={() => void saveSyncSourcePath(s)}
+                  >
+                    {busy === `syncpath-${s.id}` ? 'Saving…' : '💾 Save'}
+                  </button>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
                 {s.sync_type !== 'none' && (
                   <button type="button" className="btn btn-sm btn-ghost" disabled={busy === `sync-${s.id}`} onClick={() => void syncSource(s.id)}>
-                    {busy === `sync-${s.id}` ? 'Syncing…' : '🔁 Sync now'}
+                    {busy === `sync-${s.id}` ? 'Syncing…' : s.sync_type === 'local' ? '📋 Copy Recent Notes' : '🔁 Sync now'}
                   </button>
                 )}
                 <button type="button" className="btn btn-sm btn-primary" disabled={busy === `scan-${s.id}`} onClick={() => void scanSource(s.id)}>
                   {busy === `scan-${s.id}` ? 'Scanning…' : '▶ Scan now'}
+                </button>
+                {/* Update from folder: scan a subfolder (or the whole source)
+                    so updated & newly created files land in the Second Brain. */}
+                <input
+                  value={folderInputs[s.id] ?? ''}
+                  onChange={(e) => setFolderInputs((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const p = (folderInputs[s.id] ?? '').trim();
+                      void scanSource(s.id, p || undefined);
+                    }
+                  }}
+                  placeholder="folder… (e.g. cybersecurity)"
+                  aria-label={`Update ${s.name} from a folder`}
+                  style={{ flex: 1, minWidth: 150, fontSize: '0.72rem', padding: '0.25rem 0.55rem', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg, #fff)', color: 'var(--text)' }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  disabled={busy === `scan-${s.id}`}
+                  title="Scan just this folder (blank = whole source) and ingest new/changed files"
+                  onClick={() => void scanSource(s.id, (folderInputs[s.id] ?? '').trim() || undefined)}
+                >
+                  {busy === `scan-${s.id}` ? 'Updating…' : '📁 Update from folder'}
                 </button>
                 <button type="button" className="btn btn-sm btn-ghost" disabled={busy === `reindex-${s.id}`} onClick={() => void reindexSource(s.id)}>
                   {busy === `reindex-${s.id}` ? 'Reindexing…' : '⟳ Reindex'}
@@ -891,22 +1025,75 @@ export const KnowledgeBase = () => {
             <MindMapView documentId={activeDoc.id} />
             <QualityPanel documentId={activeDoc.id} />
 
-            <h4 style={{ fontSize: '0.85rem', margin: '0.75rem 0 0.35rem' }}>🏷️ Tag suggestions</h4>
-            {tagSuggestions.length === 0 ? (
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>No tag suggestions yet — reindex to auto-tag this document.</p>
+            <h4 style={{ fontSize: '0.85rem', margin: '0.75rem 0 0.35rem' }}>
+              🏷️ Tags{' '}
+              <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>({appliedTags.length} on note)</span>
+            </h4>
+            {appliedTags.length === 0 ? (
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>No tags on this note yet.</p>
             ) : (
               <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-                {tagSuggestions.map((t) => (
-                  <span key={t.tag_id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', background: t.provenance === 'rule' ? 'var(--accent, #2563eb)18' : '#f59e0b22', color: t.provenance === 'rule' ? 'var(--accent, #2563eb)' : '#b45309', padding: '0.15rem 0.55rem', borderRadius: 999 }}>
+                {appliedTags.map((t) => (
+                  <span key={`applied-${t.tag_id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', background: 'var(--accent, #2563eb)18', color: 'var(--accent, #2563eb)', padding: '0.15rem 0.55rem', borderRadius: 999 }}>
                     #{t.name}
-                    {t.provenance !== 'rule' && (
-                      <>
-                        <button type="button" className="btn btn-sm" style={{ padding: 0, minWidth: 0, fontSize: '0.68rem' }} title="Apply" onClick={() => void applyTag(t.tag_id)}>✓</button>
-                        <button type="button" className="btn btn-sm" style={{ padding: 0, minWidth: 0, fontSize: '0.68rem' }} title="Dismiss" onClick={() => void rejectTag(t.tag_id)}>✕</button>
-                      </>
+                    {t.provenance === 'manual' && (
+                      <button type="button" className="btn btn-sm" style={{ padding: 0, minWidth: 0, fontSize: '0.68rem' }} title="Remove tag" onClick={() => void rejectTag(t.tag_id)}>✕</button>
                     )}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* Add-tag input + course: quick chip (Second Brain dynamic courses) */}
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <input
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void createTag();
+                  }
+                }}
+                placeholder="Add a tag…"
+                style={{ flex: 1, minWidth: 140, fontSize: '0.75rem', padding: '0.3rem 0.55rem', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg, #fff)', color: 'var(--text)' }}
+              />
+              <button type="button" className="btn btn-sm" onClick={() => void createTag()} disabled={!newTagName.trim()}>Add</button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                title="Quick-tag this note as a course — it will appear on the Courses page after sync"
+                onClick={() => setNewTagName((prev) => (prev.startsWith('course:') ? prev : `course:${prev}`))}
+              >
+                course: 💡
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: '0.5rem 0 0.35rem' }}>
+              <h4 style={{ fontSize: '0.85rem', margin: 0 }}>✨ Suggested tags</h4>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                disabled={proposingTags}
+                title="Re-run the AI tag proposal for this note and save the suggestions (browsing never triggers AI)"
+                onClick={() => void proposeTagsWithAi()}
+              >
+                {proposingTags ? 'Suggesting…' : '✨ Suggest with AI'}
+              </button>
+            </div>
+            {tagSuggestions.filter((t) => t.provenance !== 'rule').length === 0 ? (
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>No suggestions yet — click “Suggest with AI” to analyze this note.</p>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                {tagSuggestions
+                  .filter((t) => t.provenance !== 'rule')
+                  .map((t) => (
+                    <span key={t.tag_id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', background: '#f59e0b22', color: '#b45309', padding: '0.15rem 0.55rem', borderRadius: 999 }}>
+                      #{t.name}
+                      <button type="button" className="btn btn-sm" style={{ padding: 0, minWidth: 0, fontSize: '0.68rem' }} title="Apply" onClick={() => void applyTag(t.tag_id)}>✓</button>
+                      <button type="button" className="btn btn-sm" style={{ padding: 0, minWidth: 0, fontSize: '0.68rem' }} title="Dismiss" onClick={() => void rejectTag(t.tag_id)}>✕</button>
+                    </span>
+                  ))}
               </div>
             )}
 

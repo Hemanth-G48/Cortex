@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import date
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -23,22 +24,49 @@ from app.services.text_extractor import EXTRACTABLE_TYPES
 logger = logging.getLogger(__name__)
 
 
+def _like_escape(text: str) -> str:
+    """Escape LIKE wildcards so a folder name is matched literally.
+
+    Vault folder names are user-controlled and can contain ``%`` / ``_``
+    (e.g. ``50%_Notes``); unescaped they act as LIKE wildcards and the sweep
+    / ingest scoping could match the wrong documents."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _ext_of(filename: str) -> str | None:
     ext = os.path.splitext(filename)[1].lstrip(".").lower()
     return ext if ext in EXTRACTABLE_TYPES else None
 
 
-def scan_source(db: Session, source: KbSource) -> dict:
-    """Idempotently scan one source folder. Returns a summary dict."""
+def scan_source(db: Session, source: KbSource, subpath: str | None = None) -> dict:
+    """Idempotently scan one source folder. Returns a summary dict.
+
+    ``subpath`` (optional) restricts the scan to a folder inside the source
+    root — a relative path such as ``"cybersecurity"``. Only that subtree is
+    walked, and only documents under it are eligible for the removed-file
+    sweep, so a folder-scoped "update from folder" never touches files
+    elsewhere in the source. ``path_rel`` values always stay relative to the
+    source root, matching stored rows.
+    """
     summary = {
         "files_seen": 0,
         "added": 0,
         "changed": 0,
+        "moved": 0,
         "removed": 0,
         "unchanged": 0,
         "duplicates_found": 0,
     }
     root = source.root_path
+    scan_root = root
+    if subpath:
+        # Defense-in-depth: the router validates the path too, but direct
+        # service callers (tests, other services) must not escape the root.
+        if os.path.isabs(subpath) or ".." in Path(subpath).parts:
+            raise ValueError(f"subpath must be relative and without '..': {subpath!r}")
+        scan_root = os.path.join(root or "", subpath)
+        if not os.path.isdir(scan_root):
+            raise FileNotFoundError(f"folder not found inside source: {subpath}")
     seen: set[str] = set()
     # Hashes seen during THIS scan — with autoflush=False pending inserts are
     # invisible to queries, so same-scan duplicates must be tracked locally.
@@ -47,9 +75,18 @@ def scan_source(db: Session, source: KbSource) -> dict:
     # re-scans treat a known duplicate as stable instead of re-counting it as
     # new (Idea 8, phrase 73).
     duplicate_map = KbService.get_duplicate_map(source)
-    if root and os.path.isdir(root):
-        for dirpath, dirnames, filenames in os.walk(root):
-            dirnames[:] = [d for d in dirnames if d not in NOISE_DIRS]
+    if root and os.path.isdir(scan_root):
+        for dirpath, dirnames, filenames in os.walk(scan_root):
+            # daily-life is the non-knowledge area of a vault: never indexed.
+            # Only filtered at the source root — a knowledge folder that
+            # happens to be named ``daily-life`` deeper in the tree stays
+            # indexable (the ``notes/``-root layout keeps it outside anyway).
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if d not in NOISE_DIRS
+                and not (dirpath == scan_root and d.casefold() == "daily-life")
+            ]
             for fname in filenames:
                 ext = _ext_of(fname)
                 if ext is None:
@@ -101,6 +138,46 @@ def scan_source(db: Session, source: KbSource) -> dict:
                         db, source.user_id, digest
                     )
                     if canonical is not None:
+                        # Same-scan new doc at another path → a true duplicate
+                        # (both files exist on disk): keep the stable dedupe path.
+                        if canonical.id in seen_hashes.values():
+                            summary["duplicates_found"] += 1
+                            KbService.record_duplicate(db, source.user_id, canonical.id)
+                            duplicate_map[rel] = canonical.id
+                            continue
+                        # The canonical row already lives at this exact relative
+                        # path in THIS source — it was repointed earlier in this
+                        # scan (move detection below, autoflush=False hides the
+                        # update): nothing new to do. (Cross-source same-path
+                        # rows still dedupe below.)
+                        if canonical.path_rel == rel and canonical.source_id == source.id:
+                            summary["unchanged"] += 1
+                            continue
+                        # Move/rename detection: the canonical document's own
+                        # file no longer exists on disk, so this is the SAME
+                        # document at a new path — not a duplicate. Keep the
+                        # document id, chunks and embeddings; update the path
+                        # only ("changing a path is not changing the content").
+                        if (
+                            canonical.source_id == source.id
+                            and not (
+                                canonical.file_path
+                                and os.path.exists(canonical.file_path)
+                            )
+                        ):
+                            duplicate_map.pop(rel, None)
+                            for k, v in list(duplicate_map.items()):
+                                if v == canonical.id:
+                                    duplicate_map.pop(k, None)
+                            if canonical.status == "deleted":
+                                canonical.status = "unchanged"
+                            canonical.path_rel = rel
+                            canonical.file_path = full
+                            canonical.updated_at = utcnow()
+                            db.add(canonical)
+                            summary["moved"] += 1
+                            continue
+                        # Genuine duplicate (canonical still on disk): record it.
                         summary["duplicates_found"] += 1
                         KbService.record_duplicate(db, source.user_id, canonical.id)
                         duplicate_map[rel] = canonical.id
@@ -156,15 +233,23 @@ def scan_source(db: Session, source: KbSource) -> dict:
                         db.add(doc)
                     # failed stays failed (retried by an explicit reindex).
 
-    # Files that vanished → status=deleted (phrase 25).
-    for doc in (
+    # Files that vanished → status=deleted (phrase 25). For a subfolder scan
+    # only documents under that subtree are candidates — files elsewhere in
+    # the source are left exactly as they are.
+    sweep = (
         db.query(KbDocument)
         .filter(
             KbDocument.user_id == source.user_id,
             KbDocument.source_id == source.id,
         )
-        .all()
-    ):
+    )
+    if subpath:
+        sweep = sweep.filter(
+            KbDocument.path_rel.like(
+                f"{_like_escape(subpath.strip('/'))}/%", escape="\\"
+            )
+        )
+    for doc in sweep.all():
         if doc.path_rel not in seen:
             summary["removed"] += 1
             doc.status = "deleted"
@@ -174,18 +259,22 @@ def scan_source(db: Session, source: KbSource) -> dict:
     db.commit()
 
     source.last_scanned_at = utcnow()
-    source.files_seen = summary["files_seen"]
-    source.files_added = summary["added"]
-    source.files_changed = summary["changed"]
-    source.files_removed = summary["removed"]
+    if not subpath:
+        # Aggregate counters describe the whole source — a folder-scoped scan
+        # reports only its subtree, so don't clobber the source-wide numbers.
+        source.files_seen = summary["files_seen"]
+        source.files_added = summary["added"]
+        source.files_changed = summary["changed"]
+        source.files_removed = summary["removed"]
     KbService.save_duplicate_map(source, duplicate_map)
     db.add(source)
     db.commit()
     return summary
 
 
-def scan_and_ingest(db: Session, source_id: int) -> dict:
-    """Scan a source, then run the ingest pipeline on new/changed/failed docs.
+def scan_and_ingest(db: Session, source_id: int, subpath: str | None = None) -> dict:
+    """Scan a source (optionally one folder inside it), then run the ingest
+    pipeline on new/changed/failed docs.
 
     Used by the job queue (Idea 10) and the watcher so a single "Scan now"
     produces parsed, chunked documents.
@@ -203,7 +292,7 @@ def scan_and_ingest(db: Session, source_id: int) -> dict:
         fts.ensure_fts_schema_for(db.bind)
     except Exception:  # noqa: BLE001 — never let FTS setup break a scan
         pass
-    summary = scan_source(db, source)
+    summary = scan_source(db, source, subpath=subpath)
     docs = (
         db.query(KbDocument)
         .filter(
@@ -211,8 +300,16 @@ def scan_and_ingest(db: Session, source_id: int) -> dict:
             KbDocument.user_id == source.user_id,
             KbDocument.status.in_(["new", "changed", "failed"]),
         )
-        .all()
     )
+    if subpath:
+        # Ingest only the scanned subtree — a folder-scoped update must not
+        # re-run the pipeline on unrelated pending docs elsewhere.
+        docs = docs.filter(
+            KbDocument.path_rel.like(
+                f"{_like_escape(subpath.strip('/'))}/%", escape="\\"
+            )
+        )
+    docs = docs.all()
     ingested = 0
     for doc in docs:
         result = ingest_document(db, doc)

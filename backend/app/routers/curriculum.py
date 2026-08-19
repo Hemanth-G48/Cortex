@@ -18,7 +18,7 @@ from app.schemas.curriculum import (
     CurriculumCreate,
     CurriculumResponse,
 )
-from app.services.security import get_current_user, require_admin
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/curriculum", tags=["curriculum"])
 
@@ -143,7 +143,7 @@ def get_unit(unit_id: int, db: Session = Depends(get_db)):
 
 @router.get("/institutions/admin/all", response_model=List[InstitutionResponse])
 def list_all_institutions_admin(
-    current_user: Institution = Depends(require_admin),
+    current_user = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return db.query(Institution).order_by(Institution.id).all()
@@ -152,7 +152,7 @@ def list_all_institutions_admin(
 @router.post("/institutions", response_model=InstitutionResponse)
 def create_institution(
     data: InstitutionCreate,
-    current_user: Institution = Depends(require_admin),
+    current_user = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     institution = Institution(**data.model_dump())
@@ -165,7 +165,7 @@ def create_institution(
 @router.patch("/institutions/{institution_id}/status")
 def toggle_institution_status(
     institution_id: int,
-    current_user: Institution = Depends(require_admin),
+    current_user = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     institution = db.query(Institution).filter(Institution.id == institution_id).first()
@@ -184,7 +184,7 @@ def toggle_institution_status(
 def create_institution_program(
     institution_id: int,
     data: ProgramCreate,
-    current_user: Institution = Depends(require_admin),
+    current_user = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     institution = db.query(Institution).filter(Institution.id == institution_id).first()
@@ -205,7 +205,7 @@ def create_institution_program(
 def create_program_subject(
     program_id: int,
     data: SubjectCreate,
-    current_user: Institution = Depends(require_admin),
+    current_user = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     program = db.query(CurriculumCourse).filter(CurriculumCourse.id == program_id).first()
@@ -227,7 +227,7 @@ def create_program_subject(
 def create_subject_unit(
     subject_id: int,
     data: CurriculumCreate,
-    current_user: Institution = Depends(require_admin),
+    current_user = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     subject = db.query(CurriculumSubject).filter(CurriculumSubject.id == subject_id).first()

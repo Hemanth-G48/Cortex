@@ -25,7 +25,7 @@ from app.models import (
     User,
 )
 from app.services.kb.search import KbSearcher
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api", tags=["search"])
 
@@ -175,7 +175,7 @@ class _DomainSearcher:
 @router.post("/search", response_model=dict)
 def global_search(
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Fan out across domains and group results (phrase 91/93/94)."""

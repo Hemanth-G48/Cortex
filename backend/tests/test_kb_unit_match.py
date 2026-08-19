@@ -100,7 +100,12 @@ class TestNameMatch:
         monkeypatch.setattr("app.config.settings.AI_ENABLED", False)
         token = _signup(client)
         profile = _confirmed(client, token)
-        with patch("app.services.kb.units.name_similarity", return_value=0.0):
+        # The app's deterministic hash-embedding fallback always yields vectors
+        # (identical titles => cosine 1.0), so simulate genuinely-unavailable
+        # embeddings to verify the "none" fallback path.
+        with patch("app.services.kb.units.name_similarity", return_value=0.0), patch(
+            "app.services.kb.units._embedding_match", return_value=0.0
+        ):
             r = client.get(
                 f"/api/subjects/{profile['id']}/match-units?use_embeddings=true",
                 headers=_auth(token),

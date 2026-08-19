@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb import auto_categorize
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb/categorize", tags=["kb-categorize"])
 
@@ -26,7 +26,7 @@ class CategorizeAction(BaseModel):
 
 @router.get("/queue")
 def get_queue(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Pending folder-move proposals for review."""
@@ -36,7 +36,7 @@ def get_queue(
 @router.post("/accept")
 def accept(
     body: CategorizeAction,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Apply approved folder moves (bulk) with version-history logging."""
@@ -47,7 +47,7 @@ def accept(
 @router.post("/reject")
 def reject(
     body: CategorizeAction,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Reject proposals (bulk); rejected moves are never re-proposed."""

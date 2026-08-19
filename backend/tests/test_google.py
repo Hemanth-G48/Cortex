@@ -75,9 +75,10 @@ def test_exchange_code_success(client, monkeypatch):
 
     resp = client.get("/api/auth/google/callback?code=abc123")
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["connected"] is True
-    assert data["email"] == "alex@student.edu"
+    # Callback now returns HTML with postMessage for popup communication
+    html = resp.text
+    assert "google-oauth" in html
+    assert "alex@student.edu" in html
 
     # Status should now report connected (token stored).
     status = client.get("/api/auth/google/status").json()
@@ -88,7 +89,9 @@ def test_exchange_code_success(client, monkeypatch):
 def test_classroom_courses_mock_fallback(client, unconfigured):
     resp = client.get("/api/classroom/courses")
     assert resp.status_code == 200
-    courses = resp.json()
+    body = resp.json()
+    assert body["source"] == "mock"
+    courses = body["courses"]
     assert len(courses) >= 3
     assert courses[0]["id"] == "gc-1"
 
@@ -96,9 +99,21 @@ def test_classroom_courses_mock_fallback(client, unconfigured):
 def test_classroom_assignments_mock_fallback(client, unconfigured):
     resp = client.get("/api/classroom/assignments")
     assert resp.status_code == 200
-    assignments = resp.json()
+    body = resp.json()
+    assert body["source"] == "mock"
+    assignments = body["assignments"]
     assert len(assignments) >= 3
     assert all("title" in a for a in assignments)
+
+
+def test_classroom_mock_never_persists_courses(client, unconfigured, db_session):
+    """Mocks are display-only — no Course rows are created by a mock sync."""
+    from app.models import Course
+
+    before = db_session.query(Course).count()
+    client.get("/api/classroom/courses")
+    client.get("/api/classroom/assignments")
+    assert db_session.query(Course).count() == before
 
 
 def test_gmail_unread_mock_fallback(client, unconfigured):

@@ -25,10 +25,19 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/auth/google/callback"
 
-    # ── Role auth (STUDENT-PLANAR G1: secret used to sign bearer tokens) ──
+    # ── Courses (dynamic source derivation) ──
+    # Second Brain documents tagged with this prefix group into one Course per
+    # tag (e.g. `course:Operating Systems` → a course titled "Operating Systems").
+    COURSE_TAG_PREFIX: str = "course:"
+
+    # ── Test-only auth (single-user app) ──
+    # The application is single-user and tokenless: no login, no roles, no
+    # bearer tokens. These settings exist solely so the pytest-only auth shim
+    # (``app/routers/auth_test.py``) and the legacy test suite's signup/login
+    # helpers keep working. They are never used by the application itself.
     APP_SECRET: str = "student-os-dev-secret"
-    # Secret key a user must supply to sign up as a teacher (empty → teacher
-    # signups rejected).
+    # Secret key the test shim checks when a test signs up a "teacher" role
+    # (empty → teacher signups rejected, even under pytest).
     TEACHER_SECRET_KEY: str = ""
 
     # ── AI response cache (QuestLog, Idea 95) ──
@@ -46,6 +55,10 @@ class Settings(BaseSettings):
     # ── File uploads (STUDENT-PLANAR G1: Phase 5) ──
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_MB: int = 10
+    # Book PDFs (textbooks, security manuals, etc.) are commonly far larger
+    # than course materials, so the reading tracker gets its own higher cap.
+    # Env-overridable via BOOK_MAX_UPLOAD_MB.
+    BOOK_MAX_UPLOAD_MB: int = 100
 
     # ── Vector store (Zenith-Study-Planner G1; Second Brain Phase 2) ──
     # "numpy" (default, in-memory) | "faiss" (optional faiss-cpu) |
@@ -92,8 +105,8 @@ class Settings(BaseSettings):
     # match the local model (all-MiniLM-L6-v2 = 384).
     EMBEDDINGS_BACKEND: str = "fastembed"
     # Local sentence model used when EMBEDDINGS_BACKEND is fastembed/auto.
-    # Using all-MiniLM-L6-v2 for faster inference (384 dim, much smaller/faster model)
-    EMBEDDINGS_LOCAL_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # Using BAAI/bge-small-en-v1.5 for fast local inference (384 dim)
+    EMBEDDINGS_LOCAL_MODEL: str = "BAAI/bge-small-en-v1.5"
     # Per-day LLM embedding budget (cost guard, mirrors SUMMARY_DAILY_LIMIT).
     EMBEDDINGS_DAILY_LIMIT: int = 1000
     # Min weight for an edge to appear in the knowledge graph (Idea 16).
@@ -231,8 +244,21 @@ class Settings(BaseSettings):
     KB_PLAN_DELTA_THRESHOLD: float = 0.2
     # Idea 89 — auto-sync external repositories (git | drive | clip).
     KB_SYNC_ENABLED: bool = False
+    # Copy Recent Notes — dedicated scheduled job for ``sync_type='local'``
+    # external vaults (mirror of a local Obsidian folder into notes/). Its own
+    # toggle so the timer can keep the vault mirrored even when remote
+    # repository sync (KB_SYNC_ENABLED) stays off.
+    KB_AUTO_LOCAL_SYNC_ENABLED: bool = False
+    # How often (seconds) the folder watcher fires the periodic automation
+    # pass — the only timer the app has, so it drives ALL KB_AUTO_* jobs
+    # (Copy Recent Notes, auto-tag, auto-summary, …). 0 disables the pass.
+    KB_AUTO_RUN_INTERVAL_SECONDS: int = 3600
     # Idea 90 — daily materialization of due revision rows as tasks.
     KB_AUTO_REVISION_TASKS_ENABLED: bool = False
+    # Dynamic courses — refresh Course rows from Second Brain `course:*` tags.
+    # Default ON (unlike the other automation jobs): idempotent, no AI cost,
+    # and only touches `source_type='kb_tag'` rows.
+    KB_AUTO_COURSE_SYNC_ENABLED: bool = True
 
     # ── Second Brain / Phase 10 (Advanced AI, Analytics & Platform, Ideas 91–100) ──
     # Idea 92 — long-term memory: consolidate episodic events older than this
@@ -396,6 +422,11 @@ class Settings(BaseSettings):
     def max_upload_bytes(self) -> int:
         """Maximum upload size in bytes."""
         return max(int(self.MAX_UPLOAD_MB), 1) * 1024 * 1024
+
+    @property
+    def book_max_upload_bytes(self) -> int:
+        """Maximum book (PDF) upload size in bytes."""
+        return max(int(self.BOOK_MAX_UPLOAD_MB), 1) * 1024 * 1024
 
     @property
     def sleep_target_hours(self) -> float:

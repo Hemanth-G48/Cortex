@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb.daily_notes import get_daily_notes, get_today
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-daily-notes"])
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-daily-notes"])
 @router.get("/daily-notes")
 def daily_notes(
     date: date,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     return get_daily_notes(db, current_user.id, date)
@@ -26,7 +26,7 @@ def daily_notes(
 
 @router.get("/daily-notes/today")
 def daily_notes_today(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     return get_today(db, current_user.id)

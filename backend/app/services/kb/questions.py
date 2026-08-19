@@ -165,7 +165,7 @@ def reject_question(db: Session, user_id: int, question_id: int) -> PracticeQues
 
 
 def _owned(db: Session, user_id: int, question_id: int) -> PracticeQuestion:
-    row = db.query(PracticeQuestion).get(question_id)
+    row = db.get(PracticeQuestion, question_id)
     if row is None or row.user_id != user_id:
         from fastapi import HTTPException
 

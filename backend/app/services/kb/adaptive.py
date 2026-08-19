@@ -68,7 +68,7 @@ def _clamp(tier: str, available: list[str]) -> str:
 
 def select_tier(db: Session, user_id: int, topic_id: int) -> dict:
     """Pick the next difficulty tier from mastery + state (phrases 61, 67)."""
-    topic = db.query(Topic).get(topic_id)
+    topic = db.get(Topic, topic_id)
     if topic is None or topic.user_id != user_id:
         from fastapi import HTTPException
 
@@ -103,7 +103,7 @@ def select_tier(db: Session, user_id: int, topic_id: int) -> dict:
 
 def record_answer(db: Session, user_id: int, topic_id: int, tier: str, correct: bool) -> dict:
     """Record one answer and apply the IRT-lite tier update (phrases 63–65)."""
-    topic = db.query(Topic).get(topic_id)
+    topic = db.get(Topic, topic_id)
     if topic is None or topic.user_id != user_id:
         from fastapi import HTTPException
 

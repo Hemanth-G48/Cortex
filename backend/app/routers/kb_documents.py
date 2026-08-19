@@ -29,7 +29,7 @@ from app.services.ingestion import MAX_EXTRACTED_CHARS
 from app.services.kb import KbService, utcnow
 from app.services.kb import jobs, braindump_draft
 from app.services.kb.pipeline import _parse_markdown_meta, ingest_document, re_chunk, snapshot_version
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-documents"])
 
@@ -76,7 +76,7 @@ def _doc_response(db: Session, doc: KbDocument) -> KbDocumentResponse:
 
 @router.get("/documents", response_model=KbDocumentListResponse)
 def list_documents(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
     source_id: int | None = Query(default=None),
     status: str | None = Query(default=None),
@@ -110,7 +110,7 @@ def list_documents(
 @router.get("/documents/{document_id}", response_model=KbDocumentResponse)
 def get_document(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     doc = KbService.get_document(db, current_user.id, document_id)
@@ -122,7 +122,7 @@ def get_document(
 @router.delete("/documents/{document_id}")
 def delete_document(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     doc = KbService.get_document(db, current_user.id, document_id)
@@ -144,7 +144,7 @@ def delete_document(
 @router.post("/documents/upload", response_model=KbUploadResult, status_code=201)
 def upload_document(
     file: UploadFile,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
     source_id: int | None = Query(default=None),
 ):
@@ -205,7 +205,7 @@ def upload_document(
 @router.get("/documents/{document_id}/chunks", response_model=list[KbChunkResponse])
 def list_chunks(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     doc = KbService.get_document(db, current_user.id, document_id)
@@ -222,7 +222,7 @@ def list_chunks(
 @router.post("/documents/{document_id}/reindex", response_model=KbJobResponse)
 def reindex_document(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Re-run the ingest pipeline for one document via the job queue."""
@@ -249,7 +249,7 @@ class KbFileDraftRequest(BaseModel):
 def file_braindump_draft(
     document_id: int,
     body: KbFileDraftRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """File a draft: set title, attach to a source/folder, add tags,
@@ -290,7 +290,7 @@ def _version_text(version: KbVersion) -> str:
 @router.get("/documents/{document_id}/versions", response_model=list[KbVersionResponse])
 def list_versions(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Version history, newest first (phrase 82)."""
@@ -310,7 +310,7 @@ def diff_versions(
     document_id: int,
     from_version: int,
     to_version: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Unified diff between two version snapshots (phrase 84)."""
@@ -359,7 +359,7 @@ def diff_versions(
 def restore_version(
     document_id: int,
     version_id: int = Query(description="kb_versions.id to restore"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Restore content from a version; the rollback itself is versioned

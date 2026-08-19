@@ -22,13 +22,13 @@ from app.services.kb import interview as interview_service
 from app.services.kb import mistakes as mistakes_service
 from app.services.kb import mocks as mocks_service
 from app.services.kb import questions as questions_service
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-practice"])
 
 
 def _topic_or_404(db: Session, user_id: int, topic_id: int) -> Topic:
-    topic = db.query(Topic).get(topic_id)
+    topic = db.get(Topic, topic_id)
     if topic is None or topic.user_id != user_id:
         raise HTTPException(404, "Topic not found")
     return topic
@@ -46,7 +46,7 @@ class GenerateRequest(BaseModel):
 @router.post("/practice/generate")
 def generate_questions(
     body: GenerateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     topic = _topic_or_404(db, current_user.id, body.topic_id)
@@ -65,7 +65,7 @@ def generate_questions(
 def list_questions(
     topic_id: int | None = Query(default=None),
     status: str | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     rows = questions_service.list_questions(db, current_user.id, topic_id=topic_id, status=status)
@@ -84,11 +84,11 @@ def list_questions(
 @router.post("/practice/{question_id}/approve")
 def approve_question(
     question_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     row = questions_service.approve_question(db, current_user.id, question_id)
-    topic = db.query(Topic).get(row.topic_id)
+    topic = db.get(Topic, row.topic_id)
     db.commit()
     return {"ok": True, "question": questions_service.question_dict(row, topic)}
 
@@ -96,7 +96,7 @@ def approve_question(
 @router.post("/practice/{question_id}/reject")
 def reject_question(
     question_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     row = questions_service.reject_question(db, current_user.id, question_id)
@@ -110,7 +110,7 @@ def reject_question(
 @router.post("/practice/session")
 def practice_session(
     body: GenerateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     _topic_or_404(db, current_user.id, body.topic_id)
@@ -126,7 +126,7 @@ def practice_session(
 @router.post("/practice/answer")
 def practice_answer(
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     topic_id = int(body.get("topic_id") or 0)
@@ -148,7 +148,7 @@ class MistakeRequest(BaseModel):
 @router.post("/practice/mistake-analysis")
 def mistake_analysis(
     body: MistakeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = mistakes_service.analyze(db, current_user.id, body.question_id, body.student_answer)
@@ -169,7 +169,7 @@ class BuildPaperRequest(BaseModel):
 @router.post("/mocks/build")
 def build_mock(
     body: BuildPaperRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     mock = mocks_service.build_paper(
@@ -182,7 +182,7 @@ def build_mock(
 
 @router.get("/mocks")
 def list_mocks(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     rows = (
@@ -198,7 +198,7 @@ def list_mocks(
 @router.post("/mocks/{mock_id}/start")
 def start_mock(
     mock_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     attempt = mocks_service.start_attempt(db, current_user.id, mock_id)
@@ -214,7 +214,7 @@ class SubmitRequest(BaseModel):
 def submit_mock(
     attempt_id: int,
     body: SubmitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = mocks_service.submit_attempt(db, current_user.id, attempt_id, body.answers)
@@ -225,7 +225,7 @@ def submit_mock(
 @router.get("/mocks/{mock_id}/attempts")
 def mock_attempts(
     mock_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     rows = (
@@ -251,7 +251,7 @@ class InterviewStartRequest(BaseModel):
 @router.post("/interview/start")
 def interview_start(
     body: InterviewStartRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     session = interview_service.start(db, current_user.id, body.skill, body.level)
@@ -268,7 +268,7 @@ class InterviewAnswerRequest(BaseModel):
 def interview_answer(
     session_id: int,
     body: InterviewAnswerRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = interview_service.answer(db, current_user.id, session_id, body.index, body.answer)
@@ -279,7 +279,7 @@ def interview_answer(
 @router.post("/interview/{session_id}/finish")
 def interview_finish(
     session_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = interview_service.finish(db, current_user.id, session_id)

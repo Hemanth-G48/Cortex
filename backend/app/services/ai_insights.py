@@ -10,8 +10,13 @@ Student Life OS's data model:
   assignments/exams, habit streaks. The analog of QuestLog's ``getUserStats``.
 - ``insights_prompt`` — renders the bundle into a compact prompt that forces
   the model to reference the student's real numbers (QuestLog's prompt rules).
-- ``get_insights`` — cache-first (``services.ai_cache``), then LLM, then a
-  deterministic local fallback so the endpoint works offline.
+- ``get_insights`` — **persisted-first**: the last generated insight is stored
+  per user (``AiInsight``) and reused on every later request, so opening the
+  dashboard never triggers an LLM call. The LLM is only consulted when no
+  snapshot exists yet (first run) or the user explicitly refreshes
+  (``force=True``). ``services.ai_cache`` still short-circuits identical
+  in-process re-generations, and a deterministic local fallback keeps the
+  endpoint working offline.
 
 The deterministic fallback mirrors the demo-* pattern used everywhere else in
 the app (``ai_fallback``), so ``AI_ENABLED=false`` keeps the UI functional.
@@ -19,13 +24,15 @@ the app (``ai_fallback``), so ``AI_ENABLED=false`` keeps the UI functional.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Assignment, Exam, Habit, Task, User
 from app.services import ai_client
 from app.services.ai_cache import cached_completion
+from app.services.kb import KbService
 
 # Prompt template — mirrors QuestLog's SYSTEM_PROMPT constraints (concise,
 # reference actual numbers, markdown **bold** for metrics).
@@ -158,29 +165,119 @@ def _fallback_insights(bundle: dict) -> str:
     return "\n".join(lines)
 
 
-def get_insights(db: Session, user: User | None) -> dict:
-    """Cache-first productivity insights (QuestLog's ``getProductivityInsights``)."""
-    bundle = build_stats_bundle(db, user)
-    prompt = insights_prompt(bundle)
+def load_saved_insight(db: Session, user_id: int) -> dict | None:
+    """Return the persisted insight snapshot for a user, or None.
 
-    def _generate(p, **kwargs):
-        return ai_client.generate(p, **kwargs)
+    ``cached=True`` + ``analyzed_at`` let the UI show a "reused, not
+    recomputed" badge next to the last-updated timestamp.
+    """
+    from app.models import AiInsight
 
-    text, cached = cached_completion(
-        prompt,
-        max_tokens=500,
-        temperature=0.6,
-        generate=_generate,
+    row = (
+        db.query(AiInsight)
+        .filter(AiInsight.user_id == user_id)
+        .first()
     )
-    ai_used = bool(text)
-    if text is None:
-        text = _fallback_insights(bundle)
+    if row is None:
+        return None
+    # SQLite stores DateTime without tzinfo — re-attach UTC so the timestamp
+    # matches fresh computes exactly (``+00:00`` suffix), mirroring the gap
+    # analysis cache (``load_saved_goal_gaps``).
+    analyzed = row.analyzed_at
+    if analyzed is not None and analyzed.tzinfo is None:
+        analyzed = analyzed.replace(tzinfo=timezone.utc)
+    return {
+        "insights": row.text,
+        "stats": KbService.json_loads(row.stats_json) or {},
+        "cached": True,
+        "ai_used": bool(row.ai_used),
+        "analyzed_at": analyzed.isoformat() if analyzed else None,
+    }
+
+
+def _save_insight(
+    db: Session,
+    user_id: int,
+    text: str,
+    bundle: dict,
+    ai_used: bool,
+) -> dict:
+    """Upsert the snapshot (one row per user) and return the response payload."""
+    from app.models import AiInsight
+
+    now = datetime.now(timezone.utc)
+    row = (
+        db.query(AiInsight)
+        .filter(AiInsight.user_id == user_id)
+        .first()
+    )
+    if row is None:
+        row = AiInsight(user_id=user_id, text=text, ai_used=ai_used, analyzed_at=now)
+        db.add(row)
+    else:
+        row.text = text
+        row.ai_used = ai_used
+        row.analyzed_at = now
+    row.stats_json = KbService.json_dumps(bundle)
+    try:
+        db.flush()
+    except IntegrityError:
+        # Rare race (two first-loads at once): the unique user row already
+        # exists — roll back the insert and update it instead.
+        db.rollback()
+        row = (
+            db.query(AiInsight)
+            .filter(AiInsight.user_id == user_id)
+            .first()
+        )
+        if row is None:
+            raise
+        row.text = text
+        row.ai_used = ai_used
+        row.stats_json = KbService.json_dumps(bundle)
+        row.analyzed_at = now
+        db.flush()
     return {
         "insights": text,
         "stats": bundle,
-        "cached": cached,
+        "cached": False,
         "ai_used": ai_used,
+        "analyzed_at": now.isoformat(),
     }
+
+
+def get_insights(db: Session, user: User | None, *, force: bool = False) -> dict:
+    """Persisted-first productivity insights — no LLM on page loads.
+
+    A saved snapshot is returned immediately (``cached=True``). Only the
+    explicit ``force`` refresh (or the very first request) consults the
+    provider — mirroring the save-and-reuse pattern used by gap analysis and
+    summaries so opening the dashboard never spends a model call.
+    """
+    user_id = user.id if user else 0
+    saved = load_saved_insight(db, user_id) if not force else None
+    if saved is not None:
+        return saved
+
+    bundle = build_stats_bundle(db, user)
+    prompt = insights_prompt(bundle)
+
+    if force:
+        # Explicit user refresh: bypass the in-memory TTL cache so the model
+        # is genuinely called on request (never served a cached copy).
+        text = ai_client.generate(prompt, max_tokens=500, temperature=0.6)
+    else:
+        text, _cached = cached_completion(
+            prompt,
+            max_tokens=500,
+            temperature=0.6,
+            generate=lambda p, **kwargs: ai_client.generate(p, **kwargs),
+        )
+    ai_used = bool(text)
+    if text is None:
+        text = _fallback_insights(bundle)
+        ai_used = False
+    return _save_insight(db, user_id, text, bundle, ai_used)
 
 
 __all__ = ["build_stats_bundle", "insights_prompt", "get_insights"]

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useToast } from '../hooks/useToast';
 import { useQuestCentreData } from '../hooks/useQuestCentreData';
+import { endpoints } from '../services/api';
 import { StatusWindowWidget } from '../components/questcentre/StatusWindowWidget';
 import { ProgressBarsQC } from '../components/questcentre/ProgressBarsQC';
 import { QuickActionsQC } from '../components/questcentre/QuickActionsQC';
@@ -44,7 +45,7 @@ export const QuestCentreDashboard = () => {
   // Keep life-areas data fresh after a mark-complete action.
   const handleLifeAreaChanged = async () => {
     try {
-      const areas = await import('../services/api').then((m) => m.endpoints.questCentre.lifeAreas());
+      const areas = await endpoints.questCentre.lifeAreas();
       setData((prev) => ({ ...prev, lifeAreas: areas }));
     } catch {
       /* silent */

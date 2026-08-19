@@ -20,7 +20,7 @@ from app.services.schedule_catalog import (
     parse_time_range,
     validate_blocks,
 )
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/dailyschedule", tags=["daily-schedule"])
 
@@ -36,7 +36,7 @@ def _get_item_or_404(db: Session, item_id: int, user_id: int) -> DailyScheduleIt
 def list_schedule(
     date: date = Query(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
 ):
     items = (
         db.query(DailyScheduleItem)
@@ -51,7 +51,7 @@ def list_schedule(
 def create_schedule(
     data: DailyScheduleItemCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
 ):
     parsed = parse_time_range(data.time_range)
     if parsed is None:
@@ -95,7 +95,7 @@ def update_schedule(
     item_id: int,
     data: DailyScheduleItemUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
 ):
     item = _get_item_or_404(db, item_id, current_user.id)
 
@@ -135,7 +135,7 @@ def update_schedule(
 def delete_schedule(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
 ):
     item = _get_item_or_404(db, item_id, current_user.id)
     db.delete(item)
@@ -147,7 +147,7 @@ def delete_schedule(
 def toggle_schedule(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
 ):
     item = _get_item_or_404(db, item_id, current_user.id)
     item.done = not item.done
@@ -160,7 +160,7 @@ def toggle_schedule(
 def schedule_stats(
     date: date = Query(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
 ):
     items = (
         db.query(DailyScheduleItem)

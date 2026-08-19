@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb import health as health_svc
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-health"])
 
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-health"])
 @router.get("/health", response_model=dict)
 def kb_health(
     refresh: bool = Query(default=False),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Aggregate knowledge-health signals into a 0–100 score (phrase 67).
@@ -29,7 +29,7 @@ def kb_health(
 
 @router.get("/gaps", response_model=dict)
 def kb_gaps(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """List topic-coverage gaps (Idea 28, phrase 76).

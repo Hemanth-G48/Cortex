@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import SubjectProfile, User
 from app.services.kb import skills as skills_service
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-skills"])
 
@@ -26,7 +26,7 @@ class MapRequest(BaseModel):
 @router.post("/skills/map")
 def map_subject_skills(
     body: MapRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = (
@@ -46,7 +46,7 @@ def map_subject_skills(
 
 @router.get("/skills")
 def get_skills(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"skills": skills_service.profile(db, current_user.id)}
@@ -55,7 +55,7 @@ def get_skills(
 @router.get("/skills/export")
 def export_skills(
     fmt: str = Query(default="markdown", pattern="^(markdown|json)$"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"format": fmt, "content": skills_service.export(db, current_user.id, fmt)}

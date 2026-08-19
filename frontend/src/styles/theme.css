@@ -541,14 +541,6 @@ input::placeholder, textarea::placeholder {
 
 /* ── Course cards ── */
 
-.course-row {
-  display: flex;
-  gap: 1rem;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-  scroll-snap-type: x mandatory;
-}
-
 .course-card {
   min-width: 280px;
   max-width: 320px;
@@ -557,8 +549,6 @@ input::placeholder, textarea::placeholder {
   border-radius: var(--radius-lg);
   overflow: hidden;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
-  scroll-snap-align: start;
-  flex-shrink: 0;
 }
 
 .course-card:hover {
@@ -568,6 +558,7 @@ input::placeholder, textarea::placeholder {
 .course-card-thumb {
   height: 100px;
   overflow: hidden;
+  position: relative;
 }
 
 .course-card-thumb img {
@@ -575,6 +566,14 @@ input::placeholder, textarea::placeholder {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Accent strip for folder-derived subjects (index.md frontmatter color). */
+.course-card-accent {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  z-index: 1;
 }
 
 .course-card-body {
@@ -587,12 +586,98 @@ input::placeholder, textarea::placeholder {
   margin-bottom: 0.5rem;
 }
 
+/* Small color swatch next to a subject's title (index.md frontmatter). */
+.course-color-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+/* Optional description from the folder's index.md frontmatter. */
+.course-card-desc {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  margin: -0.15rem 0 0.5rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .course-card-stats {
   display: flex;
   gap: 0.75rem;
   font-size: 0.75rem;
   color: var(--text-secondary);
   margin-bottom: 0.5rem;
+}
+
+/* ── Course source groups — every subject fully visible (no horizontal scroll) ── */
+.course-source-group {
+  margin-bottom: 1.75rem;
+}
+
+.course-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.course-group-header h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.course-group-header .emoji {
+  font-size: 1.1rem;
+}
+
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.course-grid .course-card-link {
+  display: block;
+  height: 100%;
+}
+
+.course-grid .course-card {
+  min-width: 0;
+  max-width: none;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.course-grid .course-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.course-grid .course-card-badges {
+  margin-top: auto;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
 }
 
 /* ── Resource cards ── */
@@ -1163,7 +1248,6 @@ input::placeholder, textarea::placeholder {
   .stat-grid { grid-template-columns: 1fr; }
   .stat-tile .value { font-size: 1.25rem; }
   .calendar-week { grid-template-columns: 1fr; }
-  .course-row { flex-direction: column; }
   .course-card { max-width: 100%; }
   .timetable-times { width: 40px; }
   .timetable-time-label { font-size: 0.5rem; }
@@ -1983,6 +2067,881 @@ textarea:focus-visible,
   padding: 0.4rem;
 }
 
+/* ── Subject Details page (Second Brain + Google Classroom split) ── */
+
+.notice-success {
+  background: var(--success-muted);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.course-detail-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.course-detail-actions .spinner-sm {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-light);
+  border-top-color: var(--accent, #4ecdc4);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+/* Source sections — clearly separated Second Brain vs Google Classroom */
+.course-source-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  margin-bottom: 1.75rem;
+  background: var(--bg-card);
+}
+
+.second-brain-section {
+  border-left: 3px solid var(--info, #6c5ce7);
+}
+
+.classroom-section {
+  border-left: 3px solid var(--success, #4ecdc4);
+}
+
+.course-source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.course-source-header h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.course-section h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Topic tree (nested topics/subtopics with their documents) */
+.course-topic-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.course-topic-node {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.course-topic-node.level-2,
+.course-topic-node.level-3 {
+  border: none;
+  border-radius: 0;
+}
+
+.course-topic-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  background: var(--bg-hover);
+  transition: background 0.15s;
+  flex-wrap: wrap;
+}
+
+.course-topic-row:hover {
+  background: var(--border-light);
+}
+
+.course-topic-node.level-2 .course-topic-row,
+.course-topic-node.level-3 .course-topic-row {
+  background: transparent;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  margin-left: 0.5rem;
+}
+
+.topic-caret {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  width: 0.9rem;
+}
+
+.topic-icon {
+  font-size: 0.95rem;
+}
+
+.topic-name {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 140px;
+}
+
+/* Folder-path breadcrumb on folder-derived topics (e.g. ``Memory / Virtual Memory``). */
+.topic-breadcrumb {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.course-topic-children {
+  padding: 0.4rem 0.75rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* Compact document card (inside topics) */
+.course-doc-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.course-doc-mini:hover {
+  border-color: var(--accent);
+  transform: translateX(2px);
+}
+
+.course-doc-mini .document-icon {
+  font-size: 1rem;
+}
+
+.course-doc-mini-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.course-doc-mini-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.course-doc-mini-meta {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* Domains-first grid — folder hierarchy as the canonical organization model */
+.course-domains-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.course-domain-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.course-domain-card:hover {
+  border-color: var(--accent, #4ecdc4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.course-domain-icon {
+  font-size: 1.4rem;
+}
+
+.course-domain-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.course-domain-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.course-domain-gap {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  align-self: flex-start;
+}
+
+.course-domain-gap.analyzed {
+  color: var(--success, #4ecdc4);
+  background: color-mix(in srgb, var(--success, #4ecdc4) 14%, transparent);
+}
+
+.course-domain-gap.pending {
+  color: var(--warning, #f5a623);
+  background: color-mix(in srgb, var(--warning, #f5a623) 14%, transparent);
+}
+
+/* Domain detail breadcrumb (Course ▸ Domain) */
+.domain-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.domain-breadcrumb-link {
+  color: var(--accent, #4ecdc4);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.domain-breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+.domain-breadcrumb-sep {
+  color: var(--text-muted);
+}
+
+.domain-breadcrumb-current {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Related concepts */
+.course-concepts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.5rem;
+}
+
+.course-concept-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  flex-wrap: wrap;
+}
+
+.course-concept-chip .concept-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.course-concept-chip .concept-count {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+/* Google Classroom assignments */
+.classroom-assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.classroom-assignment-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  flex-wrap: wrap;
+}
+
+.classroom-assignment-row .assignment-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 160px;
+}
+
+.classroom-assignment-row .assignment-desc {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  flex-basis: 100%;
+  padding-left: 0;
+}
+
+.classroom-assignment-row .assignment-due {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Gap analysis panel */
+.gap-analysis-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Goal-level Gap Analysis: right-aligned Re-analyze action above the report. */
+.gap-analysis-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Gap Analysis history timeline (subjects + goals) */
+.gap-history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.gap-history-title {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.gap-history-entry {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-card);
+}
+.gap-history-entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.gap-history-when {
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+.gap-history-diff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.gap-history-delta {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+}
+
+.gap-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.gap-block h3 {
+  font-size: 0.9rem;
+  margin: 0 0 0.35rem;
+}
+
+.gap-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+}
+
+.gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.gap-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.gap-row .gap-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 160px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gap-bar-track {
+  flex: 1;
+  min-width: 120px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.gap-bar {
+  height: 100%;
+  background: var(--warning, #f9ca24);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.gap-row-concept .gap-bar {
+  background: var(--danger, #e8496d);
+}
+
+.gap-value {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+/* ── Redesigned Gap Analysis (actionable learning/skill-gap engine) ── */
+
+.gap-summary-card {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, var(--bg-hover), var(--bg-card));
+}
+
+.gap-summary-text {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.gap-summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+.gap-level-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.gap-priority-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.gap-pri-high { color: var(--danger); background: var(--accent-muted); }
+.gap-pri-med { color: var(--warning); background: var(--warning-muted); }
+.gap-pri-low { color: var(--text-muted); background: var(--bg-hover); }
+
+/* Strength chips */
+.gap-strength-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.gap-strength-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--success);
+  border-radius: var(--radius);
+  background: var(--bg-hover);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: default;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.gap-strength-chip:hover {
+  border-color: var(--border-light);
+  transform: translateY(-1px);
+}
+
+/* Gap cards */
+.gap-item-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.gap-item-card:hover {
+  border-color: var(--border-light);
+}
+
+.gap-item-card.gap-item-open {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow);
+}
+
+.gap-item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  cursor: pointer;
+  flex-wrap: wrap;
+  transition: background 0.15s;
+}
+
+.gap-item-head:hover {
+  background: var(--bg-hover);
+}
+
+.gap-item-caret {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.gap-item-name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.gap-item-body {
+  border-top: 1px solid var(--border);
+  padding: 0.85rem 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.gap-why {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.gap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.gap-field-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.gap-steps {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.gap-steps li::marker {
+  color: var(--accent);
+}
+
+.gap-chip-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.gap-prereq-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--danger);
+  background: var(--accent-muted);
+  border: 1px solid transparent;
+}
+
+.gap-prereq-chip.gap-prereq-known {
+  color: var(--success);
+  background: var(--success-muted);
+}
+
+.gap-next-chip {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--info);
+}
+
+.gap-related-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  color: var(--info);
+  background: var(--info-muted);
+}
+
+/* Learning path */
+.gap-path {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.gap-phase-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  margin-bottom: 0.4rem;
+}
+
+.gap-phase-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.gap-phase-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-hover);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.gap-phase-item:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.gap-phase-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-size: 0.62rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+/* Path item cards: step chip + Second Brain doc links + draft-note action */
+.gap-phase-item-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  max-width: 15rem;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.gap-phase-item-card:hover {
+  border-color: var(--border-light);
+  transform: translateY(-1px);
+}
+
+.gap-phase-item-card .gap-phase-item {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.gap-phase-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.gap-doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--info);
+  font-size: 0.66rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.gap-doc-link:hover {
+  border-color: var(--info);
+  background: var(--info-muted);
+}
+
+.gap-create-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.gap-create-note:hover {
+  background: var(--accent-muted);
+  box-shadow: var(--shadow-glow);
+}
+
+.gap-create-note:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.gap-field-actions {
+  margin-top: 0.25rem;
+}
+
+/* Goal picker + domain breakdown */
+.gap-goal-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.gap-goal-chip {
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.gap-goal-chip:hover {
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.gap-goal-chip-active {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.gap-domain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.75rem;
+}
+
+.gap-domain-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.9rem;
+  background: var(--bg-card);
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.gap-domain-card:hover {
+  border-color: var(--border-light);
+  transform: translateY(-1px);
+}
+
+.gap-domain-status {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ── STUDENT-PLANAR UI utilities (reading tracker, assignments, schedule, teacher) ── */
 .tabs {
   display: flex;
@@ -2035,4 +2994,569 @@ textarea:focus-visible,
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 1rem;
+}
+
+/* ── Course card link ── */
+.course-card-link {
+  display: inline-block;
+}
+.course-card-link .course-card {
+  cursor: pointer;
+}
+
+/* ── Course detail page ── */
+.course-detail-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+.course-detail-loading .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent, #4ecdc4);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 1rem;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.course-detail-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  gap: 0.5rem;
+}
+.course-detail-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.course-section {
+  margin-top: 1.5rem;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.section-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+/* ── Topics grid ── */
+.course-topics-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.course-topic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.82rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+.course-topic-chip:hover {
+  background: var(--bg-hover, rgba(128,128,128,0.08));
+  border-color: var(--accent, #4ecdc4);
+}
+.topic-icon {
+  font-size: 0.9rem;
+}
+.topic-text {
+  font-weight: 500;
+}
+/* ── Tags ── */
+.course-tags-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.course-tag-chip {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  background: rgba(78, 205, 196, 0.12);
+  color: #4ecdc4;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+.wikilink-chip {
+  background: rgba(249, 202, 36, 0.12);
+  color: #f9ca24;
+}
+/* ── Document cards (expandable) ── */
+.document-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.document-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.document-card:hover {
+  border-color: var(--accent, #4ecdc4);
+}
+.document-card-expanded {
+  border-color: var(--accent, #4ecdc4);
+}
+.document-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  user-select: none;
+}
+.document-card-header:hover {
+  background: var(--bg-hover, rgba(128,128,128,0.04));
+}
+.document-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.document-info {
+  flex: 1;
+  min-width: 0;
+}
+.document-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.document-expand-icon {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.document-expanded-content {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0;
+}
+.document-expanded-content h5 {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.outline-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.outline-item {
+  padding: 0.2rem 0;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.outline-level-1 {
+  font-weight: 600;
+  padding-left: 0;
+}
+.outline-level-2 {
+  font-weight: 400;
+  padding-left: 1rem;
+  color: var(--text-secondary);
+}
+.outline-level-3 {
+  font-weight: 400;
+  padding-left: 2rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.document-type-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--bg-hover, rgba(128,128,128,0.08));
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+/* ── Resource cards ── */
+.resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.resource-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1rem;
+}
+.resource-card h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+}
+.resource-card p {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+/* ── Course info panel ── */
+.course-info-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1rem;
+}
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  font-size: 0.85rem;
+}
+.info-row + .info-row {
+  border-top: 1px solid var(--border);
+}
+.info-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 140px;
+}
+.info-value {
+  color: var(--text);
+}
+@media (max-width: 768px) {
+  .course-detail-nav {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .course-topics-grid {
+    flex-direction: column;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   ── Book Knowledge Gap Reader ──
+   ════════════════════════════════════════════════════════════ */
+
+/* Tabs (self-contained; the generic `.tab` styles are elsewhere in this file). */
+.bgp-page .tabs .tab-btn,
+.tabs .tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tabs .tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.tabs .tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Progress bar */
+.bgp-progress {
+  height: 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.bgp-progress-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+/* Knowledge-level dots */
+.bgp-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+}
+
+.bgp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border-light);
+  transition: background 0.15s;
+}
+
+.bgp-dot.on {
+  background: var(--accent);
+}
+
+.bgp-dots-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-left: 0.2rem;
+}
+
+/* Item cards */
+.bgp-item {
+  border-left: 3px solid var(--border-light);
+}
+
+.bgp-item.unknown { border-left-color: var(--danger); }
+.bgp-item.partially_known { border-left-color: var(--warning); }
+.bgp-item.known { border-left-color: var(--success); }
+
+.bgp-item-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.bgp-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.bgp-status-icon.unknown { background: var(--danger-muted, var(--accent-muted)); color: var(--danger); }
+.bgp-status-icon.partially_known { background: var(--warning-muted); color: var(--warning); }
+.bgp-status-icon.known { background: var(--success-muted); color: var(--success); }
+
+.bgp-item-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.bgp-item-name {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.bgp-item-name:hover {
+  color: var(--accent);
+}
+
+.bgp-item-meta {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.bgp-item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.bgp-est {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.bgp-chapter {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.55rem;
+}
+
+.bgp-snippet {
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  line-height: 1.45;
+}
+
+.bgp-why {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.4rem;
+  line-height: 1.45;
+}
+
+.bgp-historical {
+  font-size: 0.75rem;
+  color: var(--warning);
+  margin-top: 0.4rem;
+}
+
+.bgp-item-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+/* Today's reading list */
+.bgp-today-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bgp-today-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.bgp-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.bgp-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.bgp-source-block {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bgp-source-block .bgp-chapter {
+  margin-top: 0;
+}
+
+/* TOC-first workflow: topic rows (chapters / sections / subsections). */
+.bgp-topic {
+  padding: 0.8rem 1rem;
+  border-left: 3px solid var(--border);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.bgp-topic:hover {
+  transform: translateX(2px);
+}
+.bgp-topic.known { border-left-color: var(--success); }
+.bgp-topic.partially_known { border-left-color: var(--warning); }
+.bgp-topic.unknown { border-left-color: var(--danger); }
+.bgp-topic.needs_review { border-left-color: var(--info); }
+
+.bgp-topic-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.bgp-topic-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+.bgp-topic-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+.bgp-topic-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.bgp-status-icon.needs_review {
+  background: var(--info-muted, var(--accent-muted));
+  color: var(--info, var(--accent));
+}
+
+/* Deep-analysis result panel under a topic. */
+.bgp-deep-result {
+  margin-top: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+}
+.bgp-deep-failed {
+  border-color: var(--danger);
+}
+.bgp-deep-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.bgp-deep-missing {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.bgp-deep-missing li {
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+.bgp-deep-missing-name {
+  font-weight: 600;
+}
+.bgp-deep-missing-why {
+  color: var(--text-secondary);
+}
+.bgp-deep-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }

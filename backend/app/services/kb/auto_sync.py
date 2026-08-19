@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import subprocess
 from datetime import datetime
 from typing import Any, Callable
@@ -35,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import KbDocument, KbSource
-from app.services.kb import KbService, utcnow
+from app.services.kb import KbService, NOISE_DIRS, utcnow
 from app.services.kb.automation import auto_job
 from app.services.kb.pipeline import ingest_document
 from app.services.text_extractor import EXTRACTABLE_TYPES
@@ -176,10 +177,133 @@ ADAPTERS: dict[str, Callable[[KbSource, dict], tuple[list[dict], dict]]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# "local" adapter — Copy Recent Notes (external Obsidian vault → notes/)
+# ---------------------------------------------------------------------------
+# Mirrors the *knowledge Markdown files* of a configured external vault
+# (``sync_source_path``) into this source's knowledge root (``notes/``),
+# preserving the folder hierarchy. Only genuinely changed files are copied
+# (content-hash compare); unchanged files are never re-copied and their
+# embeddings are reused as-is by the scanner. Deletions only ever apply to
+# files this adapter previously synced (tracked in the cursor) — pre-existing
+# vault files are never removed.
+
+
+def _local_sync(db: Session, source: KbSource) -> dict:
+    from app.services.kb.scanner import scan_and_ingest
+
+    external = source.sync_source_path
+    if not external or not os.path.isdir(external):
+        return {
+            "source_id": source.id,
+            "sync_type": "local",
+            "skipped": True,
+            "reason": "sync_source_path is not a directory",
+        }
+    target_root = source.root_path
+    if not target_root or not os.path.isdir(target_root):
+        return {
+            "source_id": source.id,
+            "sync_type": "local",
+            "skipped": True,
+            "reason": "source root_path is not a directory",
+        }
+
+    cursor = KbService.json_loads(source.sync_cursor_json) or {}
+    # rel_path → sha256 of the last file WE synced (deletion scope = only ours).
+    external_files: dict[str, str] = {}
+    for dirpath, dirnames, filenames in os.walk(external):
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in NOISE_DIRS and d.casefold() != "daily-life"
+        ]
+        for fname in filenames:
+            if fname.startswith("."):
+                continue
+            ext = _ext_of(fname)
+            if ext is None:
+                continue
+            rel = os.path.relpath(os.path.join(dirpath, fname), external)
+            if ".." in rel.split(os.sep):
+                continue  # defensive: never follow symlink escapes
+            external_files[rel] = ext
+
+    copied = unchanged = 0
+    for rel in sorted(external_files):
+        src = os.path.join(external, rel)
+        dst = os.path.join(target_root, rel)
+        try:
+            with open(src, "rb") as fh:
+                digest = KbService.content_hash(fh.read())
+        except OSError as exc:
+            logger.warning("local sync cannot read %s: %s", src, exc)
+            continue
+        try:
+            with open(dst, "rb") as fh:
+                target_digest = KbService.content_hash(fh.read())
+        except OSError:
+            target_digest = None
+        if digest == target_digest:
+            unchanged += 1
+            cursor[rel] = digest
+            continue
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+        cursor[rel] = digest
+        copied += 1
+
+    # Delete ONLY files we previously synced that no longer exist externally.
+    removed = 0
+    for rel in [r for r in cursor if r not in external_files]:
+        dst = os.path.join(target_root, rel)
+        try:
+            if os.path.isfile(dst) and os.path.dirname(dst).startswith(target_root):
+                os.remove(dst)
+                removed += 1
+        except OSError as exc:
+            logger.warning("local sync cannot remove %s: %s", dst, exc)
+        cursor.pop(rel, None)
+
+    source.sync_cursor_json = KbService.json_dumps(cursor)
+    source.last_scanned_at = utcnow()
+    db.add(source)
+    db.commit()
+
+    # Reconcile the index: new/changed files get ingested, deleted files get
+    # swept — unchanged files are untouched (embeddings reused).
+    scanned: dict = {}
+    try:
+        scanned = scan_and_ingest(db, source.id)
+    except Exception as exc:  # noqa: BLE001 — one failed sync must not kill the loop
+        logger.exception("local sync scan failed for source %s", source.id)
+        scanned = {"error": str(exc)}
+
+    return {
+        "source_id": source.id,
+        "sync_type": "local",
+        "copied": copied,
+        "unchanged": unchanged,
+        "removed": removed,
+        "scanned": scanned,
+    }
+
+
 def sync_source(
     db: Session, source: KbSource, *, force: bool = False
 ) -> dict:
     """Run one source's adapter and import deltas through the ingest pipeline."""
+    if source.sync_type == "local":
+        # Local vaults (Copy Recent Notes) are gated by their own toggle —
+        # KB_AUTO_LOCAL_SYNC_ENABLED — so the scheduled job is independent of
+        # remote repository sync. The manual button always passes force=True.
+        if not force and not settings.KB_AUTO_LOCAL_SYNC_ENABLED:
+            return {
+                "source_id": source.id,
+                "skipped": True,
+                "reason": "KB_AUTO_LOCAL_SYNC_ENABLED is disabled",
+            }
+        return _local_sync(db, source)
     if source.sync_type not in ADAPTERS:
         return {"source_id": source.id, "skipped": True, "reason": f"no adapter for {source.sync_type!r}"}
     if not force and not settings.KB_SYNC_ENABLED:
@@ -287,13 +411,18 @@ def _import_change(db: Session, source: KbSource, change: dict) -> str:
     description="Sync changed files from git/drive/clip sources through ingest.",
 )
 def run(db: Session, user_id: int, limit: int | None = None) -> dict:
-    """Sync every enabled source with a non-``none`` sync_type (phrase 89)."""
+    """Sync every enabled git/drive/clip source (phrase 89).
+
+    ``sync_type='local'`` sources are deliberately excluded — they belong to
+    the dedicated ``auto_local_sync`` job (Copy Recent Notes) so the two
+    toggles never double-sync the same external vault.
+    """
     sources = (
         db.query(KbSource)
         .filter(
             KbSource.user_id == user_id,
             KbSource.enabled == True,  # noqa: E712
-            KbSource.sync_type != "none",
+            KbSource.sync_type.in_(("git", "drive", "clip")),
         )
         .order_by(KbSource.id.asc())
         .all()
@@ -307,6 +436,48 @@ def run(db: Session, user_id: int, limit: int | None = None) -> dict:
     return {"sources": len(sources), "imported": imported, "results": results}
 
 
+@auto_job(
+    "auto_local_sync",
+    toggle="KB_AUTO_LOCAL_SYNC_ENABLED",
+    cap="",  # delta-only by cursor; per-source config bounds the work
+    description="Copy recent notes from external vaults (sync_type='local') into notes/.",
+)
+def run_local(db: Session, user_id: int, limit: int | None = None) -> dict:
+    """Scheduled Copy Recent Notes: mirror every enabled ``local`` source.
+
+    Each ``sync_type='local'`` source mirrors a configured external vault
+    (``sync_source_path``) into its knowledge root — only changed knowledge
+    Markdown files are copied, so unchanged notes reuse their embeddings.
+    This is the same delta-only path the manual
+    ``POST /api/kb/sources/{id}/sync`` endpoint calls with ``force=True``.
+    """
+    sources = (
+        db.query(KbSource)
+        .filter(
+            KbSource.user_id == user_id,
+            KbSource.enabled == True,  # noqa: E712
+            KbSource.sync_type == "local",
+        )
+        .order_by(KbSource.id.asc())
+        .all()
+    )
+    results = []
+    copied = unchanged = removed = 0
+    for source in sources:
+        res = sync_source(db, source, force=False)
+        results.append(res)
+        copied += res.get("copied", 0)
+        unchanged += res.get("unchanged", 0)
+        removed += res.get("removed", 0)
+    return {
+        "sources": len(sources),
+        "copied": copied,
+        "unchanged": unchanged,
+        "removed": removed,
+        "results": results,
+    }
+
+
 def sync_status(source: KbSource) -> dict:
     """Per-source sync state for the UI (phrase 87)."""
     return {
@@ -315,4 +486,5 @@ def sync_status(source: KbSource) -> dict:
         "sync_type": source.sync_type,
         "last_scanned_at": source.last_scanned_at.isoformat() if source.last_scanned_at else None,
         "cursor": KbService.json_loads(source.sync_cursor_json) or {},
+        "sync_source_path": source.sync_source_path,
     }

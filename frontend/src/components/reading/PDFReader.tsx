@@ -4,9 +4,12 @@ interface PDFReaderProps {
   url: string;
   title: string;
   onClose: () => void;
+  // Jump straight to a page (book gap reader: "Read in Book"). Appended as a
+  // #page=N fragment — supported by the browser's built-in PDF viewer.
+  initialPage?: number | null;
 }
 
-export const PDFReader = ({ url, title, onClose }: PDFReaderProps) => {
+export const PDFReader = ({ url, title, onClose, initialPage }: PDFReaderProps) => {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -22,7 +25,7 @@ export const PDFReader = ({ url, title, onClose }: PDFReaderProps) => {
           <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>{title}</h2>
           <button type="button" className="btn btn-ghost" onClick={onClose}>✕ Close</button>
         </div>
-        <iframe src={url} title={title} className="pdf-frame" style={{ flex: 1, border: 'none', width: '100%' }} />
+        <iframe src={initialPage ? `${url}#page=${initialPage}` : url} title={title} className="pdf-frame" style={{ flex: 1, border: 'none', width: '100%' }} />
       </div>
     </div>
   );

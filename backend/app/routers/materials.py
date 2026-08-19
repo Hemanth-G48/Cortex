@@ -13,7 +13,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import Character, Material, CurriculumUnit, User
 from app.schemas.material import MaterialCreate, MaterialResponse
-from app.services.security import get_current_user
+from app.services.users import current_user
 from app.services.text_extractor import NoExtractableTextError
 from app.services.ingestion import text_for_material
 
@@ -141,7 +141,7 @@ def upload_material(
     unit_id: int,
     file: UploadFile,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(current_user),
 ):
     ext = _allowed_extension(file.filename or "")
     if ext is None:

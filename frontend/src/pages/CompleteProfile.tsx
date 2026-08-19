@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/layout/Header';
-import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
 import { useToast } from '../hooks/useToast';
 import { endpoints } from '../services/api';
 import type { Institution, Program, EnrollmentSummary } from '../services/api';
 import { SkeletonCard } from '../components/shared/Skeleton';
-import { EmptyState } from '../components/shared/EmptyState';
 
 export const CompleteProfile = () => {
-  const { isAuthenticated, loading: authLoading, refreshMe } = useAuth();
+  // Single-owner app: no auth gate — the profile is always the owner's.
+  const { loading: authLoading, refresh: refreshMe } = useProfile();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -24,10 +24,9 @@ export const CompleteProfile = () => {
   const currentProgId = enrollment?.program_id ?? null;
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     endpoints.curriculum.institutions().then(setInstitutions).catch(() => toast('Could not load institutions', 'error'));
     endpoints.enrollment.summary().then(setEnrollment).catch(() => undefined);
-  }, [isAuthenticated, toast]);
+  }, [toast]);
 
   useEffect(() => {
     // Load programs for the freshly picked institution — or for the user's
@@ -63,20 +62,6 @@ export const CompleteProfile = () => {
       <div className="page fade-in" style={{ maxWidth: 560, margin: '0 auto' }}>
         <Header title="Complete Profile" />
         <SkeletonCard />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="page fade-in" style={{ maxWidth: 560, margin: '0 auto' }}>
-        <Header title="Complete Profile" />
-        <EmptyState
-          icon="🔐"
-          title="Sign in to enroll"
-          message="Log in or create an account to pick your institution and program."
-          action={<Link className="btn btn-primary" to="/login">Go to login</Link>}
-        />
       </div>
     );
   }

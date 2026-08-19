@@ -1,45 +1,48 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type ReactNode } from 'react';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  fallback?: ReactNode;
+  /** Fallback UI rendered when a child throws. May be a node or a render fn. */
+  fallback: ReactNode | ((error: Error, reset: () => void) => ReactNode);
+  /** When this prop changes the boundary resets itself (e.g. route id / data key). */
+  resetKey?: unknown;
 }
 
 interface ErrorBoundaryState {
-  hasError: boolean;
   error: Error | null;
 }
 
+/**
+ * Catches render errors from a subtree so one failing component (e.g. the
+ * knowledge-graph canvas) can never unmount the entire page. The fallback is
+ * rendered in place of the crashed subtree; callers can offer a retry that
+ * resets the boundary.
+ */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false, error: null };
+  state: ErrorBoundaryState = { error: null };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+    return { error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('[ErrorBoundary]', error, info.componentStack);
+  componentDidUpdate(prevProps: ErrorBoundaryProps): void {
+    // Reset when the boundary moves to a different subtree (new course/subject).
+    if (this.state.error && prevProps.resetKey !== this.props.resetKey) {
+      // Guarded by the resetKey change, so this is the canonical error-boundary
+      // reset pattern (setState only fires when the key actually changed).
+      // oxlint-disable-next-line react/no-did-update-set-state
+      this.setState({ error: null });
+    }
   }
+
+  private reset = (): void => {
+    this.setState({ error: null });
+  };
 
   render(): ReactNode {
-    if (this.state.hasError) {
-      return this.props.fallback ?? (
-        <div className="empty-state" style={{ padding: '3rem 1rem' }}>
-          <div className="empty-icon">⚠️</div>
-          <div className="empty-title">Something went wrong</div>
-          <div className="empty-message" style={{ maxWidth: 400, margin: '0 auto' }}>
-            {this.state.error?.message ?? 'An unexpected error occurred.'}
-          </div>
-          <button
-            className="badge badge-info"
-            style={{ cursor: 'pointer', border: 'none', padding: '0.4rem 1rem', marginTop: '1rem' }}
-            onClick={() => this.setState({ hasError: false, error: null })}
-          >
-            Try again
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
+    const { error } = this.state;
+    if (error === null) return this.props.children;
+    const { fallback } = this.props;
+    return typeof fallback === 'function' ? fallback(error, this.reset) : fallback;
   }
 }

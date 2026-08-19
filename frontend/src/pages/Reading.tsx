@@ -9,6 +9,9 @@ import { PDFReader } from '../components/reading/PDFReader';
 import { useReading } from '../hooks/useReading';
 import { bookApi } from '../services/api';
 
+// Matches the backend BOOK_MAX_UPLOAD_MB default (configurable via env).
+const BOOK_MAX_MB = 100;
+
 export const Reading = () => {
   const { books, insights, loading, refresh, addBook, removeBook } = useReading();
   const [tab, setTab] = useState<'all' | 'reading' | 'finished' | 'want'>('all');
@@ -18,6 +21,7 @@ export const Reading = () => {
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState<'reading' | 'finished' | 'want'>('reading');
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfTitle, setPdfTitle] = useState('');
 
@@ -33,6 +37,12 @@ export const Reading = () => {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadError(null);
+    if (file.size > BOOK_MAX_MB * 1024 * 1024) {
+      setUploadError(`File too large (max ${BOOK_MAX_MB} MB)`);
+      e.target.value = '';
+      return;
+    }
     setUploading(true);
     try {
       const { url } = await bookApi.uploadFile(file);
@@ -41,8 +51,8 @@ export const Reading = () => {
       await bookApi.update(created.id, { file_url: url });
       setShowUpload(false);
       await refresh();
-    } catch {
-      /* silent */
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed. Is the backend running?');
     } finally {
       setUploading(false);
     }
@@ -162,7 +172,10 @@ export const Reading = () => {
         <div className="modal-overlay" onClick={() => setShowUpload(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">Upload PDF</h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Select a .pdf file to upload and add to your reading list.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Select a .pdf file to upload and add to your reading list (up to {BOOK_MAX_MB} MB).</p>
+            {uploadError && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--danger)', marginBottom: '0.75rem' }}>⚠ {uploadError}</p>
+            )}
             <input
               type="file"
               accept=".pdf"

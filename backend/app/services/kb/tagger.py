@@ -11,6 +11,7 @@ import re
 from collections import Counter
 from typing import TYPE_CHECKING
 
+from app.config import settings
 from app.services.ai_client import ai_available, generate_json
 from app.services.embeddings import embedding_budget
 from app.services.kb import KbService
@@ -52,8 +53,19 @@ def _is_noun_like(word: str) -> bool:
 
 
 def _trim_tag(name: str) -> str:
-    """Lowercase, trim whitespace, cap at ~40 chars."""
-    return name.strip().lower()[:40]
+    """Normalise a tag name for storage.
+
+    Plain tags are lowercased and capped at ~40 chars (legacy behaviour).
+    ``course:`` tags keep their case and length so derived course titles
+    stay readable and un-truncated (``course:Operating Systems`` is a course
+    title, not a keyword).
+    """
+    name = name.strip()
+    if name.startswith(settings.COURSE_TAG_PREFIX):
+        # Cap at the KbTag.name column width (100) — course names beyond that
+        # would overflow on strict DBs (e.g. Postgres).
+        return name[:100]
+    return name.lower()[:40]
 
 
 def _create_or_reuse_tag(db: Session, user_id: int, name: str, kind: str = "inline") -> KbTag:
@@ -114,9 +126,17 @@ def seed_inline_tags(db: Session, doc: KbDocument) -> list[int]:
         elif isinstance(raw_tags, str) and raw_tags.strip():
             tag_names.add(raw_tags.strip())
 
-    # 2) Inline ``#tag`` tokens in extracted_text.
+    # 2) Inline ``#tag`` tokens in extracted_text. The ``course:`` alternative
+    # is tried first so ``#course:Operating Systems`` parses as one tag (the
+    # colon and inner spaces are preserved for derivation).
     text = doc.extracted_text or ""
-    for m in re.finditer(r"(?:^|\s)#([A-Za-z0-9_]+)", text):
+    inline_re = re.compile(
+        r"(?:^|\s)#("
+        r"course:[A-Za-z0-9_][A-Za-z0-9_ .&'-]*"
+        r"|[A-Za-z0-9_][A-Za-z0-9_/.\-]*"
+        r")"
+    )
+    for m in inline_re.finditer(text):
         tag_names.add(m.group(1))
 
     tag_ids: list[int] = []
@@ -308,6 +328,117 @@ def propose_tags(db: Session, doc: KbDocument) -> list:
 
 
 # ---------------------------------------------------------------------------
+# Phrase 33b — persisted suggestions (no LLM on GET)
+# ---------------------------------------------------------------------------
+
+
+def persisted_suggestions(db: Session, doc: KbDocument) -> list[dict]:
+    """Rule + persisted-AI + deterministic suggestions — **never calls the LLM**.
+
+    This is the read path for ``GET /api/kb/documents/{id}/tags`` (and every
+    tag-editor response), so opening a document costs nothing:
+
+    1. Rule tags (provenance ``"rule"``, confidence 1.0) — inline/frontmatter
+       tags seeded at ingest.
+    2. Persisted AI rows (provenance ``"ai"``) — written at ingest by
+       ``auto_tag_document`` or on the explicit ``POST .../tags/propose``
+       action. Reused as-is; the LLM is never re-invoked to re-derive them.
+    3. When no AI rows have been persisted yet, the deterministic TF-IDF
+       fallback stands in (confidence 0.5) so the panel is never empty.
+
+    Nothing here is committed as authoritative — only ``provenance="rule"``
+    rows exist until the user applies. Mirrors ``propose_tags``'s shape so the
+    UI treats both identically.
+    """
+    user_id = doc.user_id
+    suggestions: list[dict] = []
+    seen_tag_ids: set[int] = set()
+
+    # 1) Rule tags first (persisted at ingest — free to read).
+    rule_tags = (
+        db.query(KbTag)
+        .join(KbDocumentTag, KbTag.id == KbDocumentTag.tag_id)
+        .filter(
+            KbDocumentTag.document_id == doc.id,
+            KbDocumentTag.user_id == user_id,
+            KbDocumentTag.provenance == "rule",
+        )
+        .order_by(KbTag.name)
+        .all()
+    )
+    for tag in rule_tags:
+        suggestions.append(
+            {"tag_id": tag.id, "name": tag.name, "provenance": "rule", "confidence": 1.0}
+        )
+        seen_tag_ids.add(tag.id)
+
+    # 2) Persisted AI suggestions (ingest pipeline / explicit propose action).
+    ai_tags = (
+        db.query(KbTag)
+        .join(KbDocumentTag, KbTag.id == KbDocumentTag.tag_id)
+        .filter(
+            KbDocumentTag.document_id == doc.id,
+            KbDocumentTag.user_id == user_id,
+            KbDocumentTag.provenance == "ai",
+        )
+        .order_by(KbTag.name)
+        .all()
+    )
+    for tag in ai_tags:
+        if tag.id not in seen_tag_ids:
+            suggestions.append(
+                {"tag_id": tag.id, "name": tag.name, "provenance": "ai", "confidence": 0.8}
+            )
+            seen_tag_ids.add(tag.id)
+
+    # 3) Deterministic stand-in when nothing AI-derived has been persisted yet.
+    if not ai_tags:
+        for name in tfidf_tag_candidates(db, doc, top_n=6):
+            tag = _create_or_reuse_tag(db, doc.user_id, name, kind="auto")
+            if tag.id not in seen_tag_ids:
+                suggestions.append(
+                    {
+                        "tag_id": tag.id,
+                        "name": tag.name,
+                        "provenance": "ai",
+                        "confidence": 0.5,
+                    }
+                )
+                seen_tag_ids.add(tag.id)
+
+    return suggestions
+
+
+def persist_ai_suggestions(db: Session, doc: KbDocument) -> int:
+    """Run ``propose_tags`` (the only LLM path) and persist its AI rows.
+
+    Called by the explicit ``POST /api/kb/documents/{id}/tags/propose``
+    action — the sole place a user-triggered refresh can spend a model call.
+    Persisting the result as ``provenance="ai"`` document_tags rows means
+    later GETs surface them via ``persisted_suggestions`` without re-calling
+    the LLM. Returns the number of new rows persisted.
+    """
+    suggestions = propose_tags(db, doc)
+    user_id = doc.user_id
+    saved = 0
+    for sug in suggestions:
+        if sug["provenance"] == "ai" and not _existing_document_tag(
+            db, user_id, doc.id, sug["tag_id"]
+        ):
+            db.add(
+                KbDocumentTag(
+                    user_id=user_id,
+                    document_id=doc.id,
+                    tag_id=sug["tag_id"],
+                    provenance="ai",
+                )
+            )
+            saved += 1
+    db.flush()
+    return saved
+
+
+# ---------------------------------------------------------------------------
 # Phrase 37 — apply / reject
 # ---------------------------------------------------------------------------
 
@@ -344,6 +475,21 @@ def apply_tags(db: Session, doc: KbDocument, tag_ids: list[int]) -> int:
             applied += 1
     db.flush()
     return applied
+
+
+def create_document_tag(
+    db: Session, doc: KbDocument, name: str, kind: str = "auto"
+) -> tuple[KbTag, int]:
+    """Create-or-reuse a tag by *name* and attach it to *doc* as manual.
+
+    ``course:*`` tags keep their case/length (see ``_trim_tag``) so derived
+    course titles stay readable. Returns ``(tag, applied)`` — ``applied`` is
+    the number of associations created/promoted (idempotent).
+    """
+    tag = _create_or_reuse_tag(db, doc.user_id, name, kind=kind)
+    applied = apply_tags(db, doc, [tag.id])
+    db.flush()
+    return tag, applied
 
 
 def reject_tags(db: Session, doc: KbDocument, tag_ids: list[int]) -> int:

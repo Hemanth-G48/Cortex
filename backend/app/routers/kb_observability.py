@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import PromptVersion, User
 from app.services.kb import ai_log as ai_log_service
-from app.services.security import get_current_user, require_admin
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-observability"])
 
@@ -26,23 +26,18 @@ router = APIRouter(prefix="/api/kb", tags=["kb-observability"])
 @router.get("/observability")
 def observability(
     since_days: int = Query(default=7, ge=1, le=90),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    """Dashboard payload; admin for global, teacher for own (phrase 97)."""
-    if current_user.is_admin:
-        payload = ai_log_service.aggregate(db)
-    elif current_user.role == "teacher":
-        payload = ai_log_service.aggregate(db, current_user.id)
-    else:
-        raise HTTPException(403, "Admin or teacher access required")
+    """Single-owner dashboard payload (no role gate)."""
+    payload = ai_log_service.aggregate(db)
     payload["recent"] = ai_log_service.recent_logs(db, current_user.id, limit=20)
     return payload
 
 
 @router.get("/observability/report")
 def weekly_report(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return ai_log_service.weekly_report(db, current_user.id)
@@ -56,7 +51,7 @@ class FeedbackRequest(BaseModel):
 def log_feedback(
     log_id: int,
     body: FeedbackRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     row = ai_log_service.set_feedback(db, current_user.id, log_id, body.feedback)
@@ -73,7 +68,7 @@ def log_feedback(
 
 @router.get("/prompts")
 def list_prompts(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     rows = db.query(PromptVersion).order_by(PromptVersion.feature, PromptVersion.version).all()
@@ -101,7 +96,7 @@ class PinPromptRequest(BaseModel):
 @router.post("/prompts")
 def pin_prompt(
     body: PinPromptRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     row = ai_log_service.pin_prompt(db, body.feature, body.template, body.version)

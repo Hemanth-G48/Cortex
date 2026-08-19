@@ -656,8 +656,14 @@ class TestBuildGraph:
         result_a = build_graph(graph_session, ua.id)
         result_b = build_graph(graph_session, ub.id)
 
-        # User A's graph has the edge
-        assert len(result_a["edges"]) >= 1
+        # User A's graph data has the edge (full-graph count).
+        assert result_a["total_edges"] >= 1
+        # Returned edges must be self-consistent: an edge linking to user B's
+        # document can never render (that doc is not a node in A's graph), so
+        # the payload must NOT contain it — dangling edges are dropped.
+        returned_node_ids = {n["id"] for n in result_a["nodes"]}
+        for e in result_a["edges"]:
+            assert e["source"] in returned_node_ids and e["target"] in returned_node_ids
         # User B's graph has no nodes from user A
         a_node_ids = {n["id"] for n in result_b["nodes"]}
         assert f"doc:{da.id}" not in a_node_ids

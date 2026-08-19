@@ -146,8 +146,13 @@ class TestInsightsEndpoint:
         assert r2["insights"] == r1["insights"]
         assert len(calls) == 1  # still one provider call — served from cache
 
-    def test_insights_cache_key_includes_stats(self, client, db_session, monkeypatch):
-        """Bundle changes (a new task) produce a different cache key → new call."""
+    def test_insights_persisted_reused_without_force(self, client, db_session, monkeypatch):
+        """Data changes do NOT trigger a new LLM call on plain page loads.
+
+        The persisted snapshot is reused (``cached=True``) even when the
+        stats bundle changed — the LLM is only consulted on the explicit
+        ``force=True`` refresh.
+        """
         monkeypatch.setattr(ai_client, "ai_available", lambda: True)
         calls: list[str] = []
 
@@ -158,12 +163,43 @@ class TestInsightsEndpoint:
         monkeypatch.setattr(ai_client, "generate", fake_gen)
 
         client.post("/api/ai/insights")
-        # Add a pending task → stats change → cache key changes.
+        # Add a pending task → stats change → but the persisted snapshot is
+        # still reused without an explicit refresh — no new provider call.
         user = db_session.query(User).first()
         db_session.add(Task(title="New urgent task", user_id=user.id, status="Not started"))
         db_session.commit()
-        client.post("/api/ai/insights")
+        r2 = client.post("/api/ai/insights").json()
+        assert r2["cached"] is True
+        assert len(calls) == 1  # persisted reuse — no provider call
+
+        # Explicit refresh (force=True) regenerates + persists.
+        r3 = client.post("/api/ai/insights", json={"force": True}).json()
+        assert r3["cached"] is False
         assert len(calls) == 2
+
+    def test_insights_persisted_survives_cache_clear(self, client, monkeypatch):
+        """The DB snapshot (not just the in-memory TTL cache) is reused — a
+        server restart (cache cleared) still avoids an LLM call on the next
+        dashboard open."""
+        monkeypatch.setattr(ai_client, "ai_available", lambda: True)
+        calls: list[str] = []
+
+        def fake_gen(prompt, **kwargs):  # noqa: ARG001
+            calls.append(prompt)
+            return "persisted insight"
+
+        monkeypatch.setattr(ai_client, "generate", fake_gen)
+
+        r1 = client.post("/api/ai/insights").json()
+        assert r1["cached"] is False
+        assert len(calls) == 1
+
+        # Simulate a restart: wipe the in-memory TTL cache only.
+        ai_cache.clear_cache()
+        r2 = client.post("/api/ai/insights").json()
+        assert r2["cached"] is True
+        assert r2["analyzed_at"] is not None
+        assert len(calls) == 1  # persisted row reused — no provider call
 
     def test_health_surfaces_cache_stats(self, client):
         resp = client.get("/api/ai/health")

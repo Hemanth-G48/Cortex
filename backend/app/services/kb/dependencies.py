@@ -97,7 +97,7 @@ def add_dependency(
     if prereq_topic_id == postreq_topic_id:
         raise DependencyCycleError("A topic cannot depend on itself")
     for tid in (prereq_topic_id, postreq_topic_id):
-        topic = db.query(Topic).get(tid)
+        topic = db.get(Topic, tid)
         if topic is None or topic.user_id != user_id or topic.subject_id != subject_id:
             raise ValueError("Topic not found or not in this subject")
 
@@ -131,7 +131,7 @@ def add_dependency(
 
 
 def remove_dependency(db: Session, user_id: int, dep_id: int) -> None:
-    dep = db.query(TopicDependency).get(dep_id)
+    dep = db.get(TopicDependency, dep_id)
     if dep is None or dep.user_id != user_id:
         raise ValueError("Dependency not found")
     db.delete(dep)

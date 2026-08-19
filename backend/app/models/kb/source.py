@@ -34,11 +34,16 @@ class KbSource(Base):
     duplicate_map_json = Column(Text, nullable=True)
 
     # ── Phase 9 external sync (Idea 89) ──
-    # none | git | drive | clip — which adapter syncs this source.
+    # none | git | drive | clip | local — which adapter syncs this source.
     sync_type = Column(String(20), default="none")
     # Per-source sync cursor (commit hash / Drive cursor / clip id) so only
     # deltas import on each run.
     sync_cursor_json = Column(Text, nullable=True)
+    # External vault/notes directory for the ``local`` adapter ("Copy Recent
+    # Notes"): the source-of-truth folder whose knowledge Markdown files are
+    # mirrored into this source's root (``second_brain/notes``). Unchanged
+    # files are never re-copied or re-embedded (content-hash identity).
+    sync_source_path = Column(String(500), nullable=True)
 
     created_at = Column(DateTime, server_default=func.now())
 

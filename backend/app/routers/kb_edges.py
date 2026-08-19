@@ -20,7 +20,7 @@ from app.services.kb.graph import (
     concepts_of,
     related_docs,
 )
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-edges"])
 
@@ -40,7 +40,7 @@ class EdgeCreate(BaseModel):
 @router.post("/edges")
 def create_edge(
     body: EdgeCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Create a manual edge (phrase 62). Rejects self-edges / bad targets."""
@@ -94,7 +94,7 @@ def create_edge(
 @router.delete("/edges/{edge_id}")
 def delete_edge(
     edge_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Delete any edge the user owns — manual or auto-inferred (phrase 63)."""
@@ -113,7 +113,7 @@ def delete_edge(
 @router.get("/documents/{document_id}/links")
 def document_links(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Aggregated sidebar data: concepts + related notes (phrase 64)."""

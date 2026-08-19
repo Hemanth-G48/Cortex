@@ -45,13 +45,14 @@ def _make_unit(db):
 
 
 class TestMaterialUploadAuthz:
-    def test_unauthenticated_post_returns_401(self, client, db_session):
+    def test_upload_works_without_auth(self, client, db_session):
+        """Single-user app: uploads need no token."""
         unit = _make_unit(db_session)
         resp = client.post(
             f"/api/curriculum/units/{unit.id}/materials",
             files={"file": ("test.txt", io.BytesIO(b"content"), "text/plain")},
         )
-        assert resp.status_code == 401
+        assert resp.status_code == 200
 
     def test_authenticated_post_allowed(self, client, db_session):
         unit = _make_unit(db_session)

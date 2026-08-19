@@ -42,7 +42,7 @@ def _chunk_for(db: Session, user_id: int, topic: Topic) -> KbChunk | None:
         result = KbSearcher(db, user_id).search(topic.name, mode="hybrid", limit=1)
         items = result.get("items") or []
         if items and items[0].get("chunk_id"):
-            chunk = db.query(KbChunk).get(items[0]["chunk_id"])
+            chunk = db.get(KbChunk, items[0]["chunk_id"])
             if chunk is not None:
                 return chunk
     except Exception:  # noqa: BLE001 — sessions work without vault content

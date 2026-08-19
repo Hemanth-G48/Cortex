@@ -12,7 +12,7 @@ from app.schemas.kb import KbDocumentResponse, KbPaperImport, KbPaperImportResul
 from app.services.kb import KbService, utcnow
 from app.services.kb import arxiv
 from app.services.kb.pipeline import _parse_markdown_meta, re_chunk
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-papers"])
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-papers"])
 @router.post("/papers/import", response_model=KbPaperImportResult, status_code=201)
 def import_paper(
     body: KbPaperImport,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Paste an arXiv ID (or URL) → fetch metadata → create a document.

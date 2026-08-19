@@ -164,7 +164,7 @@ def submit_attempt(
     answers: dict[int, str],
 ) -> dict:
     """Score an attempt with per-topic analytics (phrases 36–37)."""
-    attempt = db.query(MockTestAttempt).get(attempt_id)
+    attempt = db.get(MockTestAttempt, attempt_id)
     if attempt is None or attempt.user_id != user_id:
         raise HTTPException(404, "Attempt not found")
     if attempt.finished_at is not None:
@@ -222,7 +222,7 @@ def submit_attempt(
 
 
 def _owned_mock(db: Session, user_id: int, mock_test_id: int) -> MockTest:
-    mock = db.query(MockTest).get(mock_test_id)
+    mock = db.get(MockTest, mock_test_id)
     if mock is None or mock.user_id != user_id:
         raise HTTPException(404, "Mock test not found")
     return mock

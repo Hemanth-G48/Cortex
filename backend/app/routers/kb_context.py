@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb import context as context_service
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-context"])
 
@@ -27,7 +27,7 @@ class ContextOverrideRequest(BaseModel):
 
 @router.get("/context")
 def get_context(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return context_service.build_bundle(db, current_user.id)
@@ -36,7 +36,7 @@ def get_context(
 @router.put("/context")
 def put_context(
     body: ContextOverrideRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     saved = context_service.save_override(

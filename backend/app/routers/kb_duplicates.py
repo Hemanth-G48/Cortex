@@ -15,7 +15,7 @@ from app.services.kb.neardup import (
     merge_documents,
     scan_duplicates,
 )
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-duplicates"])
 
@@ -28,7 +28,7 @@ class ScanResult(BaseModel):
 
 @router.get("/duplicates", response_model=ScanResult)
 def get_duplicates(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     items = list_duplicates(db, current_user.id)
@@ -37,7 +37,7 @@ def get_duplicates(
 
 @router.post("/duplicates/scan", response_model=ScanResult)
 def post_scan(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     pairs = scan_duplicates(db, current_user.id)
@@ -57,7 +57,7 @@ def post_scan(
 @router.post("/duplicates/merge")
 def post_merge(
     body: KbMergeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = merge_documents(db, current_user.id, body.keep_id, body.merge_ids)
@@ -67,7 +67,7 @@ def post_merge(
 @router.post("/duplicates/{document_id}/archive")
 def post_archive(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     try:

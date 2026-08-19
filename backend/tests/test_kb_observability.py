@@ -133,17 +133,14 @@ class TestPromptVersioning:
 
 
 class TestGuards:
-    def test_student_blocked_from_dashboard(self, client):
+    def test_dashboard_available_to_owner(self, client):
+        """Single-user app: the dashboard is open, no role gate."""
         token = _signup(client)
         r = client.get("/api/kb/observability", headers=_auth(token))
-        assert r.status_code == 403
+        assert r.status_code == 200
+        assert "total" in r.json()
 
-    def test_admin_can_view(self, client):
-        # Seed admin (id 1) exists; sign up a student is blocked, so mint an
-        # admin token directly via the token factory.
-        from app.services.security import create_bearer_token
-
-        token = create_bearer_token(1, "admin")
-        r = client.get("/api/kb/observability", headers=_auth(token))
+    def test_dashboard_works_without_any_token(self, client):
+        r = client.get("/api/kb/observability")
         assert r.status_code == 200
         assert "total" in r.json()

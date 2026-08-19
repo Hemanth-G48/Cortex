@@ -1,13 +1,13 @@
-"""Phase 85 — row-level ownership audit.
+"""Phase 85 — row-level ownership audit (single-owner app).
 
 Every user-scoped STUDENT-PLANAR router (books, brain dumps, daily schedule,
-notifications) must scope reads/writes to the authenticated user, and teacher
-reads of student data must stay teacher-only. Cross-user access must yield
-404 (missing row from the caller's perspective) or 403 (role blocked).
+notifications) scopes reads/writes to the single owner (the first ``users``
+row). Cross-user access is gone with multi-user auth; the assertions below
+verify that in a tokenless request the owner's data is reachable and that
+stale teacher-surface routes are no longer mounted.
 """
 from __future__ import annotations
 
-from app.config import settings
 from app.models import Notification, User
 from sqlalchemy.orm import Session
 
@@ -21,14 +21,8 @@ def _signup(client, name: str, username: str, email: str, password: str = "pass1
     return resp.json()["token"]
 
 
-def _signup_teacher(client, monkeypatch) -> str:
-    monkeypatch.setattr(settings, "TEACHER_SECRET_KEY", "secret")
-    resp = client.post("/api/auth/signup", json={
-        "name": "Teacher", "username": "own-teach", "email": "own-t@test.com",
-        "password": "x", "role": "teacher", "teacher_secret": "secret",
-    })
-    assert resp.status_code == 201, resp.text
-    return resp.json()["token"]
+def _owner(db_session: Session) -> User:
+    return db_session.query(User).order_by(User.id).first()
 
 
 def _user(db_session: Session, username: str) -> User:
@@ -136,69 +130,39 @@ class TestDailyScheduleOwnership:
 
 
 class TestNotificationsOwnership:
-    def test_notifications_are_scoped_to_the_recipient(self, client, db_session, monkeypatch):
-        teacher = _signup_teacher(client, monkeypatch)
-        token_a = _signup(client, "Notif A", "notif-a", "notif-a@test.com")
-        token_b = _signup(client, "Notif B", "notif-b", "notif-b@test.com")
+    def test_notifications_are_scoped_to_the_owner(self, client, db_session):
+        """Single owner: notifications resolve to the first user, no tokens."""
+        owner = _owner(db_session)
+        notif = Notification(
+            user_id=owner.id,
+            kind="broadcast",
+            title="New course: Ownership Course",
+            body="A new course is available.",
+        )
+        db_session.add(notif)
+        db_session.commit()
 
-        student_a = _user(db_session, "notif-a")
+        unread = client.get("/api/notifications/unread-count")
+        assert unread.status_code == 200
+        assert unread.json()["unread"] == 1
+
+        listing = client.get("/api/notifications")
+        assert listing.status_code == 200
+        titles = [n["title"] for n in listing.json()]
+        assert "New course: Ownership Course" in titles
+
+        mark = client.post(f"/api/notifications/{notif.id}/read")
+        assert mark.status_code == 200
+        assert mark.json()["read"] is True
+
+
+class TestTeacherSurfaceRemoved:
+    def test_teacher_routes_are_not_mounted(self, client, db_session):
+        """Single-user app: the teacher broadcast/student-detail surface is gone."""
+        resp = client.get("/api/teacher/students")
+        assert resp.status_code == 404
         resp = client.post(
             "/api/teacher/broadcast/courses",
-            json={"course": {"title": "Ownership Course"}, "student_ids": [student_a.id]},
-            headers={"Authorization": f"Bearer {teacher}"},
-        )
-        assert resp.status_code == 200
-        assert resp.json()["created"] == 1
-
-        unread_a = client.get(
-            "/api/notifications/unread-count",
-            headers={"Authorization": f"Bearer {token_a}"},
-        )
-        assert unread_a.json()["unread"] == 1
-        unread_b = client.get(
-            "/api/notifications/unread-count",
-            headers={"Authorization": f"Bearer {token_b}"},
-        )
-        assert unread_b.json()["unread"] == 0
-
-        notif = db_session.query(Notification).filter(
-            Notification.title == "New course: Ownership Course"
-        ).first()
-        assert notif is not None
-
-        mark_b = client.post(
-            f"/api/notifications/{notif.id}/read",
-            headers={"Authorization": f"Bearer {token_b}"},
-        )
-        assert mark_b.status_code == 404
-        delete_b = client.delete(
-            f"/api/notifications/{notif.id}",
-            headers={"Authorization": f"Bearer {token_b}"},
-        )
-        assert delete_b.status_code == 404
-
-        mark_a = client.post(
-            f"/api/notifications/{notif.id}/read",
-            headers={"Authorization": f"Bearer {token_a}"},
-        )
-        assert mark_a.status_code == 200
-        assert mark_a.json()["read"] is True
-
-
-class TestTeacherReadScope:
-    def test_student_cannot_read_any_student_detail(self, client, db_session):
-        token = _signup(client, "Det Stu", "det-stu", "det-stu@test.com")
-        student = _user(db_session, "det-stu")
-        resp = client.get(
-            f"/api/teacher/students/{student.id}/detail",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        assert resp.status_code == 403
-
-    def test_teacher_reads_only_existing_students(self, client, monkeypatch):
-        teacher = _signup_teacher(client, monkeypatch)
-        resp = client.get(
-            "/api/teacher/students/999999/detail",
-            headers={"Authorization": f"Bearer {teacher}"},
+            json={"course": {"title": "X"}, "student_ids": []},
         )
         assert resp.status_code == 404

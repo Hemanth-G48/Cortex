@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.database import engine, Base, migrate_schema
 from app.routers import (
-    assignments, auth, courses, notes, tasks,
+    assignments, profile, courses, notes, tasks,
     habits, pomodoro, fitness, journal, quests, projects, life_areas,
     characters, rewards, missions, schedule_events,
     daily_quests, weekly_reset, vault,
@@ -20,7 +20,7 @@ from app.routers import (
     uploads, curriculum, materials, summaries, quizzes,
     mood, sleep,
     books, braindumps, daily_schedule, notifications,
-    teacher, enrollment,
+    enrollment,
     kb_sources, kb_documents, kb_papers, kb_jobs,
     kb_stats, kb_metadata, kb_tags, kb_concepts,
     kb_graph, kb_related, kb_duplicates, kb_reindex,
@@ -32,8 +32,14 @@ from app.routers import (
     kb_tutor, kb_practice, kb_skills,
     kb_automation, kb_categorize, kb_links,
     kb_personal,
+    kb_auto_subjects,
+    kb_book_gaps,
     kb_agents, kb_memory, kb_context, kb_research,
     kb_recommendations, kb_reflections, kb_forecast, kb_observability,
+    kb_today, kb_triage, kb_backup, kb_weekly_review,
+    kb_learning_plans,
+    kb_health_audit, kb_focus,
+    kb_folders,
     leaderboard,
 )
 from app.seed import seed_database
@@ -107,7 +113,7 @@ app.add_middleware(
 )
 
 app.include_router(assignments.router)
-app.include_router(auth.router)
+app.include_router(profile.router)
 app.include_router(courses.router)
 app.include_router(notes.router)
 app.include_router(tasks.router)
@@ -152,8 +158,14 @@ app.include_router(books.router)
 app.include_router(braindumps.router)
 app.include_router(daily_schedule.router)
 app.include_router(notifications.router)
-app.include_router(teacher.router)
 app.include_router(enrollment.router)
+
+# Test-only auth shim: signup/login/me/logout for the legacy test suite.
+# Never mounted in production — the application is single-user and tokenless.
+if "pytest" in sys.modules:
+    from app.routers import auth_test
+
+    app.include_router(auth_test.router)
 app.include_router(kb_sources.router)
 app.include_router(kb_documents.router)
 app.include_router(kb_papers.router)
@@ -186,6 +198,8 @@ app.include_router(kb_automation.router)
 app.include_router(kb_categorize.router)
 app.include_router(kb_links.router)
 app.include_router(kb_personal.router)
+app.include_router(kb_auto_subjects.router)
+app.include_router(kb_book_gaps.router)
 app.include_router(kb_agents.router)
 app.include_router(kb_memory.router)
 app.include_router(kb_context.router)
@@ -194,6 +208,14 @@ app.include_router(kb_recommendations.router)
 app.include_router(kb_reflections.router)
 app.include_router(kb_forecast.router)
 app.include_router(kb_observability.router)
+app.include_router(kb_today.router)
+app.include_router(kb_triage.router)
+app.include_router(kb_backup.router)
+app.include_router(kb_weekly_review.router)
+app.include_router(kb_learning_plans.router)
+app.include_router(kb_health_audit.router)
+app.include_router(kb_focus.router)
+app.include_router(kb_folders.router)
 app.include_router(leaderboard.router)
 
 

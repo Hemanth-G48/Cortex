@@ -13,7 +13,7 @@ from app.database import get_db
 from app.models.book import Book
 from app.schemas.book import BookCreate, BookUpdate, BookResponse, BookInsights
 from app.services.reading import compute_book_insights
-from app.services.security import get_current_user
+from app.services.users import current_user
 from app.models.user import User
 
 router = APIRouter(prefix="/api", tags=["books"])
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api", tags=["books"])
 
 @router.get("/books", response_model=dict)
 def list_books(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
     category: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
@@ -44,7 +44,7 @@ def list_books(
 @router.post("/books", response_model=BookResponse, status_code=201)
 def create_book(
     body: BookCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> Book:
     """Create a new book owned by the current user."""
@@ -58,6 +58,7 @@ def create_book(
     )
     db.add(book)
     db.flush()
+    db.commit()  # get_db closes without committing — persist before returning.
     db.refresh(book)
     return book
 
@@ -66,7 +67,7 @@ def create_book(
 def update_book(
     book_id: int,
     body: BookUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> Book:
     """Update a book; 404 if missing or not owned by the caller."""
@@ -76,6 +77,7 @@ def update_book(
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(book, field, value)
     db.flush()
+    db.commit()
     db.refresh(book)
     return book
 
@@ -83,7 +85,7 @@ def update_book(
 @router.delete("/books/{book_id}")
 def delete_book(
     book_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Delete a book; 404 if missing or not owned by the caller."""
@@ -92,13 +94,14 @@ def delete_book(
         raise HTTPException(status_code=404, detail="Book not found")
     db.delete(book)
     db.flush()
+    db.commit()
     return {"ok": True}
 
 
 @router.post("/books/upload", status_code=201)
 def upload_book_file(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Upload a reading file (PDF only) for the current user."""
@@ -108,8 +111,11 @@ def upload_book_file(
         raise HTTPException(400, detail={"error": "Only PDF files are allowed"})
 
     data = file.file.read()
-    if len(data) > settings.max_upload_bytes:
-        raise HTTPException(413, detail={"error": "File too large"})
+    if len(data) > settings.book_max_upload_bytes:
+        raise HTTPException(
+            413,
+            detail={"error": f"File too large (max {settings.BOOK_MAX_UPLOAD_MB} MB)"},
+        )
 
     directory = Path(settings.UPLOAD_DIR)
     directory.mkdir(parents=True, exist_ok=True)
@@ -123,7 +129,7 @@ def upload_book_file(
 
 @router.get("/books/insights", response_model=BookInsights)
 def book_insights(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> BookInsights:
     """Return reading insights for the current user."""

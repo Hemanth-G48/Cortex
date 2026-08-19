@@ -20,6 +20,8 @@ export const resourceIcon = (type: string): string => {
     case 'link': case 'url': return '🔗';
     case 'code': case 'github': return '💻';
     case 'quiz': return '📝';
+    case 'folder': case 'drive': return '📁';
+    case 'classroom': return '🏫';
     default: return '📎';
   }
 };

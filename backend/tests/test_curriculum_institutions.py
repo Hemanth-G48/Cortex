@@ -136,32 +136,26 @@ class TestAdminInstitutionEndpoints:
         assert resp3.status_code == 200
         assert resp3.json()["is_active"] is False
 
-    def test_non_admin_blocked(self, client):
+    def test_owner_manages_institutions(self, client):
+        """Single-user app: no admin role gate — the owner manages the catalog."""
         token = get_student_token(client)
         resp = client.get(
             "/api/curriculum/institutions/admin/all",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 200
 
         resp2 = client.post(
             "/api/curriculum/institutions",
-            json={"name": "Nope", "short_name": "NOPE"},
+            json={"name": "Owner Uni", "short_name": "OWN"},
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp2.status_code == 403
+        assert resp2.status_code == 200
+        inst_id = resp2.json()["id"]
 
-        # Create an institution to test toggle
-        token_admin = get_token(client)
-        resp3 = client.post(
-            "/api/curriculum/institutions",
-            json={"name": "For Toggle", "short_name": "FTGL"},
-            headers={"Authorization": f"Bearer {token_admin}"},
-        )
-        inst_id = resp3.json()["id"]
-
-        resp4 = client.patch(
+        resp3 = client.patch(
             f"/api/curriculum/institutions/{inst_id}/status",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp4.status_code == 403
+        assert resp3.status_code == 200
+        assert resp3.json()["is_active"] is True

@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models import User
 from app.services.kb import KbService
 from app.services.kb.mindmap import build_tree, export_markdown, export_opml
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-mindmap"])
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-mindmap"])
 def document_mindmap(
     document_id: int,
     format: str = Query(default="json"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Mind-map tree for a document (json | markdown | opml)."""

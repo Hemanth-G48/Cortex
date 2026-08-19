@@ -1,4 +1,4 @@
-from app.routers import assignments, auth, courses, notes, tasks
+from app.routers import assignments, profile, auth_test, courses, notes, tasks
 from app.routers import habits, pomodoro, fitness, journal, quests, projects, life_areas
 from app.routers import characters, rewards, missions, schedule_events
 from app.routers import daily_quests, weekly_reset
@@ -13,7 +13,6 @@ from app.routers import uploads
 from app.routers import curriculum, materials, summaries, quizzes
 from app.routers import mood, sleep
 from app.routers import books, braindumps, daily_schedule, notifications
-from app.routers import teacher
 from app.routers import kb_sources, kb_documents, kb_papers, kb_jobs
 # Phase 2 (Embeddings, Indexing & Knowledge Graph)
 from app.routers import (
@@ -46,16 +45,27 @@ from app.routers import kb_study, kb_labs, kb_attendance
 from app.routers import kb_automation, kb_categorize, kb_links
 # Phase 8 (Personalization & Learning Memory, Ideas 71–80)
 from app.routers import kb_personal
+# Auto subject detection for course derivation
+from app.routers import kb_auto_subjects
+# Book Knowledge Gap Analyzer (KB books)
+from app.routers import kb_book_gaps
+# Workflow glue: Today command center, new-note triage, vault backup,
+# weekly review ritual.
+from app.routers import kb_today, kb_triage, kb_backup, kb_weekly_review
+# Workflow glue — Learning Path Planner
+from app.routers import kb_learning_plans
+# Folder-hierarchy-as-source-of-truth: canonical domains + domain gap analysis
+from app.routers import kb_folders
 
 __all__ = [
-    "assignments", "auth", "characters", "courses", "notes", "tasks",
+    "assignments", "profile", "auth_test", "characters", "courses", "notes", "tasks",
     "habits", "pomodoro", "fitness", "journal", "quests", "projects", "life_areas",
     "rewards", "missions", "schedule_events",
     "daily_quests", "weekly_reset", "quest_centre", "ai", "grades", "flashcards", "study_plans", "analytics",
     "auth_google", "classroom", "gmail", "calendar", "uploads",
     "curriculum", "materials", "summaries", "quizzes",
     "mood", "sleep",
-    "books", "braindumps", "daily_schedule", "notifications", "teacher",
+    "books", "braindumps", "daily_schedule", "notifications",
     "kb_sources", "kb_documents", "kb_papers", "kb_jobs",
     "kb_stats", "kb_metadata", "kb_tags", "kb_concepts",
     "kb_graph", "kb_related", "kb_duplicates", "kb_reindex",
@@ -76,4 +86,12 @@ __all__ = [
     "kb_categorize",
     "kb_links",
     "kb_personal",
+    "kb_auto_subjects",
+    "kb_book_gaps",
+    "kb_today",
+    "kb_triage",
+    "kb_backup",
+    "kb_weekly_review",
+    "kb_learning_plans",
+    "kb_folders",
 ]

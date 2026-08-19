@@ -1,22 +1,25 @@
-"""Security utilities: password hashing, bearer-token factory/decoder, and FastAPI auth dependencies."""
+"""Security utilities kept for the pytest test shim.
+
+Production is single-user and tokenless — routers resolve the owner via
+``app.services.users.current_user`` and no request is ever rejected for
+missing/invalid credentials. The bcrypt password helpers and the HMAC
+bearer-token factory/decoder below exist only so the test suite's legacy
+``_signup`` helpers, ``create_bearer_token`` calls and
+``decode_bearer_token`` lookups keep working. They are never used by the
+application itself.
+"""
 
 import base64
-import hmac
 import hashlib
+import hmac
 import json
 import time
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
 from app.config import settings
-from app.database import get_db
-from app.models import User
-from sqlalchemy.orm import Session
 
 
 # ---------------------------------------------------------------------------
-# Password hashing (bcrypt)
+# Password hashing (bcrypt) — test shim only
 # ---------------------------------------------------------------------------
 
 def hash_password(password: str) -> str:
@@ -32,11 +35,8 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Bearer token (HMAC-SHA256 signed, stateless)
+# Bearer token (HMAC-SHA256 signed, stateless) — test shim only
 # ---------------------------------------------------------------------------
-
-_bearer_scheme = HTTPBearer(auto_error=False)
-
 
 def _b64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
@@ -77,41 +77,3 @@ def decode_bearer_token(token: str) -> dict:
         return payload
     except Exception:
         return {}
-
-
-# ---------------------------------------------------------------------------
-# FastAPI dependencies
-# ---------------------------------------------------------------------------
-
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
-    db: Session = Depends(get_db),
-) -> User:
-    if credentials is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    token = credentials.credentials
-    payload = decode_bearer_token(token)
-    if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
-    user = db.query(User).filter(User.id == payload["user_id"]).first()
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return user
-
-
-async def require_student(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "student":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student access required")
-    return current_user
-
-
-async def require_teacher(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "teacher":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Teacher access required")
-    return current_user
-
-
-async def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if not current_user.is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-    return current_user

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb import forecast as forecast_service
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-forecast"])
 
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-forecast"])
 @router.get("/forecast/{subject_id}")
 def get_forecast(
     subject_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return forecast_service.trajectory(db, current_user.id, subject_id)
@@ -32,7 +32,7 @@ def get_forecast(
 
 @router.post("/forecast/scan")
 def scan_forecast(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = forecast_service.run(db, current_user.id)

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html><head><style>html,body{margin:0;padding:0;background:#1b1b1f}#g{width:800px;height:600px;position:relative}</style></head>
+<body><div id="g"></div>
+<script type="module">
+import Graph from 'graphology';
+import Sigma from 'sigma';
+import ForceSupervisor from 'graphology-layout-force/worker';
+import { NodeProgram } from 'sigma/rendering';
+import { floatColor } from 'sigma/utils';
+
+const GLOW_UNIFORMS = ['u_sizeRatio', 'u_correctionRatio', 'u_matrix'];
+const GLOW_VERTEX_SHADER_SOURCE = `
+  attribute vec4 a_id;
+  attribute vec4 a_color;
+  attribute vec2 a_position;
+  attribute float a_size;
+  attribute float a_angle;
+  uniform mat3 u_matrix;
+  uniform float u_sizeRatio;
+  uniform float u_correctionRatio;
+  varying vec4 v_color;
+  varying vec2 v_diffVector;
+  varying float v_radius;
+  const float bias = 255.0 / 254.0;
+  void main() {
+    float size = a_size * u_correctionRatio / u_sizeRatio * 4.0;
+    vec2 diffVector = size * vec2(cos(a_angle), sin(a_angle));
+    vec2 position = a_position + diffVector;
+    gl_Position = vec4((u_matrix * vec3(position, 1)).xy, 0, 1);
+    v_diffVector = diffVector;
+    v_radius = size / 2.0;
+    #ifdef PICKING_MODE
+    v_color = a_id;
+    #else
+    v_color = a_color;
+    #endif
+    v_color.a *= bias;
+  }
+`;
+const GLOW_FRAGMENT_SHADER_SOURCE = `
+  precision highp float;
+  varying vec4 v_color;
+  varying vec2 v_diffVector;
+  varying float v_radius;
+  const vec4 transparent = vec4(0.0, 0.0, 0.0, 0.0);
+  void main(void) {
+    float dist = length(v_diffVector) / v_radius;
+    #ifdef PICKING_MODE
+    if (dist > 1.5)
+      gl_FragColor = transparent;
+    else
+      gl_FragColor = v_color;
+    #else
+    float core = exp(-dist * dist * 7.0);
+    float halo = exp(-dist * dist * 2.2);
+    float alpha = v_color.a * (0.6 * core + 0.4 * halo);
+    gl_FragColor = vec4(v_color.rgb, alpha);
+    #endif
+  }
+`;
+const GL_TRIANGLES = 0x0004;
+const GL_FLOAT = 0x1406;
+const GL_UNSIGNED_BYTE = 0x1401;
+
+class GlowNodeProgram extends NodeProgram {
+  static get ANGLE_1() { return 0; }
+  static get ANGLE_2() { return (2 * Math.PI) / 3; }
+  static get ANGLE_3() { return (4 * Math.PI) / 3; }
+
+  getDefinition() {
+    return {
+      VERTICES: 3,
+      VERTEX_SHADER_SOURCE: GLOW_VERTEX_SHADER_SOURCE,
+      FRAGMENT_SHADER_SOURCE: GLOW_FRAGMENT_SHADER_SOURCE,
+      METHOD: GL_TRIANGLES,
+      UNIFORMS: GLOW_UNIFORMS,
+      ATTRIBUTES: [
+        { name: 'a_position', size: 2, type: GL_FLOAT },
+        { name: 'a_size', size: 1, type: GL_FLOAT },
+        { name: 'a_color', size: 4, type: GL_UNSIGNED_BYTE, normalized: true },
+        { name: 'a_id', size: 4, type: GL_UNSIGNED_BYTE, normalized: true },
+      ],
+      CONSTANT_ATTRIBUTES: [{ name: 'a_angle', size: 1, type: GL_FLOAT }],
+      CONSTANT_DATA: [
+        [GlowNodeProgram.ANGLE_1],
+        [GlowNodeProgram.ANGLE_2],
+        [GlowNodeProgram.ANGLE_3],
+      ],
+    };
+  }
+
+  processVisibleItem(nodeIndex, startIndex, data) {
+    const array = this.array;
+    const color = floatColor(data.color);
+    array[startIndex++] = data.x;
+    array[startIndex++] = data.y;
+    array[startIndex++] = data.size;
+    array[startIndex++] = color;
+    array[startIndex++] = nodeIndex;
+  }
+
+  setUniforms(params, { gl, uniformLocations }) {
+    gl.uniform1f(uniformLocations.u_sizeRatio, params.sizeRatio);
+    gl.uniform1f(uniformLocations.u_correctionRatio, params.correctionRatio);
+    gl.uniformMatrix3fv(uniformLocations.u_matrix, false, params.matrix);
+  }
+}
+
+window.__results = { stage: 'init' };
+try {
+  const graph = new Graph();
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * 2 * Math.PI;
+    graph.addNode('n' + i, { label: 'n' + i, size: 8, color: '#3b82f6', x: 120 * Math.cos(a), y: 120 * Math.sin(a) });
+  }
+  for (let i = 0; i < 11; i++) graph.addEdge('n' + i, 'n' + (i + 1), { size: 1, color: 'rgba(255,255,255,0.2)' });
+  const layout = new ForceSupervisor(graph, { settings: { attraction: 0.0005, repulsion: 4, gravity: 0.2, inertia: 0.6, maxMove: 200 } });
+  layout.start();
+  const renderer = new Sigma(graph, document.getElementById('g'), {
+    nodeProgramClasses: { glow: GlowNodeProgram },
+    defaultNodeType: 'glow',
+    labelDensity: 0.07,
+    renderLabels: true,
+  });
+  window.__renderer = renderer;
+  window.__results = { stage: 'rendered', nodes: graph.order, edges: graph.size };
+} catch (e) {
+  window.__results = { stage: 'error', error: e.message, stack: e.stack };
+}
+</script>
+</body></html>

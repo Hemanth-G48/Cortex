@@ -15,7 +15,7 @@ from app.services.kb.quality import (
     list_by_score,
     list_suggestions,
 )
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-quality"])
 
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-quality"])
 @router.get("/documents/{document_id}/quality")
 def document_quality(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     doc = KbService.get_document(db, current_user.id, document_id)
@@ -39,7 +39,7 @@ def document_quality(
 @router.get("/quality")
 def quality_list(
     sort: str = "score",
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     return list_by_score(db, current_user.id, sort=sort)
@@ -48,7 +48,7 @@ def quality_list(
 @router.post("/documents/{document_id}/quality/suggestions")
 def quality_suggestions_generate(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     doc = KbService.get_document(db, current_user.id, document_id)
@@ -61,7 +61,7 @@ def quality_suggestions_generate(
 @router.post("/quality/suggestions/{suggestion_id}/dismiss")
 def quality_suggestion_dismiss(
     suggestion_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     ok = dismiss_suggestion(db, current_user.id, suggestion_id)

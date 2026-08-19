@@ -18,15 +18,17 @@ from app.database import get_db
 from app.models import KbSource, User
 from app.schemas.kb import KbJobResponse
 from app.services.kb import jobs
+from app.services.kb.domain_service import invalidate_domain_gaps
+from app.services.kb.gap_engine import invalidate_goal_gaps
 from app.services.kb.reindex import dirty_documents
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-reindex"])
 
 
 @router.post("/admin/reindex", response_model=KbJobResponse)
 def admin_reindex(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
     source_id: int | None = Query(default=None),
     document_ids: list[int] | None = Query(default=None),
@@ -57,12 +59,19 @@ def admin_reindex(
             d.id for d in dirty_documents(db, current_user.id)
         ]
         job = jobs.submit_reindex_job(db, current_user.id, document_ids=doc_ids)
+    # The user's knowledge changed — any saved Goal-level Gap Analysis is
+    # stale. Drop the cached copies so the next request recomputes from the
+    # fresh evidence (same pattern as course resync invalidating subjects).
+    # Deliberately unconditional: "a reindex was requested" is treated as
+    # "the evidence may have changed", even when the dirty set is empty.
+    invalidate_goal_gaps(db, current_user.id)
+    invalidate_domain_gaps(db, current_user.id)
     return KbJobResponse.model_validate(job)
 
 
 @router.post("/admin/backfill", response_model=KbJobResponse)
 def admin_backfill(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
     source_id: int | None = Query(default=None),
 ):
@@ -107,4 +116,8 @@ def admin_backfill(
     db.add(job)
     db.commit()
     db.refresh(job)
+    # Full reindex → all knowledge changed; drop the saved goal analyses AND
+    # the saved per-domain analyses too.
+    invalidate_goal_gaps(db, current_user.id)
+    invalidate_domain_gaps(db, current_user.id)
     return KbJobResponse.model_validate(job)

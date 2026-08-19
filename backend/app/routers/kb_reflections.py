@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb import reflections as reflection_service
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-reflections"])
 
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-reflections"])
 @router.get("/reflections")
 def list_reflections(
     limit: int = Query(default=12, ge=1, le=50),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"items": reflection_service.list_reflections(db, current_user.id, limit=limit)}
@@ -43,7 +43,7 @@ class GenerateReflectionRequest(BaseModel):
 @router.post("/reflections/generate")
 def generate_reflection(
     body: GenerateReflectionRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = reflection_service.get_or_generate(
@@ -55,7 +55,7 @@ def generate_reflection(
 
 @router.post("/reflections/adjust")
 def adjust_plans(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     applied = reflection_service.apply_plan_adjustments(db, current_user.id)
@@ -71,7 +71,7 @@ def adjust_plans(
 @router.get("/goals/derived")
 def derived_goals(
     quarter: str | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {
@@ -93,7 +93,7 @@ class ConfirmDerivedGoalRequest(BaseModel):
 @router.post("/goals/derived/confirm")
 def confirm_derived_goal(
     body: ConfirmDerivedGoalRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     try:
@@ -108,7 +108,7 @@ def confirm_derived_goal(
 
 @router.get("/goals")
 def list_goals(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"items": reflection_service.list_goals(db, current_user.id)}
@@ -117,7 +117,7 @@ def list_goals(
 @router.get("/goals/{goal_id}/progress")
 def goal_progress(
     goal_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = reflection_service.goal_progress(db, current_user.id, goal_id)

@@ -17,8 +17,10 @@ class KbSourceCreate(BaseModel):
     source_type: str = "local_dir"
     root_path: str
     enabled: bool = True
-    # Phase 9 (Idea 89): git | drive | clip | none
+    # Phase 9 (Idea 89): git | drive | clip | local | none
     sync_type: str = "none"
+    # ``local`` adapter: external vault dir mirrored into the source root.
+    sync_source_path: str | None = None
 
 
 class KbSourceUpdate(BaseModel):
@@ -27,6 +29,7 @@ class KbSourceUpdate(BaseModel):
     root_path: str | None = None
     enabled: bool | None = None
     sync_type: str | None = None
+    sync_source_path: str | None = None
 
 
 class KbSourceResponse(BaseModel):
@@ -46,6 +49,8 @@ class KbSourceResponse(BaseModel):
     # Phase 9 (Idea 89): external sync adapter + per-source cursor.
     sync_type: str = "none"
     sync_cursor: dict | None = Field(default=None, validation_alias="sync_cursor_json")
+    # ``local`` adapter external vault dir (Copy Recent Notes source).
+    sync_source_path: str | None = None
 
     @field_validator("sync_cursor", mode="before")
     @classmethod
@@ -283,13 +288,18 @@ class KbMetadataProposal(BaseModel):
 class KbTagSuggestion(BaseModel):
     tag_id: int
     name: str
-    provenance: str  # rule | ai
+    provenance: str  # rule | ai | manual
     confidence: float = 0.0
 
 
 class KbDocumentTagsResponse(BaseModel):
     document_id: int
+    # Suggestion list (rule + ai). Manual/applied tags are excluded here —
+    # they surface in ``applied`` below.
     tags: list[KbTagSuggestion]
+    # Tags already linked to the document (rule + manual) — the "applied"
+    # chips in the tag editor.
+    applied: list[KbTagSuggestion] = Field(default_factory=list)
 
 
 class KbApplyTags(BaseModel):

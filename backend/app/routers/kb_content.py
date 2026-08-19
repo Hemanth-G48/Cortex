@@ -18,7 +18,7 @@ from app.services.kb import KbService
 from app.services.kb import flashcards as flashcards_service
 from app.services.kb import note_quizzes as note_quiz_service
 from app.services.kb import summarize, explain, braindump_draft
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-content"])
 
@@ -37,7 +37,7 @@ def _doc_or_404(db: Session, user_id: int, document_id: int):
 @router.get("/documents/{document_id}/summary")
 def get_document_summary(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     doc = _doc_or_404(db, current_user.id, document_id)
@@ -47,7 +47,7 @@ def get_document_summary(
 @router.post("/documents/{document_id}/summary")
 def regenerate_document_summary(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     doc = _doc_or_404(db, current_user.id, document_id)
@@ -67,7 +67,7 @@ class ExplainRequest(BaseModel):
 @router.post("/explain")
 def post_explain(
     body: ExplainRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     return explain.explain(
@@ -92,7 +92,7 @@ class NoteQuizRequest(BaseModel):
 @router.post("/quizzes")
 def create_note_quiz(
     body: NoteQuizRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     quiz = note_quiz_service.generate_note_quiz(
@@ -115,7 +115,7 @@ def create_note_quiz(
 @router.get("/quizzes/{quiz_id}/document", response_model=KbDocumentResponse | None)
 def quiz_source_document(
     quiz_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Reverse provenance: which note generated this quiz (phrase 26)."""
@@ -129,7 +129,7 @@ def quiz_source_document(
 @router.post("/documents/{document_id}/flashcards")
 def generate_flashcards(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     return flashcards_service.generate_candidates(db, current_user.id, document_id)
@@ -138,7 +138,7 @@ def generate_flashcards(
 @router.get("/flashcards/candidates")
 def list_flashcard_candidates(
     status: str = Query(default="pending"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     return {"items": flashcards_service.list_candidates(db, current_user.id, status)}
@@ -153,7 +153,7 @@ class FlashcardReviewRequest(BaseModel):
 @router.post("/flashcards/review")
 def review_flashcards(
     body: FlashcardReviewRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     return flashcards_service.review_candidates(
@@ -172,7 +172,7 @@ def review_flashcards(
 @router.post("/documents/{document_id}/split")
 def split_braindump_document(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     return braindump_draft.split_draft(db, current_user.id, document_id)

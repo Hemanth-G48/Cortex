@@ -8,14 +8,14 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import KbJob, User
 from app.schemas.kb import KbJobResponse
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-jobs"])
 
 
 @router.get("/jobs", response_model=dict)
 def list_jobs(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
     limit: int = Query(default=50, ge=1, le=200),
 ):
@@ -33,7 +33,7 @@ def list_jobs(
 @router.get("/jobs/{job_id}", response_model=KbJobResponse)
 def get_job(
     job_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     job = (

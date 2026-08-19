@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models import Attendance, Notification, User
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api", tags=["kb-attendance"])
 
@@ -40,7 +40,7 @@ def _history(db: Session, user_id: int, subject_id: int) -> list[Attendance]:
 @router.post("/attendance")
 def mark_attendance(
     body: AttendanceMark,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Mark a class day present/absent (upsert per user+subject+date)."""
@@ -85,7 +85,7 @@ def mark_attendance(
 @router.get("/subjects/{subject_id}/attendance")
 def attendance_history(
     subject_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     rows = _history(db, current_user.id, subject_id)
@@ -107,7 +107,7 @@ def attendance_history(
 
 @router.get("/attendance/analytics")
 def attendance_analytics(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Per-subject attendance % + streak summary (phrase 55)."""

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 def build_rubric(db: Session, user_id: int, topic_id: int | None, question: str) -> str:
     """Key-point rubric from the topic's chunks (phrase 52)."""
     if topic_id is not None:
-        topic = db.query(Topic).get(topic_id)
+        topic = db.get(Topic, topic_id)
         if topic is not None and topic.user_id == user_id:
             items = retrieve_chunks(db, user_id, topic.name, limit=4)
             if items:

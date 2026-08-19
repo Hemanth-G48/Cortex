@@ -115,4 +115,16 @@ describe('Knowledge Graph page', () => {
     renderGraph();
     await waitFor(() => expect(screen.getByText('No graph data yet')).toBeInTheDocument());
   });
+
+  it('does not crash when the payload omits nodes/edges', async () => {
+    // Regression: a backend response missing the arrays must fall back to the
+    // empty state instead of crashing on graphData.nodes.map.
+    vi.mocked(endpoints.kb.graph.list).mockResolvedValueOnce({
+      truncated: false,
+      total_nodes: 0,
+      total_edges: 0,
+    } as unknown as Awaited<ReturnType<typeof endpoints.kb.graph.list>>);
+    renderGraph();
+    await waitFor(() => expect(screen.getByText('No graph data yet')).toBeInTheDocument());
+  });
 });

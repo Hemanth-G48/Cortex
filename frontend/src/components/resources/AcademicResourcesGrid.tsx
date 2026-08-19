@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { endpoints } from '../../services/api';
 import { ResourceCard } from './ResourceCard';
 import type { Resource } from './ResourceCard';
 
@@ -12,9 +14,35 @@ interface AcademicResourcesGridProps {
   resources?: Resource[];
 }
 
-/** Grid of academic resource cards */
+/** Grid of academic resource cards — derived from KB sources + Classroom when available. */
 export const AcademicResourcesGrid = ({ resources }: AcademicResourcesGridProps) => {
-  const items = resources ?? defaultResources;
+  const [items, setItems] = useState<Resource[]>(resources ?? defaultResources);
+
+  useEffect(() => {
+    if (resources) {
+      setItems(resources);
+      return;
+    }
+    endpoints.courses
+      .resources()
+      .then((fetched) => {
+        if (fetched.length > 0) {
+          // Backend already falls back to defaults; coerce null url/description.
+          setItems(
+            fetched.map((r) => ({
+              id: r.id,
+              title: r.title,
+              type: r.type,
+              url: r.url ?? '#',
+              description: r.description ?? undefined,
+            })),
+          );
+        }
+      })
+      .catch(() => {
+        // Keep defaults on any failure so the grid never renders empty.
+      });
+  }, [resources]);
 
   return (
     <div className="page-section">

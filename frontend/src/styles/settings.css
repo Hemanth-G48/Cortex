@@ -219,6 +219,32 @@
   margin-bottom: 1rem;
 }
 
+/* Courses page: live sync diagnostics strip under the sync actions. */
+.sync-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.1rem;
+  align-items: center;
+  padding: 0.5rem 0.9rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-muted);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.sync-status span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sync-status .sync-status-live {
+  color: var(--success);
+  font-weight: 600;
+}
+
 .btn-danger-ghost {
   background: transparent;
   color: var(--danger);

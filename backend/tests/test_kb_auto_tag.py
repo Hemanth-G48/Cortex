@@ -431,6 +431,102 @@ class TestDocumentTagsEndpoint:
         assert all(s["tag_id"] != applied_tag_id for s in data["tags"])
 
 
+class TestNoLLMOnGet:
+    """Browsing a document must never call the LLM for tag suggestions.
+
+    The GET endpoint reads persisted suggestions (+ deterministic TF-IDF
+    stand-in). The explicit POST .../tags/propose action is the only path
+    that re-runs the AI proposal.
+    """
+
+    def _upload(self, client: TestClient, token: str) -> int:
+        resp = client.post(
+            "/api/kb/documents/upload",
+            headers={AUTH: f"Bearer {token}"},
+            files={
+                "file": (
+                    "t.md",
+                    b"# Machine Learning\n\nDeep learning is a subset of machine "
+                    b"learning. Neural networks power deep learning tasks. #ml",
+                    "t.md",
+                )
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        return resp.json()["document"]["id"]
+
+    def test_get_tags_never_calls_llm(self, db_session: Session, client: TestClient, monkeypatch):
+        """GET /documents/{id}/tags works without any LLM call — the read
+        path uses persisted suggestions + the deterministic TF-IDF stand-in.
+        """
+        from app.config import settings
+
+        token = _signup(client)
+        doc_id = self._upload(client, token)
+        doc = db_session.query(KbDocument).get(doc_id)
+        # Rule tags are ingested by the pipeline; ensure a rule row exists.
+        original = settings.AI_ENABLED
+        settings.AI_ENABLED = False
+        try:
+            seed_inline_tags(db_session, doc)
+        finally:
+            settings.AI_ENABLED = original
+
+        # If the GET endpoint ever calls the LLM path, fail loudly.
+        monkeypatch.setattr(
+            "app.services.kb.tagger.propose_tags",
+            lambda *a, **k: (_ for _ in ()).throw(AssertionError("GET must not call propose_tags")),
+        )
+
+        resp = client.get(
+            f"/api/kb/documents/{doc_id}/tags",
+            headers={AUTH: f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        # Rule tag from #ml is present; deterministic TF-IDF fills the rest.
+        assert any(t["name"] == "ml" and t["provenance"] == "rule" for t in data["applied"])
+        assert isinstance(data["tags"], list)
+
+    def test_propose_endpoint_persists_and_get_reuses(self, db_session: Session, client: TestClient, monkeypatch):
+        """POST /documents/{id}/tags/propose (explicit action) runs the AI
+        proposal, persists it, and later GETs reuse the rows without any
+        further LLM call.
+        """
+        token = _signup(client)
+        doc_id = self._upload(client, token)
+
+        # Deterministic fake AI proposal.
+        def fake_propose(db, doc):  # noqa: ARG001
+            from app.models import KbTag
+
+            tag = KbTag(user_id=doc.user_id, name="ai-suggested", kind="auto")
+            db.add(tag)
+            db.flush()
+            return [{"tag_id": tag.id, "name": "ai-suggested", "provenance": "ai", "confidence": 0.8}]
+
+        monkeypatch.setattr("app.services.kb.tagger.propose_tags", fake_propose)
+
+        resp = client.post(
+            f"/api/kb/documents/{doc_id}/tags/propose",
+            headers={AUTH: f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert any(t["name"] == "ai-suggested" for t in resp.json()["tags"])
+
+        # Now GET must reuse the persisted row without touching the LLM path.
+        monkeypatch.setattr(
+            "app.services.kb.tagger.propose_tags",
+            lambda *a, **k: (_ for _ in ()).throw(AssertionError("GET must not call propose_tags")),
+        )
+        resp2 = client.get(
+            f"/api/kb/documents/{doc_id}/tags",
+            headers={AUTH: f"Bearer {token}"},
+        )
+        assert resp2.status_code == 200, resp2.text
+        assert any(t["name"] == "ai-suggested" and t["provenance"] == "ai" for t in resp2.json()["tags"])
+
+
 class TestPerUserIsolation:
     def test_user_cannot_see_other_users_tags(self, db_session: Session, client: TestClient):
         token_a = _signup(client, uname="user-a", email="a@test.com")
@@ -488,3 +584,102 @@ class TestPerUserIsolation:
             headers={AUTH: f"Bearer {token_b}"},
         )
         assert resp_b.status_code == 404
+
+
+class TestCreateTagEndpoint:
+    """POST /api/kb/documents/{id}/tags/create (Second Brain tag editor)."""
+
+    def _upload(self, client: TestClient, token: str) -> int:
+        resp = client.post(
+            "/api/kb/documents/upload",
+            headers={AUTH: f"Bearer {token}"},
+            files={"file": ("t.md", b"# Title\n\nContent about things", "t.md")},
+        )
+        assert resp.status_code == 201, resp.text
+        return resp.json()["document"]["id"]
+
+    def test_create_plain_tag_appears_in_applied(self, db_session: Session, client: TestClient):
+        token = _signup(client)
+        doc_id = self._upload(client, token)
+
+        resp = client.post(
+            f"/api/kb/documents/{doc_id}/tags/create",
+            json={"name": "  Machine-Learning  "},
+            headers={AUTH: f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        applied = {t["name"]: t for t in data["applied"]}
+        # Trimmed + lowercased (plain tags), attached as manual.
+        assert "machine-learning" in applied
+        assert applied["machine-learning"]["provenance"] == "manual"
+        # The manual tag must NOT be re-suggested.
+        assert all(t["tag_id"] != applied["machine-learning"]["tag_id"] for t in data["tags"])
+
+    def test_create_blank_name_rejected(self, db_session: Session, client: TestClient):
+        token = _signup(client)
+        doc_id = self._upload(client, token)
+
+        resp = client.post(
+            f"/api/kb/documents/{doc_id}/tags/create",
+            json={"name": "   "},
+            headers={AUTH: f"Bearer {token}"},
+        )
+        assert resp.status_code == 400
+
+    def test_create_course_tag_derives_course(self, db_session: Session, client: TestClient):
+        from app.models import Course
+
+        token = _signup(client)
+        doc_id = self._upload(client, token)
+
+        resp = client.post(
+            f"/api/kb/documents/{doc_id}/tags/create",
+            json={"name": "course:Operating Systems"},
+            headers={AUTH: f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        # course: tags keep original case (readable course titles).
+        applied_names = {t["name"] for t in data["applied"]}
+        assert "course:Operating Systems" in applied_names
+
+        tag = (
+            db_session.query(KbTag)
+            .filter(KbTag.name == "course:Operating Systems")
+            .first()
+        )
+        assert tag is not None
+        course = (
+            db_session.query(Course)
+            .filter(Course.user_id == tag.user_id, Course.source_type == "kb_tag")
+            .first()
+        )
+        assert course is not None
+        assert course.title == "Operating Systems"
+
+    def test_rule_tags_still_listed_in_applied(self, db_session: Session, client: TestClient):
+        """Rule (inline) tags surface in ``applied`` alongside manual ones."""
+        token = _signup(client)
+        resp = client.post(
+            "/api/kb/documents/upload",
+            headers={AUTH: f"Bearer {token}"},
+            files={"file": ("t.md", b"---\ntags:\n  - biology\n---\n# Title\n\nContent", "t.md")},
+        )
+        assert resp.status_code == 201
+        doc_id = resp.json()["document"]["id"]
+        doc = db_session.query(KbDocument).get(doc_id)
+        # Under hermetic (AI-off) runs the upload pipeline does not auto-tag;
+        # seed inline tags explicitly so the rule row exists (same as the
+        # existing seed_inline_tags tests).
+        seed_inline_tags(db_session, doc)
+
+        resp = client.get(
+            f"/api/kb/documents/{doc_id}/tags",
+            headers={AUTH: f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        applied_names = {t["name"]: t for t in data["applied"]}
+        assert "biology" in applied_names
+        assert applied_names["biology"]["provenance"] == "rule"

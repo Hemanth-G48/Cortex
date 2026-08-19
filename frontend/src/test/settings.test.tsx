@@ -21,17 +21,11 @@ const { user } = vi.hoisted(() => {
   return { user };
 });
 
-vi.mock('../hooks/useAuth', () => ({
-  useAuth: vi.fn(() => ({
-    user,
-    token: 'tok',
-    role: 'student',
+vi.mock('../hooks/useProfile', () => ({
+  useProfile: vi.fn(() => ({
+    profile: user,
     loading: false,
-    isAuthenticated: true,
-    login: vi.fn(),
-    signup: vi.fn(),
-    logout: vi.fn(),
-    refreshMe: vi.fn(),
+    refresh: vi.fn(),
   })),
 }));
 
@@ -63,8 +57,8 @@ vi.mock('../services/api', () => {
         disconnect: vi.fn().mockResolvedValue({ connected: false }),
       },
       classroom: {
-        courses: vi.fn().mockResolvedValue([]),
-        assignments: vi.fn().mockResolvedValue([]),
+        courses: vi.fn().mockResolvedValue({ courses: [], source: 'mock' }),
+        assignments: vi.fn().mockResolvedValue({ assignments: [], source: 'mock' }),
       },
       gmail: {
         unread: vi.fn().mockResolvedValue({ count: 0 }),

@@ -63,9 +63,10 @@ def test_assignment_analytics_per_course(client, db_session: Session):
     assert isinstance(data["overall"]["completion_pct"], float)
 
 
-def test_assignment_analytics_requires_auth(client):
+def test_assignment_analytics_works_without_auth(client):
+    """Single-user app: analytics resolve to the owner without a token."""
     resp = client.get("/api/assignments/analytics")
-    assert resp.status_code in (401, 403)
+    assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

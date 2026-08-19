@@ -8,7 +8,6 @@ Every feature endpoint:
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -16,21 +15,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import Assignment, Course, User
 from app.services import ai_cache, ai_client, ai_fallback, ai_providers, embeddings
-from app.services.security import _bearer_scheme, decode_bearer_token
-
-
-async def _optional_user(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
-    db: Session = Depends(get_db),
-) -> User | None:
-    """Auth that never 401s — used by grade-answer's advanced mode so the
-    existing anonymous flashcard flow keeps working (Idea 66, phrase 51)."""
-    if credentials is None or not credentials.credentials:
-        return None
-    payload = decode_bearer_token(credentials.credentials)
-    if not payload:
-        return None
-    return db.query(User).filter(User.id == payload["user_id"]).first()
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -310,6 +295,13 @@ class GradeAnswerRequest(BaseModel):
     topic_id: int | None = None
 
 
+class InsightsRequest(BaseModel):
+    # True = explicit user refresh: recompute + re-persist. False (default)
+    # = return the persisted snapshot — opening the dashboard never spends a
+    # model call.
+    force: bool = False
+
+
 class ChatRequest(BaseModel):
     message: str
 
@@ -321,20 +313,20 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/insights")
-def ai_insights(db: Session = Depends(get_db)) -> dict:
-    """Cached productivity insights from real user stats (QuestLog pattern).
+def ai_insights(body: InsightsRequest | None = None, db: Session = Depends(get_db)) -> dict:
+    """Persisted productivity insights from real user stats (QuestLog pattern).
 
-    Builds a per-user stats bundle (task completion rate, XP/level, upcoming
-    deadlines, habit streaks), sends it to the provider through the TTL cache
-    (``services.ai_cache``), and falls back to a deterministic local analysis
-    when AI is disabled. Repeated calls within the TTL return instantly with
-    ``cached=True`` — no provider spend, no latency.
+    The last generated insight is stored per user and reused on every request
+    (``cached=True`` + ``analyzed_at``) — opening the dashboard never triggers
+    an LLM call. The provider is only consulted when no snapshot exists yet
+    (first run) or the user explicitly asks for a refresh (``force=True``).
+    Deterministic fallback keeps the endpoint functional when AI is disabled.
     """
     from app.services.ai_insights import get_insights
 
     user = db.query(User).first()
-    result = get_insights(db, user)
-    db.flush()
+    result = get_insights(db, user, force=bool(body and body.force))
+    db.commit()
     return result
 
 
@@ -409,20 +401,20 @@ def ai_chat(data: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
 def ai_grade_answer(
     data: GradeAnswerRequest,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(_optional_user),
+    current_user: User = Depends(current_user),
 ) -> dict:
     if data.mode == "advanced":
         # Phase 7 (Idea 66): partial credit + structured feedback, persisted to
-        # learning events when the caller is authenticated.
+        # the owner's learning events.
         from app.services.kb.grading import grade_answer
 
         result = grade_answer(
             db,
-            current_user.id if current_user else 0,
+            current_user.id,
             data.question,
             data.expected,
             data.answer,
-            topic_id=data.topic_id if current_user else None,
+            topic_id=data.topic_id,
         )
         db.commit()
         return {**result["grade"], "ai_used": result["ai_used"], "mode": "advanced"}

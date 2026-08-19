@@ -44,15 +44,34 @@ from app.models.kb.user_preference import UserPreference
 from app.models.kb.user_memory import UserMemory
 from app.models.kb.missing_note_suggestion import MissingNoteSuggestion
 from app.models.kb.outdated_note import OutdatedNote
+# Saved Goal-level Gap Analysis (Idea 72 cache — same save-and-reuse pattern
+# as CourseGapAnalysis for subjects).
+from app.models.kb.goal_gap import GoalGapAnalysis
+# Snapshot log of gap analyses over time (subjects + goals).
+from app.models.kb.gap_history import GapAnalysisHistory
 # Phase 9 (Automation, Ideas 81–90)
 from app.models.kb.categorize_suggestion import CategorizeSuggestion
 # Phase 10 (Advanced AI, Analytics & Platform, Ideas 91–100)
+from app.models.kb.ai_insight import AiInsight
 from app.models.kb.agent_run import AgentRun
 from app.models.kb.episodic_memory import EpisodicMemory
 from app.models.kb.reflection import Reflection
 from app.models.kb.ai_log import AiLog
 from app.models.kb.prompt_version import PromptVersion
 from app.models.kb.context_override import ContextOverride
+# Workflow glue — Learning Path Planner
+from app.models.kb.learning_path import (
+    LearningDependency,
+    LearningPath,
+    LearningPathResource,
+    LearningResource,
+    PortswiggerSession,
+)
+from app.models.kb.learning_plan import LearningPlan, LearningTask
+# Folder-hierarchy-as-source-of-truth: canonical folder/domain entities +
+# saved per-domain Gap Analysis.
+from app.models.kb.folder import KbFolder
+from app.models.kb.folder_gap import FolderGapAnalysis
 
 __all__ = [
     "KbChunk",
@@ -73,6 +92,7 @@ __all__ = [
     "KbSummary",
     "KbTag",
     "KbVersion",
+    "AiInsight",
     "Roadmap",
     "SubjectProfile",
     "Topic",
@@ -94,6 +114,8 @@ __all__ = [
     "UserSkill",
     "UserPreference",
     "UserMemory",
+    "GoalGapAnalysis",
+    "GapAnalysisHistory",
     "MissingNoteSuggestion",
     "OutdatedNote",
     "CategorizeSuggestion",
@@ -103,4 +125,6 @@ __all__ = [
     "AiLog",
     "PromptVersion",
     "ContextOverride",
+    "KbFolder",
+    "FolderGapAnalysis",
 ]

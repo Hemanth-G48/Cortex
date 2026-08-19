@@ -191,15 +191,22 @@ def extract_frontmatter(db: Session, doc: KbDocument) -> dict:
 # Metadata proposal (phrase 23)
 # ---------------------------------------------------------------------------
 
-def propose_metadata(db: Session, doc: KbDocument) -> KbMetadataProposal:
+def propose_metadata(
+    db: Session, doc: KbDocument, *, use_llm: bool = True
+) -> KbMetadataProposal:
     """Propose metadata for a document, merging frontmatter + LLM + heuristics.
 
     Start from frontmatter values; for missing fields, if AI is
-    available, call ``generate_json`` with a strict schema requesting
-    ``{author, language, source_url}``. When AI is disabled/unreachable
-    or parsing fails, fall back to deterministic heuristics
-    (``detect_language``, ``estimate_reading_time``) with confidence
-    0.3. Never raises — always returns a valid ``KbMetadataProposal``.
+    available (and ``use_llm`` is True), call ``generate_json`` with a strict
+    schema requesting ``{author, language, source_url}``. When AI is
+    disabled/unreachable or parsing fails, fall back to deterministic
+    heuristics (``detect_language``, ``estimate_reading_time``) with
+    confidence 0.3. Never raises — always returns a valid
+    ``KbMetadataProposal``.
+
+    ``use_llm=False`` (the GET endpoint) is deterministic-only — reading a
+    proposal while browsing must never spend a model call. The ingest
+    ``enrich_metadata`` path keeps ``use_llm=True`` (explicit work).
     """
     frontmatter = extract_frontmatter(db, doc)
     fm_author = frontmatter.get("author")
@@ -217,7 +224,7 @@ def propose_metadata(db: Session, doc: KbDocument) -> KbMetadataProposal:
     llm_source_url: str | None = None
     llm_language: str | None = None
 
-    if settings.AI_ENABLED and (needs_author or needs_source_url or needs_language):
+    if use_llm and settings.AI_ENABLED and (needs_author or needs_source_url or needs_language):
         try:
             prompt = (
                 "Extract metadata from the following document text. "

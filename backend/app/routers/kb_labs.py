@@ -18,7 +18,7 @@ from app.models import Lab, Topic, User
 from app.services.kb import KbService
 from app.services.kb.mastery import log_event
 from app.services.kb.search import KbSearcher
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api", tags=["kb-labs"])
 
@@ -44,7 +44,7 @@ class LabUpdate(BaseModel):
 
 
 def _lab_or_404(db: Session, user_id: int, lab_id: int) -> Lab:
-    lab = db.query(Lab).get(lab_id)
+    lab = db.get(Lab, lab_id)
     if lab is None or lab.user_id != user_id:
         raise HTTPException(404, "Lab not found")
     return lab
@@ -67,7 +67,7 @@ def _lab_dict(db: Session, lab: Lab) -> dict:
 def list_labs(
     subject_id: int,
     status: str | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     q = db.query(Lab).filter(Lab.user_id == current_user.id, Lab.subject_id == subject_id)
@@ -79,7 +79,7 @@ def list_labs(
 @router.get("/labs")
 def list_all_labs(
     status: str | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     q = db.query(Lab).filter(Lab.user_id == current_user.id)
@@ -92,7 +92,7 @@ def list_all_labs(
 def create_lab(
     subject_id: int,
     body: LabCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     lab = Lab(
@@ -115,7 +115,7 @@ def create_lab(
 def update_lab(
     lab_id: int,
     body: LabUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     lab = _lab_or_404(db, current_user.id, lab_id)
@@ -134,7 +134,7 @@ def update_lab(
 @router.post("/labs/{lab_id}/complete")
 def complete_lab(
     lab_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     lab = _lab_or_404(db, current_user.id, lab_id)
@@ -150,7 +150,7 @@ def complete_lab(
 @router.delete("/labs/{lab_id}")
 def delete_lab(
     lab_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     lab = _lab_or_404(db, current_user.id, lab_id)
@@ -162,7 +162,7 @@ def delete_lab(
 @router.get("/labs/{lab_id}/prep")
 def lab_prep(
     lab_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """\"Read before lab\" — top chunks per pre-requisite topic (phrase 44)."""

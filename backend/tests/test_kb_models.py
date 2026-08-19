@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -74,6 +74,118 @@ def _doc(session, user, source=None, path="notes/hello.md", content_hash=None) -
     session.add(doc)
     session.flush()
     return doc
+
+
+class TestColumnMigrations:
+    """Regression coverage for ``migrate_schema`` — columns added to models
+    after a table first shipped must be back-filled on legacy databases."""
+
+    @staticmethod
+    def _legacy_engine(extra: dict[str, str]) -> tuple:
+        """A legacy engine containing a minimal table for every table the
+        migration registry touches, plus the caller's extra tables (name →
+        column DDL). SQLite returns an empty result for PRAGMA on a missing
+        table, so without the stubs ``migrate_schema`` would ALTER missing
+        tables."""
+        import app.database as database
+
+        legacy = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        with legacy.begin() as conn:
+            # Stub tables so every registered migration finds its table (the
+            # caller's tables are created with their legacy DDL instead). NOTE:
+            # stubs only work because migrate_schema() applies the COLUMN_-
+            # MIGRATIONS ALTERs before the index/rebuild helpers run — keep it
+            # that way if new helpers are added.
+            for table in database.COLUMN_MIGRATIONS:
+                if table in extra:
+                    continue
+                conn.execute(text(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY)"))
+            for table, ddl in extra.items():
+                conn.execute(text(f"CREATE TABLE {table} ({ddl})"))
+        return legacy, database
+
+    def test_legacy_learning_plans_gains_source_json(self, monkeypatch):
+        """The two-layer Learning Path Planner added ``learning_plans.source_json``
+        to the model. A DB created before that must gain the column on startup
+        (this was the cause of a live ``API 500`` — ``plan_dict`` read
+        ``plan.source_json`` against a table lacking it)."""
+        legacy, database = self._legacy_engine(
+            {
+                # Mirrors the real pre-feature table exactly: every model column
+                # except the Layer-1 ``source_json`` (the only drift found on a
+                # live DB that produced this 500).
+                "learning_plans": (
+                    "id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, "
+                    "goal VARCHAR(300) NOT NULL, goal_key VARCHAR(60), "
+                    "description TEXT, resources_json TEXT, knowledge_json TEXT, "
+                    "plan_json TEXT, status VARCHAR(20) DEFAULT 'draft', "
+                    "engine VARCHAR(20) DEFAULT 'deterministic', "
+                    "created_at DATETIME, generated_at DATETIME"
+                )
+            }
+        )
+        with legacy.begin() as conn:
+            conn.execute(
+                text("INSERT INTO learning_plans (user_id, goal) VALUES (1, 'websecurity')")
+            )
+
+        monkeypatch.setattr(database, "engine", legacy)
+        database.migrate_schema()
+
+        def _cols():
+            with legacy.connect() as conn:
+                return {
+                    row[1]
+                    for row in conn.execute(text("PRAGMA table_info(learning_plans)")).fetchall()
+                }
+
+        assert "source_json" in _cols(), "source_json must be added to legacy tables"
+        # The exact failure mode of the live API 500: loading the row through
+        # the ORM model (as plan_dict does) must now work on the migrated
+        # legacy row — without the migration this raises OperationalError
+        # (no such column: learning_plans.source_json).
+        from sqlalchemy.orm import sessionmaker
+        from app.models import LearningPlan
+
+        LegacySession = sessionmaker(bind=legacy)
+        session = LegacySession()
+        plan = session.query(LearningPlan).filter_by(goal="websecurity").first()
+        assert plan is not None
+        assert plan.source_json is None  # readable via the model → no 500
+        session.close()
+        # Idempotent: a second run must not error and must not duplicate.
+        database.migrate_schema()
+        assert "source_json" in _cols()
+        with legacy.connect() as conn:
+            rows = conn.execute(text("SELECT COUNT(*) FROM learning_plans")).fetchone()[0]
+        assert rows == 1  # preserved the legacy row
+
+    def test_learning_tasks_gain_resource_and_path_links(self, monkeypatch):
+        """learning_tasks.resource_id/path_id were also added post-ship; the
+        migration must back-fill them too."""
+        legacy, database = self._legacy_engine(
+            {
+                "learning_tasks": (
+                    "id INTEGER PRIMARY KEY, plan_id INTEGER NOT NULL, "
+                    "user_id INTEGER NOT NULL, title VARCHAR(300) NOT NULL, "
+                    "done BOOLEAN DEFAULT 0"
+                )
+            }
+        )
+        monkeypatch.setattr(database, "engine", legacy)
+        database.migrate_schema()
+
+        with legacy.connect() as conn:
+            cols = {
+                row[1]
+                for row in conn.execute(text("PRAGMA table_info(learning_tasks)")).fetchall()
+            }
+        assert "resource_id" in cols
+        assert "path_id" in cols
 
 
 class TestModelCreation:

@@ -17,6 +17,8 @@ Every query filters ``user_id``; every generation is budget-capped.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -25,13 +27,15 @@ from app.database import get_db
 from app.models import User
 from app.services.kb import connect as connect_service
 from app.services.kb import explain as explain_service
+from app.services.kb import gap_engine as gap_engine_service
+from app.services.kb import gap_history as gap_history_service
 from app.services.kb import gaps as gaps_service
 from app.services.kb import memory as memory_service
 from app.services.kb import next_action as next_action_service
 from app.services.kb import outdated as outdated_service
 from app.services.kb import preferences as preferences_service
 from app.services.kb import suggestions as suggestions_service
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api", tags=["kb-personal"])
 
@@ -53,7 +57,7 @@ class PreferencesRequest(BaseModel):
 
 @router.get("/users/me/preferences")
 def get_my_preferences(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return preferences_service.get_preferences(db, current_user.id)
@@ -62,7 +66,7 @@ def get_my_preferences(
 @router.put("/users/me/preferences")
 def update_my_preferences(
     body: PreferencesRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = preferences_service.upsert_preferences(
@@ -79,7 +83,7 @@ class NudgeRequest(BaseModel):
 @router.post("/kb/preferences/nudge")
 def nudge_preferences(
     body: NudgeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = preferences_service.nudge_for_feedback(db, current_user.id, body.feedback)
@@ -93,10 +97,139 @@ def nudge_preferences(
 @router.get("/kb/gaps/concepts")
 def get_concept_gaps(
     limit: int = Query(default=20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"items": gaps_service.concept_gaps(db, current_user.id, limit=limit)}
+
+
+# ---------------------------------------------------------------------------
+# Redesigned Gap Analysis — actionable learning/skill-gap engine
+# ---------------------------------------------------------------------------
+@router.get("/kb/gaps/domains")
+def get_gap_domains(current_user: User = Depends(current_user)):
+    """Available goals + domains for the Gap Analysis goal selector."""
+    return {"goals": gap_engine_service.list_domains()}
+
+
+@router.get("/kb/gaps/goal")
+def get_goal_gaps(
+    goal: str = Query(min_length=1, max_length=60),
+    current_user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Goal/career-level Gap Analysis across all of the goal's domains.
+
+    Returns the same actionable payload as the subject analysis (strengths,
+    gaps with why/prereqs/learn/practice/next, phased learning path) plus a
+    per-domain breakdown (Strong / Developing / Major gap).
+
+    Results are saved per goal: the first request computes and stores the
+    analysis; later requests return the saved copy (``cached: True``) without
+    recomputing. Recompute happens only on the explicit
+    ``POST /kb/gaps/goal/analyze`` or after a KB reindex.
+    """
+    if not gap_engine_service.goal_exists(goal):
+        raise HTTPException(404, f"Unknown goal: {goal}")
+    saved = gap_engine_service.load_saved_goal_gaps(db, current_user.id, goal)
+    if saved is not None:
+        return saved
+    result = gap_engine_service.analyze_goal(db, current_user.id, goal)
+    if result is None:
+        raise HTTPException(404, f"Unknown goal: {goal}")
+    result["cached"] = False
+    result["analyzed_at"] = datetime.now(timezone.utc).isoformat()
+    # Stored with the payload so later cached loads can diff the document
+    # count and surface "new notes since this analysis".
+    result["document_count"] = gap_engine_service.user_document_count(db, current_user.id)
+    gap_engine_service.save_goal_gaps(db, current_user.id, goal, result)
+    return result
+
+
+@router.get("/kb/gaps/goal/history")
+def goal_gaps_history(
+    goal: str = Query(min_length=1, max_length=60),
+    current_user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Snapshot log of this goal's gap analyses (oldest → newest).
+
+    Each entry is a compact diffable snapshot (counts, coverage, per-gap/
+    per-strength summaries) so the UI can show how the goal's gaps changed
+    across re-analyses.
+    """
+    if not gap_engine_service.goal_exists(goal):
+        raise HTTPException(404, f"Unknown goal: {goal}")
+    return {"history": gap_history_service.list_gap_history(db, current_user.id, goal_key=goal)}
+
+
+@router.post("/kb/gaps/goal/analyze")
+def reanalyze_goal_gaps(
+    goal: str = Query(min_length=1, max_length=60),
+    current_user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Force a fresh Goal-level Gap Analysis and save the result.
+
+    The only path that recomputes without a KB reindex — used by the UI's
+    "Re-analyze" action so the user stays in control of when results update.
+    """
+    if not gap_engine_service.goal_exists(goal):
+        raise HTTPException(404, f"Unknown goal: {goal}")
+    result = gap_engine_service.analyze_goal(db, current_user.id, goal)
+    if result is None:
+        raise HTTPException(404, f"Unknown goal: {goal}")
+    result["cached"] = False
+    result["analyzed_at"] = datetime.now(timezone.utc).isoformat()
+    result["document_count"] = gap_engine_service.user_document_count(db, current_user.id)
+    gap_engine_service.save_goal_gaps(db, current_user.id, goal, result)
+    return result
+
+
+class GapNoteSource(BaseModel):
+    document_id: int
+    title: str | None = None
+
+
+class CreateGapNoteRequest(BaseModel):
+    """Draft a capture note for one gap ("Create note for this gap")."""
+
+    name: str = Field(min_length=1, max_length=200)
+    subject: str | None = Field(default=None, max_length=200)
+    why: str | None = Field(default=None, max_length=2000)
+    learn: list[str] | None = None
+    practice: list[str] | None = None
+    sources: list[GapNoteSource] | None = None
+
+
+@router.post("/kb/gaps/note")
+def create_gap_note(
+    body: CreateGapNoteRequest,
+    current_user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Draft a ready-to-edit capture note (``status='draft'``) for a gap.
+
+    Idempotent: re-creating a note for the same gap returns the existing
+    draft with ``created=False`` instead of duplicating it.
+    """
+    try:
+        doc, created = gap_engine_service.create_gap_note(
+            db,
+            current_user.id,
+            body.name,
+            subject=body.subject,
+            why=body.why,
+            learn=body.learn,
+            practice=body.practice,
+            sources=[s.model_dump() for s in (body.sources or [])],
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {
+        "document": {"id": doc.id, "title": doc.title, "status": doc.status},
+        "created": created,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +244,7 @@ class PersonalizedExplainRequest(BaseModel):
 @router.post("/kb/explain/personalized")
 def explain_personalized(
     body: PersonalizedExplainRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return explain_service.explain_personalized(
@@ -129,7 +262,7 @@ def explain_personalized(
 @router.get("/kb/memory")
 def get_memory(
     limit: int = Query(default=200, ge=1, le=500),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"items": memory_service.get_memory(db, current_user.id, limit=limit)}
@@ -144,7 +277,7 @@ class MemoryBumpRequest(BaseModel):
 @router.post("/kb/memory/bump")
 def bump_memory(
     body: MemoryBumpRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     touched = memory_service.bump(
@@ -156,7 +289,7 @@ def bump_memory(
 
 @router.post("/kb/memory/decay")
 def decay_memory(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     touched = memory_service.decay(db, current_user.id)
@@ -170,7 +303,7 @@ def decay_memory(
 @router.get("/kb/recommend/next")
 def recommend_next(
     limit: int = Query(default=1, ge=1, le=5),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     items = next_action_service.recommend(db, current_user.id, limit=limit)
@@ -184,7 +317,7 @@ def recommend_next(
 def connect_suggestions(
     document_id: int,
     limit: int = Query(default=5, ge=1, le=20),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return connect_service.connect_suggestions(db, current_user.id, document_id, limit=limit)
@@ -199,7 +332,7 @@ class ConnectRequest(BaseModel):
 def confirm_connect(
     document_id: int,
     body: ConnectRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     try:
@@ -219,7 +352,7 @@ def confirm_connect(
 def list_missing_notes(
     status: str = Query(default="suggested", pattern="^(suggested|accepted|dismissed)$"),
     limit: int = Query(default=50, ge=1, le=200),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"items": suggestions_service.list_suggestions(db, current_user.id, status=status, limit=limit)}
@@ -228,7 +361,7 @@ def list_missing_notes(
 @router.post("/kb/suggestions/missing-notes")
 def suggest_missing_notes(
     limit: int = Query(default=10, ge=1, le=50),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     items = suggestions_service.suggest_missing_notes(db, current_user.id, limit=limit)
@@ -239,7 +372,7 @@ def suggest_missing_notes(
 @router.post("/kb/suggestions/{suggestion_id}/accept")
 def accept_suggestion(
     suggestion_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     try:
@@ -253,7 +386,7 @@ def accept_suggestion(
 @router.post("/kb/suggestions/{suggestion_id}/dismiss")
 def dismiss_suggestion(
     suggestion_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     try:
@@ -269,7 +402,7 @@ def dismiss_suggestion(
 # ---------------------------------------------------------------------------
 @router.post("/kb/outdated/scan")
 def scan_outdated(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = outdated_service.scan(db, current_user.id)
@@ -281,7 +414,7 @@ def scan_outdated(
 def outdated_review(
     status: str = Query(default="open", pattern="^(open|updated|archived|dismissed)$"),
     limit: int = Query(default=50, ge=1, le=200),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"items": outdated_service.review_queue(db, current_user.id, status=status, limit=limit)}
@@ -297,7 +430,7 @@ class ResolveOutdatedRequest(BaseModel):
 def resolve_outdated(
     note_id: int,
     body: ResolveOutdatedRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     try:

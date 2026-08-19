@@ -15,7 +15,7 @@ from app.database import get_db
 from app.models import KbDocument, User
 from app.schemas.kb import KbRelatedResponse
 from app.services.kb.related import related_documents
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-related"])
 
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-related"])
 @router.get("/documents/{document_id}/related", response_model=KbRelatedResponse)
 def get_related(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
     relation: str | None = None,
     infer: bool = True,

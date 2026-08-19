@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import User
 from app.schemas.kb import KbMetadataProposal, KbMetadataUpdate
 from app.services.kb.metadata import apply_metadata_update, propose_metadata
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-metadata"])
 
@@ -16,23 +16,28 @@ router = APIRouter(prefix="/api/kb", tags=["kb-metadata"])
 @router.get("/documents/{document_id}/metadata-proposal", response_model=KbMetadataProposal)
 def get_metadata_proposal(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    """Return a metadata proposal for the given document (per-user 404)."""
+    """Return a metadata proposal for the given document (per-user 404).
+
+    Read-only: deterministic (frontmatter + heuristics) only — browsing must
+    never trigger an LLM call. The LLM-assisted proposal runs on the ingest
+    ``enrich_metadata`` path, not on page loads.
+    """
     from app.services.kb import KbService
 
     doc = KbService.get_document(db, current_user.id, document_id)
     if doc is None:
         raise HTTPException(404, "Document not found")
-    return propose_metadata(db, doc)
+    return propose_metadata(db, doc, use_llm=False)
 
 
 @router.put("/documents/{document_id}/metadata", response_model=dict)
 def update_metadata(
     document_id: int,
     body: KbMetadataUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Apply a manual metadata override to a document.

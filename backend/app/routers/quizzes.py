@@ -13,7 +13,7 @@ from app.schemas.quiz import (
     QuizAttemptResult,
     HistoryItem,
 )
-from app.services.security import get_current_user
+from app.services.users import current_user
 from app.services.quizzes import generate_quiz, score_attempt
 from app.services.quiz_stats import grant_quiz_xp, reviewer_summary
 
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/quizzes", tags=["quizzes"])
 @router.post("")
 def create_quiz(
     data: QuizCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> QuizResponse:
     quiz = generate_quiz(db, data.unit_id, data.num_questions, data.difficulty)
@@ -40,7 +40,7 @@ def create_quiz(
 def attempt_quiz(
     quiz_id: int,
     data: QuizAttemptRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
@@ -70,7 +70,7 @@ def attempt_quiz(
 
 @router.get("/history", response_model=list[HistoryItem])
 def quiz_history(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     attempts = (
@@ -85,7 +85,7 @@ def quiz_history(
 
 @router.get("/analytics")
 def quiz_analytics(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     return reviewer_summary(db, current_user.id)

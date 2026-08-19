@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb import automation
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb/automation", tags=["kb-automation"])
 
@@ -32,7 +32,7 @@ class RunRequest(BaseModel):
 
 @router.get("/jobs", response_model=dict)
 def list_automation_jobs(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
 ):
     """Registered Phase 9 jobs + enabled/cap state (for a control UI)."""
     return {"jobs": automation.registered_jobs()}
@@ -41,7 +41,7 @@ def list_automation_jobs(
 @router.post("/run", response_model=dict)
 def run_automation(
     payload: RunRequest = Body(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Run one named job (``mode="one"``) or all enabled jobs (``mode="all"``)."""

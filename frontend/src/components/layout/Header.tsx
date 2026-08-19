@@ -1,12 +1,9 @@
 import { NotificationsBell } from '../NotificationsBell';
-import { useAuth } from '../../hooks/useAuth';
+import { useProfile } from '../../hooks/useProfile';
 
 export const Header = ({ title }: { title: string }) => {
-  // Use the authenticated user (AuthContext) rather than the legacy
-  // no-body ``/auth/login`` (first-user) call — the latter would silently
-  // overwrite the stored token with the first user's on every page load,
-  // breaking multi-user sessions.
-  const { user } = useAuth();
+  // Single-owner app: the owner profile (no login) drives the badge.
+  const { profile: user } = useProfile();
 
   return (
     <header className="header">

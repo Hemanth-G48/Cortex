@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb import agents as agents_service
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-agents"])
 
@@ -28,7 +28,7 @@ class AgentRunRequest(BaseModel):
 @router.post("/agents/run")
 def run_agents(
     body: AgentRunRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     try:
@@ -41,7 +41,7 @@ def run_agents(
 @router.get("/agents/runs")
 def list_runs(
     limit: int = Query(default=20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"items": agents_service.list_runs(db, current_user.id, limit=limit)}

@@ -3,23 +3,24 @@ import { endpoints } from '../../services/api';
 import type { AIInsightsResponse } from '../../services/api';
 
 /**
- * Cached AI productivity insights (QuestLog pattern, Idea 95).
+ * Persisted AI productivity insights (Idea 95).
  *
- * Fetches ``POST /api/ai/insights`` — a per-user stats bundle analyzed by the
- * provider through the TTL response cache. Repeated loads within the cache
- * TTL return instantly with a "cached" badge; the deterministic fallback
- * keeps the card functional when AI is offline.
+ * The backend stores the last generated insight per user, so opening the
+ * dashboard returns the saved snapshot instantly ("cached" badge + last
+ * updated timestamp) with NO LLM call. The provider is only consulted on the
+ * explicit ↻ Refresh click (``force``), which recomputes and re-persists.
+ * The deterministic fallback keeps the card functional when AI is offline.
  */
 export const AiInsightsCard = () => {
   const [data, setData] = useState<AIInsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     setLoading(true);
     setError(false);
     try {
-      setData(await endpoints.ai.insights());
+      setData(await endpoints.ai.insights(force));
     } catch {
       setError(true);
     } finally {
@@ -44,12 +45,20 @@ export const AiInsightsCard = () => {
           >
             cached
           </span>
-        )}
-        {data?.ai_used === false && (
-          <span className="badge" style={{ color: 'var(--warning)', background: 'var(--warning-muted)' }}>
-            offline mode
-          </span>
-        )}
+        )}          {data?.ai_used === false && (
+            <span className="badge" style={{ color: 'var(--warning)', background: 'var(--warning-muted)' }}>
+              offline mode
+            </span>
+          )}
+          {data?.analyzed_at && (
+            <span
+              className="badge"
+              title="When this insight was generated (reused until you hit Refresh)"
+              style={{ color: 'var(--text-secondary)', background: 'var(--bg-hover)' }}
+            >
+              {new Date(data.analyzed_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+            </span>
+          )}
       </div>
 
       {loading ? (
@@ -70,7 +79,7 @@ export const AiInsightsCard = () => {
             <span>Habits: {data.stats.habits.active_streaks} active</span>
           </div>
           <div style={{ marginTop: '0.75rem', textAlign: 'right' }}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void load()}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void load(true)}>
               ↻ Refresh
             </button>
           </div>

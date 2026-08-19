@@ -164,7 +164,7 @@ def generate_study_plan(
 def _exam_for(db: Session, profile: SubjectProfile, exam_id: int | None) -> Exam | None:
     if exam_id is None:
         return None
-    exam = db.query(Exam).get(exam_id)
+    exam = db.get(Exam, exam_id)
     return exam
 
 

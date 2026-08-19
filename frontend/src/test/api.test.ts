@@ -1,51 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { authApi, uploadApi, setToken, clearToken, getToken } from '../services/api';
+import { profileApi, uploadApi } from '../services/api';
 
 describe('api', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    clearToken();
   });
 
-  describe('authApi.login', () => {
-    it('posts to /api/auth/login with identifier and password', async () => {
-      const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1, name: 'Alex', role: 'student' }, token: 'tok123' }),
-      } as unknown as Response);
-
-      const result = await authApi.login({ identifier: 'alex@test.com', password: 'pass' });
-
-      expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ identifier: 'alex@test.com', password: 'pass' }),
-      }));
-      expect(result.token).toBe('tok123');
-      expect(result.user.name).toBe('Alex');
-    });
-
-    it('stores token in localStorage after login', async () => {
+  describe('profileApi.get', () => {
+    it('posts to /api/profile and returns the owner', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ user: { id: 1, name: 'Alex', role: 'student' }, token: 'tok123' }),
+        json: () => Promise.resolve({ user: { id: 1, name: 'Alex', role: 'student' } }),
       } as unknown as Response);
 
-      await authApi.login({ identifier: 'a', password: 'p' });
-      expect(getToken()).toBe('tok123');
-    });
+      const result = await profileApi.get();
 
-    it('posts to /api/auth/login with empty body for legacy login', async () => {
-      const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1, name: 'Alex', role: 'student', token: 'tok123' } }),
-      } as unknown as Response);
-
-      await authApi.login();
-
-      expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({
-        method: 'POST',
-        body: undefined,
-      }));
+      const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(call[0]).toBe('/api/profile');
+      expect(result.user.name).toBe('Alex');
     });
   });
 
@@ -82,28 +54,14 @@ describe('api', () => {
     });
   });
 
-  describe('auth header', () => {
-    it('attaches Authorization header when token is set', async () => {
-      setToken('mytoken');
+  describe('requests are tokenless', () => {
+    it('never attaches an Authorization header', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ user: { id: 1, name: 'Alex', role: 'student', token: 'mytoken' } }),
+        json: () => Promise.resolve({ user: { id: 1, name: 'Alex' } }),
       } as unknown as Response);
 
-      await authApi.me();
-
-      const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-      const headers = (call[1] as RequestInit).headers as Record<string, string>;
-      expect(headers['Authorization']).toBe('Bearer mytoken');
-    });
-
-    it('does not attach Authorization header when no token is set', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ user: { id: 1, name: 'Alex', role: 'student', token: 'tok' } }),
-      } as unknown as Response);
-
-      await authApi.me();
+      await profileApi.get();
 
       const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       const headers = (call[1] as RequestInit).headers as Record<string, string>;

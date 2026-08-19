@@ -13,7 +13,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import KbChunk, KbDocument, KbVersion
+from app.models import KbChunk, KbDocument, KbEmbedding, KbVersion
 from app.services.ingestion import MAX_EXTRACTED_CHARS
 from app.services.kb import KbService, utcnow
 from app.services.kb import chunker, markdown_parser, ocr
@@ -36,6 +36,18 @@ def re_chunk(db: Session, doc: KbDocument) -> int:
     its own ``engine.begin()`` connection which, on SQLite, would commit/pin the
     outer transaction mid-ingest and lose the version snapshot added just before.
     """
+    # Remove embeddings of the chunks being replaced first — a content
+    # change must never leave stale vectors for text that no longer exists
+    # ("do not leave both old and new embeddings active").
+    old_chunk_ids = [
+        c.id
+        for c in db.query(KbChunk.id).filter(KbChunk.document_id == doc.id).all()
+    ]
+    if old_chunk_ids:
+        db.query(KbEmbedding).filter(
+            KbEmbedding.chunk_id.in_(old_chunk_ids),
+            KbEmbedding.user_id == doc.user_id,
+        ).delete(synchronize_session=False)
     db.query(KbChunk).filter(KbChunk.document_id == doc.id).delete()
     outline = KbService.json_loads(doc.outline_json) or None
     if outline:
@@ -245,7 +257,7 @@ def run_post_ingest_hooks(db: Session, doc: KbDocument) -> None:
             from app.models import User
             from app.services.kb.capture_xp import award_capture_xp
 
-            user = db.query(User).get(doc.user_id)
+            user = db.get(User, doc.user_id)
             if user is not None:
                 award_capture_xp(db, user, "daily_note", f"doc:{doc.id}")
         db.commit()

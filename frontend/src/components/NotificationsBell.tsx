@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
 import { useNotifications } from '../hooks/useNotifications';
 
 export const NotificationsBell = () => {
-  const { user } = useAuth();
+  const { profile: user } = useProfile();
   const { notifications, unread, markRead, markAllRead, remove } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

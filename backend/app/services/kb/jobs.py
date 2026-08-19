@@ -136,7 +136,18 @@ def _run_inline(db: Session, job_id: int) -> None:
                 summary["failures"] = failures
                 _merge_summary(job, summary)
         elif job.ref_type == "source":
-            summary = scan_and_ingest(db, job.ref_id or 0)
+            # A folder-scoped scan carries its relative subpath in
+            # ``ref_ids_json`` (``["cybersecurity"]``); a whole-source scan
+            # leaves it empty.
+            subpath = None
+            if job.ref_ids_json:
+                try:
+                    stored = json.loads(job.ref_ids_json)
+                    if stored and isinstance(stored[0], str):
+                        subpath = stored[0]
+                except (ValueError, TypeError, IndexError):
+                    subpath = None
+            summary = scan_and_ingest(db, job.ref_id or 0, subpath=subpath)
             job.total_items = int(summary.get("files_seen", 0))
             job.processed_items = job.total_items
             job.summary_json = json.dumps(summary)
@@ -155,6 +166,17 @@ def _run_inline(db: Session, job_id: int) -> None:
                 db.add(job)
                 db.commit()
         job.status = "done"
+        # Event hook: after a scan/reindex completes, refresh KB-derived courses
+        # so new vault material tagged `course:*` surfaces without a manual sync.
+        if job.job_type in ("scan", "reindex", "ingest"):
+            try:
+                from app.services.course_derivation import derive_courses_from_tags
+
+                derive_courses_from_tags(db, job.user_id)
+            except Exception:  # noqa: BLE001 — never fail the job over course sync
+                logger.exception(
+                    "Course derivation after job %s failed", job.id
+                )
     except Exception as exc:  # noqa: BLE001 — capture, never crash the worker
         logger.exception("Job %s failed", job.id)
         job.status = "failed"
@@ -198,9 +220,15 @@ def _dispatch(
 def submit_scan_job(
     db: Session,
     source_id: int,
+    subpath: str | None = None,
     session_factory: Callable[[], Session] | None = None,
 ) -> KbJob:
-    """Enqueue a scan job (and return the KbJob row, phrase 92)."""
+    """Enqueue a scan job (and return the KbJob row, phrase 92).
+
+    ``subpath`` optionally scopes the scan to one folder inside the source
+    root (relative path, already validated by the caller); it is carried on
+    the job in ``ref_ids_json`` so the worker can replay it.
+    """
     source = db.query(KbSource).filter(KbSource.id == source_id).first()
     if source is None:
         raise ValueError("source not found")
@@ -211,6 +239,8 @@ def submit_scan_job(
         ref_type="source",
         ref_id=source_id,
     )
+    if subpath:
+        job.ref_ids_json = json.dumps([subpath])
     db.add(job)
     db.commit()
     db.refresh(job)

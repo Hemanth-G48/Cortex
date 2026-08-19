@@ -22,7 +22,7 @@ from app.services.kb import subjects as subjects_service
 from app.services.kb import topics as topics_service
 from app.services.kb import units as units_service
 from app.services.kb.dependencies import DependencyCycleError
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/subjects", tags=["kb-subjects"])
 
@@ -90,7 +90,7 @@ def _profile_dict(db: Session, profile: SubjectProfile) -> dict:
 @router.post("/import")
 def import_syllabus(
     body: ImportRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Parse syllabus text (or an uploaded file → text) into a proposal."""
@@ -112,7 +112,7 @@ def import_syllabus(
 @router.post("/import-file")
 async def import_syllabus_file(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Import a syllabus file (PDF/DOCX/MD/TXT) via the text extractor."""
@@ -149,7 +149,7 @@ async def import_syllabus_file(
 @router.get("/proposals")
 def list_proposals(
     status: str | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     if status and status not in ("proposed", "confirmed", "rejected"):
@@ -162,7 +162,7 @@ def list_proposals(
 def list_subjects(
     semester: str | None = Query(default=None),
     status: str | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Subject facet list (Idea 43, phrase 26): filterable by semester."""
@@ -178,7 +178,7 @@ def list_subjects(
 @router.get("/{profile_id}")
 def get_profile(
     profile_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -191,7 +191,7 @@ def get_profile(
 def confirm_proposal(
     profile_id: int,
     body: ConfirmRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -214,7 +214,7 @@ def confirm_proposal(
 @router.post("/{profile_id}/reject")
 def reject_proposal(
     profile_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -231,7 +231,7 @@ def reject_proposal(
 @router.post("/{profile_id}/topics/generate")
 def generate_topics(
     profile_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -249,7 +249,7 @@ def generate_topics(
 def list_topics(
     profile_id: int,
     status: str | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -283,7 +283,7 @@ def _topic_dict(t: Topic) -> dict:
 
 
 def _topic_or_404(db: Session, user_id: int, topic_id: int) -> Topic:
-    topic = db.query(Topic).get(topic_id)
+    topic = db.get(Topic, topic_id)
     if topic is None or topic.user_id != user_id:
         raise HTTPException(404, "Topic not found")
     return topic
@@ -292,7 +292,7 @@ def _topic_or_404(db: Session, user_id: int, topic_id: int) -> Topic:
 @router.post("/{profile_id}/topics/{topic_id}/confirm")
 def confirm_topic(
     profile_id: int, topic_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     _profile_or_404(db, current_user.id, profile_id)
@@ -305,7 +305,7 @@ def confirm_topic(
 @router.post("/{profile_id}/topics/{topic_id}/reject")
 def reject_topic(
     profile_id: int, topic_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     _profile_or_404(db, current_user.id, profile_id)
@@ -322,7 +322,7 @@ class MergeRequest(BaseModel):
 @router.post("/{profile_id}/topics/{topic_id}/merge")
 def merge_topic(
     profile_id: int, topic_id: int, body: MergeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     _profile_or_404(db, current_user.id, profile_id)
@@ -345,7 +345,7 @@ def merge_topic(
 def match_units(
     profile_id: int,
     use_embeddings: bool = Query(default=False),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -370,7 +370,7 @@ class MatchConfirmRequest(BaseModel):
 def confirm_unit_match(
     profile_id: int,
     body: MatchConfirmRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -393,7 +393,7 @@ def confirm_unit_match(
 @router.get("/{profile_id}/dependencies")
 def get_dependencies(
     profile_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -405,7 +405,7 @@ def get_dependencies(
 @router.post("/{profile_id}/dependencies/generate")
 def seed_dependencies(
     profile_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -428,7 +428,7 @@ class AddDependencyRequest(BaseModel):
 def add_dependency(
     profile_id: int,
     body: AddDependencyRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -450,7 +450,7 @@ def add_dependency(
 @router.delete("/dependencies/{dep_id}")
 def delete_dependency(
     dep_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     try:
@@ -475,7 +475,7 @@ class RoadmapRequest(BaseModel):
 def generate_roadmap(
     profile_id: int,
     body: RoadmapRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -493,7 +493,7 @@ def generate_roadmap(
 @router.get("/{profile_id}/roadmap")
 def get_roadmap(
     profile_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -532,7 +532,7 @@ class TopicPatchRequest(BaseModel):
 def patch_topic(
     topic_id: int,
     body: TopicPatchRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Manual difficulty / time override (phrases 77, 88)."""
@@ -551,7 +551,7 @@ def patch_topic(
 
 
 @router.post("/topics/{topic_id}/recompute")
-def recompute_topic(topic_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def recompute_topic(topic_id: int, current_user: User = Depends(current_user), db: Session = Depends(get_db)):
     topic = _topic_or_404(db, current_user.id, topic_id)
     topics_service.set_topic_estimates(db, current_user.id, topic)
     db.commit()
@@ -561,7 +561,7 @@ def recompute_topic(topic_id: int, current_user: User = Depends(get_current_user
 @router.get("/{profile_id}/time-budget")
 def time_budget(
     profile_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Per-topic estimates + weekly totals for the roadmap engine/UI (phrase 86)."""
@@ -573,7 +573,7 @@ def time_budget(
         .filter(Topic.user_id == current_user.id, Topic.subject_id == profile.curriculum_subject_id)
         .all()
     )
-    user = db.query(User).get(current_user.id)
+    user = db.get(User, current_user.id)
     multiplier = float(user.pacing_multiplier or 1.0) if user else 1.0
     items = [_topic_dict(t) for t in topics]
     weekly = sum(t.first_pass_mins or 0 for t in topics)
@@ -592,11 +592,11 @@ class PacingRequest(BaseModel):
 @router.put("/me/pacing")
 def set_pacing(
     body: PacingRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Per-user pacing multiplier for time estimates (phrase 84)."""
-    user = db.query(User).get(current_user.id)
+    user = db.get(User, current_user.id)
     user.pacing_multiplier = round(body.multiplier, 2)
     db.commit()
     return {"ok": True, "pacing_multiplier": user.pacing_multiplier}
@@ -608,7 +608,7 @@ def set_pacing(
 
 
 @router.get("/topics/{topic_id}/outcomes")
-def get_outcomes(topic_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_outcomes(topic_id: int, current_user: User = Depends(current_user), db: Session = Depends(get_db)):
     topic = _topic_or_404(db, current_user.id, topic_id)
     return {"topic_id": topic.id, "outcomes": topics_service.get_outcomes(topic)}
 
@@ -620,7 +620,7 @@ class AddOutcomeRequest(BaseModel):
 @router.post("/topics/{topic_id}/outcomes")
 def add_outcome(
     topic_id: int, body: AddOutcomeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     topic = _topic_or_404(db, current_user.id, topic_id)
@@ -630,7 +630,7 @@ def add_outcome(
 
 
 @router.post("/topics/{topic_id}/outcomes/expand")
-def expand_outcomes(topic_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def expand_outcomes(topic_id: int, current_user: User = Depends(current_user), db: Session = Depends(get_db)):
     topic = _topic_or_404(db, current_user.id, topic_id)
     topics_service.expand_outcomes(db, current_user.id, topic)
     db.commit()
@@ -640,7 +640,7 @@ def expand_outcomes(topic_id: int, current_user: User = Depends(get_current_user
 @router.post("/topics/{topic_id}/outcomes/{index}/complete")
 def complete_outcome(
     topic_id: int, index: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     topic = _topic_or_404(db, current_user.id, topic_id)

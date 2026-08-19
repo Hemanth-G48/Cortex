@@ -14,7 +14,7 @@ from app.database import get_db
 from app.models import BrainDump, User
 from app.schemas.braindump import BrainDumpCreate, BrainDumpResponse
 from app.services.kb import braindump_draft
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/braindumps", tags=["braindumps"])
 
@@ -26,7 +26,7 @@ def _linked_document_id(db: Session, user_id: int) -> int | None:
 
 
 @router.get("/", response_model=dict)
-def get_braindump(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_braindump(current_user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Return the current user's brain dump row.
 
     If no row exists yet, returns ``{"content": None}`` with 200.
@@ -40,7 +40,7 @@ def get_braindump(current_user: User = Depends(get_current_user), db: Session = 
 
 
 @router.put("/", response_model=BrainDumpResponse)
-def upsert_braindump(data: BrainDumpCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def upsert_braindump(data: BrainDumpCreate, current_user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Upsert the current user's brain dump content.
 
     If a row already exists for the user, its ``content`` is updated.

@@ -58,6 +58,8 @@ FEATURE_MODULES = [
     "app.services.kb.auto_sync",
     # Idea 90 — auto-create revision tasks
     "app.services.kb.auto_revision",
+    # Dynamic courses — refresh Course rows from `course:*` tags (idempotent)
+    "app.services.kb.auto_course_sync",
 ]
 
 

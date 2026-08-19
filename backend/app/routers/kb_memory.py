@@ -16,7 +16,7 @@ from app.database import get_db
 from app.models import EpisodicMemory, User
 from app.services.kb import KbService
 from app.services.kb import memory_longterm as memory_service
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-memory"])
 
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-memory"])
 @router.get("/memory/timeline")
 def memory_timeline(
     limit: int = Query(default=50, ge=1, le=200),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     episodes = (
@@ -52,7 +52,7 @@ def memory_timeline(
 
 @router.post("/memory/consolidate")
 def run_consolidation(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     if not KbService.bool_setting("KB_MEMORY_CONSOLIDATION_ENABLED", False):

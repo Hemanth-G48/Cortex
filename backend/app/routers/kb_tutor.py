@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import TutorSession, User
 from app.services.kb import tutor as tutor_service
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-tutor"])
 
@@ -29,7 +29,7 @@ class TutorChatRequest(BaseModel):
 @router.post("/tutor/chat")
 def tutor_chat(
     body: TutorChatRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = tutor_service.tutor_chat(db, current_user.id, body.message, body.session_id)
@@ -45,7 +45,7 @@ class TutorDoubtRequest(BaseModel):
 @router.post("/tutor/doubt")
 def tutor_doubt(
     body: TutorDoubtRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     result = tutor_service.tutor_doubt(db, current_user.id, body.question, body.step_where_stuck)
@@ -55,7 +55,7 @@ def tutor_doubt(
 
 @router.get("/tutor/sessions")
 def tutor_sessions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     rows = (

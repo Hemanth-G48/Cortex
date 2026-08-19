@@ -29,7 +29,7 @@ from app.services.kb import plans as plans_service
 from app.services.kb import revision as revision_service
 from app.services.kb import sessions as sessions_service
 from app.services.kb.mastery import mastery_by_topic, progress_payload
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api", tags=["kb-study"])
 
@@ -52,7 +52,7 @@ def _confirmed(db: Session, user_id: int, profile: SubjectProfile) -> int:
 
 
 def _topic_or_404(db: Session, user_id: int, topic_id: int) -> Topic:
-    topic = db.query(Topic).get(topic_id)
+    topic = db.get(Topic, topic_id)
     if topic is None or topic.user_id != user_id:
         raise HTTPException(404, "Topic not found")
     return topic
@@ -83,7 +83,7 @@ def _plan_dict(plan: StudyPlan) -> dict:
 def generate_study_plan(
     profile_id: int,
     body: StudyPlanRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -105,7 +105,7 @@ def generate_study_plan(
 @router.get("/subjects-ai/{profile_id}/study-plan")
 def get_study_plan(
     profile_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -135,7 +135,7 @@ class ReviewRequest(BaseModel):
 def review_topic(
     topic_id: int,
     body: ReviewRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     topic = _topic_or_404(db, current_user.id, topic_id)
@@ -158,7 +158,7 @@ def review_topic(
 
 @router.get("/reviews/due")
 def get_due_reviews(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return {"items": revision_service.due_reviews(db, current_user.id, on=date.today())}
@@ -166,7 +166,7 @@ def get_due_reviews(
 
 @router.post("/reviews/materialize")
 def materialize_reviews(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     created = revision_service.materialize_due(db, current_user.id, on=date.today())
@@ -183,7 +183,7 @@ def materialize_reviews(
 def generate_exam_prep(
     profile_id: int,
     exam_id: int | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -203,7 +203,7 @@ def generate_exam_prep(
 def get_exam_prep(
     profile_id: int,
     exam_id: int | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -225,7 +225,7 @@ def get_exam_prep(
 @router.get("/subjects-ai/{profile_id}/progress")
 def subject_progress(
     profile_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     profile = _profile_or_404(db, current_user.id, profile_id)
@@ -243,7 +243,7 @@ def subject_progress(
 def weak_topics(
     subject_id: int | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=50),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     q = db.query(Topic).filter(
@@ -279,7 +279,7 @@ def weak_topics(
 def next_action(
     subject_id: int | None = Query(default=None),
     limit: int = Query(default=3, ge=1, le=10),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     items = next_action_service.recommend(
@@ -305,7 +305,7 @@ class AdaptRoadmapRequest(BaseModel):
 def adapt_roadmap(
     profile_id: int,
     body: AdaptRoadmapRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Recompute the subject roadmap from mastery + due reviews + gaps.
@@ -339,7 +339,7 @@ class StartSessionRequest(BaseModel):
 @router.post("/sessions/start")
 def start_session(
     body: StartSessionRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     topic = _topic_or_404(db, current_user.id, body.topic_id)
@@ -354,13 +354,13 @@ def start_session(
 @router.post("/sessions/{session_id}/complete")
 def complete_session(
     session_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    session = db.query(MicroSession).get(session_id)
+    session = db.get(MicroSession, session_id)
     if session is None or session.user_id != current_user.id:
         raise HTTPException(404, "Session not found")
-    topic = db.query(Topic).get(session.topic_id) if session.topic_id else None
+    topic = db.get(Topic, session.topic_id) if session.topic_id else None
     sessions_service.complete_session(db, current_user.id, session)
     db.commit()
     return {"ok": True, "session": sessions_service.session_dict(session, topic)}
@@ -369,10 +369,10 @@ def complete_session(
 @router.post("/sessions/{session_id}/pomodoro")
 def session_pomodoro(
     session_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    session = db.query(MicroSession).get(session_id)
+    session = db.get(MicroSession, session_id)
     if session is None or session.user_id != current_user.id:
         raise HTTPException(404, "Session not found")
     pomo = sessions_service.launch_pomodoro(db, current_user.id, session)
@@ -388,14 +388,14 @@ def session_pomodoro(
 @router.get("/sessions/suggested")
 def suggested_sessions(
     limit: int = Query(default=5, ge=1, le=20),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Suggested micro-sessions from the next-action recommender (phrase 92)."""
     recs = next_action_service.recommend(db, current_user.id, limit=limit)
     out = []
     for rec in recs:
-        topic = db.query(Topic).get(rec["topic_id"])
+        topic = db.get(Topic, rec["topic_id"])
         if topic is None:
             continue
         session = sessions_service.build_session(db, current_user.id, topic)

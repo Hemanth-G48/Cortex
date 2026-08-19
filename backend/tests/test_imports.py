@@ -3,8 +3,9 @@ from __future__ import annotations
 
 
 def test_import_auth_router():
-    from app.routers import auth
-    assert auth.router is not None
+    # The auth router is a pytest-only shim now (single-user app).
+    from app.routers import auth_test
+    assert auth_test.router is not None
 
 
 def test_import_user_schemas():

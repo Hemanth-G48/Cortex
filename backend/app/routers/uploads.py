@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models import User
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 
@@ -107,7 +107,7 @@ def upload(
 
 @router.get("")
 def list_uploads(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> list[dict]:
     """List previously uploaded files (metadata only). Authenticated."""
@@ -129,7 +129,7 @@ def list_uploads(
 @router.delete("/{name}")
 def delete_upload(
     name: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Delete an uploaded file by its stored name. Authenticated."""

@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import User, Summary
 from app.schemas.summary import SummaryGenerateRequest, SummaryListItem, SummaryResponse
-from app.services.security import get_current_user
+from app.services.users import current_user
 from app.services.summaries import (
     find_cached,
     generate_summary,
@@ -37,7 +37,7 @@ def _daily_generation_count(db: Session) -> int:
 @router.post("")
 def create_summary(
     data: SummaryGenerateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     # G13 (Phase 87): per-day LLM cost guard for *new* generations. A cache hit
@@ -55,7 +55,7 @@ def create_summary(
 
 @router.get("", response_model=list[SummaryListItem])
 def get_summaries(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     rows = list_summaries(db)
@@ -74,7 +74,7 @@ def get_summaries(
 @router.delete("/{summary_id}")
 def remove_summary(
     summary_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     found = delete_summary(db, summary_id)

@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { KnowledgeBase } from '../pages/KnowledgeBase';
+
+const renderPage = () =>
+  render(
+    <MemoryRouter>
+      <KnowledgeBase />
+    </MemoryRouter>,
+  );
 
 vi.mock('../services/api', () => {
   const sources = [
@@ -95,14 +103,41 @@ vi.mock('../services/api', () => {
           list: vi.fn().mockResolvedValue({ document_id: 10, related: [], method: 'embedding' }),
         },
         tags: {
-          forDocument: vi.fn().mockResolvedValue({ document_id: 10, tags: [] }),
-          apply: vi.fn().mockResolvedValue({ document_id: 10, tags: [] }),
+          forDocument: vi.fn().mockResolvedValue({ document_id: 10, tags: [], applied: [] }),
+          apply: vi.fn().mockResolvedValue({ document_id: 10, tags: [], applied: [] }),
+          create: vi.fn().mockResolvedValue({
+            document_id: 10,
+            tags: [],
+            applied: [{ tag_id: 77, name: 'course:Operating Systems', provenance: 'manual', confidence: 1 }],
+          }),
           reject: vi.fn().mockResolvedValue({ ok: true, removed: 1 }),
         },
         concepts: {
           list: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20 }),
         },
         metadata: { update: vi.fn().mockResolvedValue({}) },
+        // Drawer panels fetch these on mount when a document is opened.
+        summaries: {
+          get: vi.fn().mockResolvedValue({
+            document_id: 10,
+            cached: false,
+            summary: { content: 'S', key_points: [], definitions: [], open_questions: [] },
+          }),
+          regenerate: vi.fn().mockResolvedValue({
+            document_id: 10,
+            cached: false,
+            summary: { content: 'S', key_points: [], definitions: [], open_questions: [] },
+          }),
+        },
+        mindmap: {
+          get: vi.fn().mockResolvedValue({ id: 'root', label: 'Root', concepts: [], children: [] }),
+          exportUrl: vi.fn().mockResolvedValue(''),
+        },
+        quality: {
+          document: vi.fn().mockResolvedValue({ document_id: 10, issues: [], suggestions: [] }),
+          generateSuggestions: vi.fn().mockResolvedValue({ items: [] }),
+          dismissSuggestion: vi.fn().mockResolvedValue({ ok: true }),
+        },
         duplicates: {
           list: vi.fn().mockResolvedValue({ items: [], total: 0, method: 'embedding' }),
           scan: vi.fn().mockResolvedValue({ items: [], total: 0, method: 'embedding' }),
@@ -125,7 +160,7 @@ describe('Knowledge Base page', () => {
   });
 
   it('renders sources, documents and action buttons', async () => {
-    render(<KnowledgeBase />);
+    renderPage();
     await waitFor(() => expect(screen.getByText('/home/me/vault')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText('hello')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /Add Source/ })).toBeInTheDocument();
@@ -137,8 +172,22 @@ describe('Knowledge Base page', () => {
   });
 
   it('shows a jobs empty state', async () => {
-    render(<KnowledgeBase />);
+    renderPage();
     await waitFor(() => expect(screen.getByText('/home/me/vault')).toBeInTheDocument());
     expect(screen.getByText(/No jobs yet/)).toBeInTheDocument();
+  });
+
+  it('creates a course: tag from the tag editor', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText('hello')).toBeInTheDocument());
+    // Open the document drawer.
+    fireEvent.click(screen.getByText('hello'));
+
+    const input = await screen.findByPlaceholderText('Add a tag…');
+    fireEvent.change(input, { target: { value: 'course:Operating Systems' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    // The created tag renders as an applied chip.
+    await waitFor(() => expect(screen.getByText('#course:Operating Systems')).toBeInTheDocument());
   });
 });

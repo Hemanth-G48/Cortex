@@ -38,8 +38,40 @@ export default function GoogleSyncCard() {
     setError(null);
     try {
       const res = await endpoints.google.connect();
-      if (res.url) window.open(res.url, '_blank');
-      else setError(res.error ?? 'Google OAuth not configured');
+      if (res.url) {
+        // Open OAuth popup and listen for callback message
+        window.open(res.url, '_google-oauth', 'width=500,height=600');
+        
+        // Listen for OAuth callback message
+        const messageHandler = (event: MessageEvent) => {
+          if (event.data?.type === 'google-oauth') {
+            window.removeEventListener('message', messageHandler);
+            if (event.data.error) {
+              setError(event.data.error);
+            } else if (event.data.connected) {
+              // Refresh status after successful connection
+              loadStatus();
+            }
+          }
+        };
+        window.addEventListener('message', messageHandler);
+        
+        // Also poll status as fallback (popup might block postMessage)
+        const pollInterval = setInterval(() => {
+          endpoints.google.status().then((s) => {
+            if (s.connected) {
+              clearInterval(pollInterval);
+              window.removeEventListener('message', messageHandler);
+              loadStatus();
+            }
+          }).catch(() => {});
+        }, 2000);
+        
+        // Stop polling after 60 seconds
+        setTimeout(() => clearInterval(pollInterval), 60000);
+      } else {
+        setError(res.error ?? 'Google OAuth not configured');
+      }
     } catch (e) {
       setError((e as Error).message);
     }
@@ -64,12 +96,22 @@ export default function GoogleSyncCard() {
     setError(null);
     try {
       switch (kind) {
-        case 'classroom-courses':
-          setCourses(await endpoints.classroom.courses());
+        case 'classroom-courses': {
+          const res = await endpoints.classroom.courses();
+          setCourses(res.courses);
+          if (res.source === 'mock') {
+            setError('Showing offline demo courses — connect Google for live data.');
+          }
           break;
-        case 'classroom-assignments':
-          setAssignments(await endpoints.classroom.assignments());
+        }
+        case 'classroom-assignments': {
+          const res = await endpoints.classroom.assignments();
+          setAssignments(res.assignments);
+          if (res.source === 'mock') {
+            setError('Showing offline demo assignments — connect Google for live data.');
+          }
           break;
+        }
         case 'gmail':
           setMessages(await endpoints.gmail.messages(5));
           setUnread((await endpoints.gmail.unread()).count);

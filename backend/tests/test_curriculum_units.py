@@ -97,7 +97,8 @@ class TestAdminCreateUnit:
         assert data["name"] == "Bonus Unit"
         assert data["unit_number"] == 99
 
-    def test_non_admin_blocked(self, client):
+    def test_create_allowed_for_any_user(self, client):
+        # Single-user app: curriculum writes are not admin-gated.
         token = get_student_token(client)
         resp = client.get(
             "/api/curriculum/institutions",
@@ -122,7 +123,7 @@ class TestAdminCreateUnit:
             json={"unit_number": 99, "name": "Hacker Unit"},
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp4.status_code == 403
+        assert resp4.status_code == 200
 
 
 class TestGetUnit:

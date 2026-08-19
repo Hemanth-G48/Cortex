@@ -19,6 +19,12 @@ class MicroSession(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     topic_id = Column(Integer, ForeignKey("topics.id"), nullable=True, index=True)
     chunk_id = Column(Integer, ForeignKey("kb_chunks.id"), nullable=True)
+    # Study-Session Loop (workflow): optional link to a learning-plan task.
+    # A session can be tied to either a curriculum topic (legacy) or a
+    # learning-plan task — never both, but the columns stay independent so
+    # links survive even if the other side is deleted.
+    learning_plan_id = Column(Integer, ForeignKey("learning_plans.id"), nullable=True, index=True)
+    learning_task_id = Column(Integer, ForeignKey("learning_tasks.id"), nullable=True, index=True)
     practice_task = Column(Text, nullable=True)
     duration_mins = Column(Integer, default=25)
     # suggested | started | done

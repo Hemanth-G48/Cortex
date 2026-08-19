@@ -8,6 +8,7 @@ Read-only Classroom/Gmail/Calendar flow implemented with plain httpx REST
 from __future__ import annotations
 
 import logging
+import secrets
 import time
 from datetime import datetime
 from urllib.parse import urlencode
@@ -34,12 +35,32 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email",
 ]
 
+# In-memory state store for CSRF protection (single-user app)
+_oauth_states: dict[str, float] = {}
+_STATE_TTL_SECONDS = 600  # 10 minutes
+
+
+def _generate_state() -> str:
+    """Generate a random state parameter for CSRF protection."""
+    state = secrets.token_urlsafe(32)
+    _oauth_states[state] = time.time()
+    return state
+
+
+def _validate_state(state: str) -> bool:
+    """Validate and consume a state parameter."""
+    if state not in _oauth_states:
+        return False
+    created = _oauth_states.pop(state)
+    return (time.time() - created) < _STATE_TTL_SECONDS
+
 
 def is_configured() -> bool:
     return bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
 
 
 def auth_url() -> str:
+    state = _generate_state()
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -47,6 +68,7 @@ def auth_url() -> str:
         "scope": " ".join(SCOPES),
         "access_type": "offline",
         "prompt": "consent",
+        "state": state,
     }
     return f"{AUTH_URL}?{urlencode(params)}"
 
@@ -154,17 +176,26 @@ def status(db: Session) -> dict:
 
 
 def authorized_get(url: str, db: Session, params: dict | None = None, headers: dict | None = None) -> dict | list | None:
-    """GET a Google API endpoint with the stored token. Returns None when unauthenticated."""
+    """GET a Google API endpoint with the stored token. Returns None when unauthenticated or when the API returns an error."""
     token = access_token(db)
     if not token:
         return None
-    resp = httpx.get(
-        url,
-        params=params,
-        headers={"Authorization": f"Bearer {token}", **(headers or {})},
-        timeout=30.0,
-    )
-    if resp.status_code == 401:
+    try:
+        resp = httpx.get(
+            url,
+            params=params,
+            headers={"Authorization": f"Bearer {token}", **(headers or {})},
+            timeout=30.0,
+        )
+        # Return None for auth errors or API errors (401, 403, etc.)
+        if resp.status_code in (401, 403, 404):
+            logger.warning("Google API returned %d for %s: %s", resp.status_code, url, resp.text[:200])
+            return None
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPStatusError as exc:
+        logger.warning("Google API HTTP error for %s: %s", url, exc)
         return None
-    resp.raise_for_status()
-    return resp.json()
+    except Exception as exc:
+        logger.warning("Google API request failed for %s: %s", url, exc)
+        return None

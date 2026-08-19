@@ -13,7 +13,17 @@ from dataclasses import dataclass, field
 import frontmatter as fm
 
 WIKILINK_RE = re.compile(r"\[\[([^\[\]]+?)\]\]")
-TAG_RE = re.compile(r"(?:^|[\s(])#([A-Za-z0-9_][A-Za-z0-9_/.\-]*)")
+# Inline tag: plain ``#tag`` / ``#nested/tag`` OR a ``course:<name>`` tag that
+# may contain spaces (e.g. ``#course:Operating Systems``). The ``course:``
+# alternative is tried first so ``#course:X`` is never split into ``course`` + X.
+# Course tags capture word chars, spaces, and ``. & ' -`` until the next
+# character that isn't part of a tag (punctuation, another ``#``, EOL).
+TAG_RE = re.compile(
+    r"(?:^|[\s(])#("
+    r"course:[A-Za-z0-9_][A-Za-z0-9_ .&'-]*"
+    r"|[A-Za-z0-9_][A-Za-z0-9_/.\-]*"
+    r")"
+)
 CALLOUT_RE = re.compile(r"^>\s*\[!(\w+)\]")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 FENCE_RE = re.compile(r"^(`{3,}|~{3,})")

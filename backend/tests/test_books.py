@@ -253,3 +253,21 @@ class TestUpload:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 400
+
+    def test_upload_oversized_returns_413(self, client, db_session: Session):
+        # Books use their own cap (BOOK_MAX_UPLOAD_MB) rather than the shared
+        # material limit, so shrink it to prove the guard still fires.
+        from app.config import settings as app_settings
+
+        original_max = app_settings.BOOK_MAX_UPLOAD_MB
+        app_settings.BOOK_MAX_UPLOAD_MB = 1  # 1 MB cap
+        try:
+            token = _get_token(client)
+            resp = client.post(
+                "/api/books/upload",
+                files={"file": ("big.pdf", b"x" * (1024 * 1024 + 1), "application/pdf")},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert resp.status_code == 413
+        finally:
+            app_settings.BOOK_MAX_UPLOAD_MB = original_max

@@ -110,7 +110,8 @@ class TestAdminCreateProgram:
         assert data["code"] == "BTECH-ECE"
         assert data["institution_id"] == inst_id
 
-    def test_non_admin_blocked(self, client):
+    def test_owner_can_create_program(self, client):
+        """Single-user app: no admin role gate — the owner can manage the catalog."""
         token = get_student_token(client)
         resp = client.get(
             "/api/curriculum/institutions",
@@ -120,7 +121,8 @@ class TestAdminCreateProgram:
 
         resp2 = client.post(
             f"/api/curriculum/institutions/{inst_id}/programs",
-            json={"name": "Hacker Program", "code": "HACK"},
+            json={"name": "Owner Program", "code": "OWN"},
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp2.status_code == 403
+        assert resp2.status_code == 200
+        assert resp2.json()["code"] == "OWN"

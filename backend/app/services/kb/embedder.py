@@ -56,26 +56,25 @@ def embed_document_chunks(db: Session, user_id: int, doc_id: int) -> dict:
     skipped = 0
     total = len(chunks)
 
-    # Collect content hashes that already have embeddings for this user.
-    existing_hashes: set[str] = set()
+    # Collect chunk IDs that already have embeddings for this user.
+    existing_chunk_ids: set[int] = set()
     if chunks:
         chunk_ids = [c.id for c in chunks]
         existing = (
-            db.query(KbEmbedding.content_hash)
+            db.query(KbEmbedding.chunk_id)
             .filter(
                 KbEmbedding.user_id == user_id,
                 KbEmbedding.chunk_id.in_(chunk_ids),
             )
             .all()
         )
-        existing_hashes = {row.content_hash for row in existing if row.content_hash}
+        existing_chunk_ids = {row.chunk_id for row in existing}
 
     texts_to_embed: list[str] = []
     chunk_indices: list[int] = []  # index into chunks list
 
     for idx, chunk in enumerate(chunks):
-        h = embeddings.embedding_hash(chunk.content)
-        if h in existing_hashes:
+        if chunk.id in existing_chunk_ids:
             skipped += 1
             continue
         texts_to_embed.append(chunk.content)
@@ -162,26 +161,26 @@ def embed_dirty_batch(
         .all()
     )
 
-    # Content hashes that already have an embedding row for this user.
-    existing_hashes: set[str] = set()
+    # Chunk IDs that already have an embedding row for this user.
+    existing_chunk_ids: set[int] = set()
     if chunks:
         chunk_ids = [c.id for c in chunks]
         existing = (
-            db.query(KbEmbedding.content_hash)
+            db.query(KbEmbedding.chunk_id)
             .filter(
                 KbEmbedding.user_id == user_id,
                 KbEmbedding.chunk_id.in_(chunk_ids),
             )
             .all()
         )
-        existing_hashes = {row.content_hash for row in existing if row.content_hash}
+        existing_chunk_ids = {row.chunk_id for row in existing}
 
     # (chunk, text, hash) triples that still need a vector.
     pending: list[tuple[KbChunk, str, str]] = []
     for chunk in chunks:
-        h = embeddings.embedding_hash(chunk.content)
-        if h in existing_hashes:
+        if chunk.id in existing_chunk_ids:
             continue
+        h = embeddings.embedding_hash(chunk.content)
         pending.append((chunk, chunk.content, h))
 
     embedded = 0

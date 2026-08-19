@@ -5,7 +5,9 @@ from __future__ import annotations
 import os
 from sqlalchemy import func, or_
 
-from fastapi import APIRouter, Depends, HTTPException
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -13,9 +15,29 @@ from app.models import KbDocument, KbEdge, KbSource, User
 from app.schemas.kb import KbScanResult, KbSourceCreate, KbSourceResponse, KbSourceUpdate
 from app.services.kb import KbService
 from app.services.kb import auto_sync, jobs
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-sources"])
+
+
+def _normalize_scan_subpath(path: str | None) -> str | None:
+    """Validate + normalize an optional scan subfolder path.
+
+    Returns ``None`` when omitted/blank (whole-source scan). Rejects absolute
+    paths and any ``..`` traversal; returns the cleaned relative path (no
+    leading/trailing slashes) otherwise.
+    """
+    if path is None:
+        return None
+    raw = path.strip()
+    if not raw:
+        return None
+    if os.path.isabs(raw):
+        raise HTTPException(400, "path must be relative to the source root")
+    parts = Path(raw).parts
+    if not parts or ".." in parts:
+        raise HTTPException(400, "path must be a relative folder inside the source")
+    return "/".join(parts)
 
 
 def _with_counts(db: Session, user_id: int, sources: list[KbSource]) -> list[KbSourceResponse]:
@@ -39,7 +61,7 @@ def _with_counts(db: Session, user_id: int, sources: list[KbSource]) -> list[KbS
 @router.post("/sources", response_model=KbSourceResponse, status_code=201)
 def create_source(
     body: KbSourceCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Register a source; ``root_path`` must exist on disk (phrase 13)."""
@@ -52,6 +74,7 @@ def create_source(
         root_path=os.path.abspath(body.root_path),
         enabled=body.enabled,
         sync_type=body.sync_type,
+        sync_source_path=body.sync_source_path,
     )
     db.add(source)
     db.commit()
@@ -61,7 +84,7 @@ def create_source(
 
 @router.get("/sources", response_model=dict)
 def list_sources(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     sources = (
@@ -77,7 +100,7 @@ def list_sources(
 @router.get("/sources/{source_id}", response_model=KbSourceResponse)
 def get_source(
     source_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     source = KbService.get_source(db, current_user.id, source_id)
@@ -90,7 +113,7 @@ def get_source(
 def update_source(
     source_id: int,
     body: KbSourceUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     source = KbService.get_source(db, current_user.id, source_id)
@@ -108,6 +131,10 @@ def update_source(
         source.enabled = body.enabled
     if body.sync_type is not None:
         source.sync_type = body.sync_type
+    if body.sync_source_path is not None:
+        if not os.path.isdir(body.sync_source_path):
+            raise HTTPException(400, "sync_source_path does not exist or is not a directory")
+        source.sync_source_path = os.path.abspath(body.sync_source_path)
     db.add(source)
     db.commit()
     db.refresh(source)
@@ -117,7 +144,7 @@ def update_source(
 @router.delete("/sources/{source_id}")
 def delete_source(
     source_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Hard-delete the source, its documents, chunks, versions and edges in one
@@ -147,15 +174,32 @@ def delete_source(
 @router.post("/sources/{source_id}/scan", response_model=KbScanResult)
 def scan_source(
     source_id: int,
-    current_user: User = Depends(get_current_user),
+    path: str | None = Query(
+        default=None,
+        description="Optional folder inside the source root to scan (relative path, e.g. 'cybersecurity'). Omit to scan the whole source.",
+    ),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Enqueue a scan job and return it (phrase 17). Synchronous runs include
-    the summary so the UI can show dedupe stats immediately."""
+    the summary so the UI can show dedupe stats immediately.
+
+    ``path`` scopes the scan to one folder inside the source root — a
+    manual "update from folder" so updated and newly created files in that
+    folder are ingested without re-scanning the whole vault. The path must
+    be relative (no ``..``, no leading slash) and exist on disk.
+    """
     source = KbService.get_source(db, current_user.id, source_id)
     if source is None:
         raise HTTPException(404, "Source not found")
-    job = jobs.submit_scan_job(db, source.id)
+    subpath = _normalize_scan_subpath(path)
+    if subpath is not None:
+        target = os.path.join(source.root_path or "", subpath)
+        if not os.path.isdir(target):
+            raise HTTPException(
+                400, f"Folder not found inside source: {path}"
+            )
+    job = jobs.submit_scan_job(db, source.id, subpath=subpath)
     return KbScanResult(
         job=job,
         summary=KbService.json_loads(job.summary_json),
@@ -165,7 +209,7 @@ def scan_source(
 @router.post("/sources/{source_id}/sync", response_model=dict)
 def sync_source(
     source_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Manual sync trigger for an external source (Idea 89, phrase 87).
@@ -182,7 +226,7 @@ def sync_source(
 @router.get("/sources/{source_id}/sync-status", response_model=dict)
 def sync_status(
     source_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Last-sync state for one source (Idea 89, phrase 87)."""

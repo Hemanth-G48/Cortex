@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { NavLinks } from '../widgets/NavLinks';
 import { ThemeSwitcher } from '../shared/ThemeSwitcher';
 import { DigitalClock } from '../widgets/DigitalClock';
@@ -9,7 +8,7 @@ import { GoalTracker } from '../widgets/GoalTracker';
 import { PerformanceWidget } from '../vault/PerformanceWidget';
 import { HabitStatistics } from '../vault/HabitStatistics';
 import { endpoints, type VaultSummary } from '../../services/api';
-import { useAuth } from '../../hooks/useAuth';
+import { useProfile } from '../../hooks/useProfile';
 
 interface HabitStat {
   habit: string;
@@ -19,8 +18,8 @@ interface HabitStat {
 }
 
 export const Sidebar = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  // Single-owner app: the owner profile is always present — no login/logout.
+  const { profile: user } = useProfile();
   const [summary, setSummary] = useState<VaultSummary | null>(null);
   const [stats, setStats] = useState<HabitStat[]>([]);
   const [streakGraph, setStreakGraph] = useState<{ date: string; streak_length: number }[]>([]);
@@ -49,23 +48,9 @@ export const Sidebar = () => {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">🎓 Student OS</div>
-      {user ? (
+      {user && (
         <div className="sidebar-user">
-          <span>{user.name} · {user.role ?? 'student'}</span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            title="Log out"
-            onClick={() => {
-              void logout().finally(() => navigate('/login'));
-            }}
-          >
-            Log out
-          </button>
-        </div>
-      ) : (
-        <div className="sidebar-user">
-          <Link className="btn btn-primary btn-sm" to="/login">Sign in</Link>
+          <span>{user.name}</span>
         </div>
       )}
       <ThemeSwitcher />

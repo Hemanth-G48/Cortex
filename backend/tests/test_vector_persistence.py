@@ -170,8 +170,14 @@ class TestFileVectorStorePersistence:
 
 
 class TestEmbedDocumentChunks:
-    def test_embeds_chunks_and_writes_rows(self, vp_session, tmp_path):
+    def test_embeds_chunks_and_writes_rows(self, vp_session, tmp_path, monkeypatch):
         """embed_document_chunks writes KbEmbedding rows with local model."""
+        # Force the deterministic hash backend so the stored marker is stable
+        # on any machine: the real chain may resolve to fastembed or the AI
+        # provider depending on the environment (this suite must be hermetic).
+        monkeypatch.setattr(embeddings, "embed_available", lambda: False)
+        monkeypatch.setattr(embeddings, "fastembed_available", lambda: False)
+
         user, doc, chunks = _setup_user_doc(vp_session, str(tmp_path))
         vp_session.commit()
 

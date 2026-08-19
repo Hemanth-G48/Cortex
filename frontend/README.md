@@ -207,34 +207,24 @@ display headings, Space Grotesk for body text, neon cyan/magenta accents and a
 subtle scanline page backdrop.
 The switcher lives in `src/components/shared/ThemeSwitcher.tsx`.
 
-## Role auth, teacher flow & ported features (STUDENT-PLANAR)
+## Single-user architecture & ported features (STUDENT-PLANAR)
 
-The STUDENT-PLANAR reference (a MERN role-based study planner) was ported onto
-Student Life OS's FastAPI + React architecture: real role auth (student /
-teacher + teacher secret key), a teacher broadcast dashboard, a reading
+The application is **single-user and local-only**: there is exactly one owner
+(the seeded first user), no login/signup, no passwords, no roles, and no
+application-level authorization. The app opens directly into the dashboard.
+
+- Profile is served by `GET/PUT /api/profile` (see `context/ProfileContext.tsx`
+  and `hooks/useProfile.ts`) — no tokens, no `Authorization` headers.
+- The legacy auth router (`/api/auth/signup|login|me|logout`) and the teacher
+  dashboard/broadcast surface have been **removed** from the production app;
+  they survive only as a pytest-only shim so the legacy test suite's signup
+  helpers keep working (`backend/app/routers/auth_test.py`).
+- Google OAuth is kept as an **external integration** (read-only
+  Classroom/Gmail/Calendar) — it is not application auth.
+
+Ported STUDENT-PLANAR features that remain fully functional: the reading
 tracker, the brain-dump autosave widget, date-specific daily schedule blocks,
 assignment type/status/attachments, in-app notifications, and file uploads.
-
-### Role auth
-
-- `POST /api/auth/signup` — create a student, or a teacher with the correct
-  `teacher_secret` (`TEACHER_SECRET_KEY` env, empty ⇒ teacher signups blocked)
-- `POST /api/auth/login` — credential login (username/email + password); the
-  legacy no-body login still returns the first user for single-user boot
-- `GET /api/auth/me`, `POST /api/auth/logout`, `PUT /api/auth/enrollment`
-- `GET /api/auth/google` … — Google OAuth (see Google Sync section)
-- Passwords are bcrypt-hashed; sessions are HMAC-SHA256 bearer tokens
-  (`APP_SECRET`); every API route is guarded by `get_current_user`,
-  `require_student`, `require_teacher` or `require_admin`
-  (`app/services/security.py`)
-- Login throttling: 10 failed credential attempts per IP within 60s ⇒ 429
-
-### Teacher dashboard (`/teacher`, teacher role only)
-
-- `GET /api/teacher/students` — per-student stats (courses/assignments/todos/books/braindump)
-- `GET /api/teacher/students/{id}/detail` — assignments, todos, brain dump, books (404 for unknown students)
-- `POST /api/teacher/broadcast/{courses|assignments|todos|books|schedule}` — create
-  rows for selected students (or all) + emit a notification per target
 
 ### Reading tracker (`/reading`)
 
@@ -272,11 +262,10 @@ assignment type/status/attachments, in-app notifications, and file uploads.
 - Extension allowlist + 10 MB cap + magic-byte sniffing (MIME spoofs rejected)
 - `MAX_UPLOAD_MB`, `UPLOAD_DIR`, `APP_SECRET`, `TEACHER_SECRET_KEY` env vars (see `.env.example`)
 
-### Demo accounts
+### Demo data
 
-Seeded on startup: student `alex` / `demo-password-123` (first user) and
-teacher `demo.teacher` / `demo-password-123`, plus a demo reading shelf, brain
-dump, daily-schedule day and assignment types.
+Seeded on startup: the single owner profile (first `users` row) plus a demo
+reading shelf, brain dump, daily-schedule day and assignment types.
 
 ## Toasts
 
@@ -362,7 +351,7 @@ model or the in-flight `/api/ai` router.
 | `/browse` | Browse | Public 3-level browse: Institution → Program → Subjects by semester |
 | `/subjects/:id` | Subject | Unit cards + multi-unit summary selection |
 | `/units/:id` | Unit | Material library, upload, Generate Quiz / Generate Summary |
-| `/admin` | Admin | Role-gated curator page: approve institutions, create catalog |
+| `/admin` | Admin | Curator page (owner-only surface): approve institutions, create catalog |
 | `/complete-profile` | CompleteProfile | Pick institution + program (enrollment) |
 
 ### Backend endpoints consumed
@@ -379,7 +368,7 @@ model or the in-flight `/api/ai` router.
 | `POST /api/quizzes` / `POST /api/quizzes/{id}/attempt` | Generate quiz / submit answers (scored, indexed) |
 | `GET /api/quizzes/history`, `/analytics` | Last-50 attempts + per-unit stats |
 | `POST /api/summaries` | Single/multi-unit AI summary (cached by sorted unit ids) |
-| `GET /api/enrollment/summary`, `PUT /api/auth/enrollment` | Enrolled program progress + save enrollment |
+| `GET /api/enrollment/summary`, `PUT /api/profile/enrollment` | Enrolled program progress + save enrollment |
 | `PATCH /api/curriculum/institutions/{id}/status` | Admin approve/deactivate |
 
 ### Gamification & guards (SyllabusAI G13)

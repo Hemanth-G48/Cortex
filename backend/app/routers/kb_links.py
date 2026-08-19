@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb import auto_link
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb/links", tags=["kb-links"])
 
@@ -26,7 +26,7 @@ class LinkAction(BaseModel):
 
 @router.get("/queue")
 def get_queue(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Pending auto-link proposals for review (strongest first)."""
@@ -36,7 +36,7 @@ def get_queue(
 @router.post("/accept")
 def accept(
     body: LinkAction,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Promote approved pending edges to the live graph (bulk)."""
@@ -47,7 +47,7 @@ def accept(
 @router.post("/reject")
 def reject(
     body: LinkAction,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Reject proposals (bulk); rejected pairs are never re-proposed."""

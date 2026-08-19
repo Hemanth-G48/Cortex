@@ -219,7 +219,7 @@ def _roll(prompt: str, *, max_tokens: int = 800) -> str | None:
 # --------------------------------------------------------------------------- #
 def get_or_create_session(db: Session, user_id: int, session_id: int | None) -> TutorSession:
     if session_id is not None:
-        session = db.query(TutorSession).get(session_id)
+        session = db.get(TutorSession, session_id)
         if session is not None and session.user_id == user_id:
             return session
     session = TutorSession(user_id=user_id)
@@ -410,7 +410,7 @@ def blocking_concepts(db: Session, user_id: int, items: list[dict]) -> list[dict
             .all()
         )
         for dep in deps:
-            prereq = db.query(Topic).get(dep.prereq_topic_id)
+            prereq = db.get(Topic, dep.prereq_topic_id)
             if prereq is None or prereq.id in seen:
                 continue
             seen.add(prereq.id)

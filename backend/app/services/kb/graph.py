@@ -321,12 +321,29 @@ def cooccurrence_edges(db: Session, user_id: int) -> list[KbEdge]:
             doc_concepts[m.source_document_id].add(m.target_concept_id)
 
     doc_ids = list(doc_concepts.keys())
+
+    # Existing SHARES_CONCEPT pairs, loaded ONCE.  The old implementation
+    # called ``add_edge`` per pair — a SELECT + flush per pair — which made
+    # this whole-user pass O(docs²) DB round-trips (6.8M pairs at ~3.7k
+    # concept-bearing docs) and effectively hung the reindex / graph sync.
+    existing = {
+        (r.source_document_id, r.target_document_id)
+        for r in db.query(KbEdge)
+        .filter(
+            KbEdge.user_id == user_id,
+            KbEdge.relation == "SHARES_CONCEPT",
+            KbEdge.target_document_id.is_not(None),
+            KbEdge.source_document_id.is_not(None),
+        )
+        .all()
+    }
+
     edges: list[KbEdge] = []
     seen: set[tuple[int, int]] = set()
 
     for i, a_id in enumerate(doc_ids):
+        a_set = doc_concepts[a_id]
         for b_id in doc_ids[i + 1 :]:
-            a_set = doc_concepts[a_id]
             b_set = doc_concepts[b_id]
             shared = a_set & b_set
             if not shared:
@@ -338,25 +355,25 @@ def cooccurrence_edges(db: Session, user_id: int) -> list[KbEdge]:
 
             # Ensure source < target for deterministic ordering.
             src, tgt = (a_id, b_id) if a_id < b_id else (b_id, a_id)
-            key = (src, tgt, "SHARES_CONCEPT")
-            if key in seen:
+            key = (src, tgt)
+            if key in seen or key in existing:
                 continue
             seen.add(key)
-
-            edge = add_edge(
-                db,
-                user_id,
-                src,
-                target_document_id=tgt,
-                relation="SHARES_CONCEPT",
-                weight=round(weight, 4),
-                provenance="rule",
-                target_type="document",
-                overwrite=True,
+            edges.append(
+                KbEdge(
+                    user_id=user_id,
+                    source_document_id=src,
+                    target_document_id=tgt,
+                    relation="SHARES_CONCEPT",
+                    weight=round(weight, 4),
+                    provenance="rule",
+                    target_type="document",
+                )
             )
-            if edge is not None:
-                edges.append(edge)
 
+    if edges:
+        db.add_all(edges)
+        db.flush()
     return edges
 
 
@@ -509,6 +526,7 @@ def build_graph(
     tag: str | None = None,
     concept: str | None = None,
     relation: str | None = None,
+    doc_ids: set[int] | None = None,
     limit: int = 200,
 ) -> KbGraphResponse:
     """Build a graph response with nodes and edges for ``user_id``.
@@ -518,7 +536,10 @@ def build_graph(
         ``tag`` — document has a ``document_tags`` join to that tag name.
         ``concept`` — document has a MENTIONS edge to that concept name.
         ``relation`` — edge relation type.
-        ``limit`` — cap nodes returned (edges still reference all nodes).
+        ``doc_ids`` — restrict to these documents and their incident edges;
+            concepts are likewise scoped to those mentioned by the documents
+            (used for subject-scoped graphs on course pages).
+        ``limit`` — cap nodes returned.
 
     Nodes with ``id`` formatted as ``"doc:<id>"`` or ``"concept:<id>"``.
     Edges use the same node ``id`` strings for ``source``/``target``.
@@ -569,6 +590,28 @@ def build_graph(
     concept_q = db.query(KbConcept).filter(KbConcept.user_id == user_id)
     if concept is not None:
         concept_q = concept_q.filter(KbConcept.canonical_name.ilike(f"%{concept}%"))
+
+    # When scoping to specific documents, restrict concepts to those they
+    # actually mention so unrelated vault concepts never pollute the graph.
+    if doc_ids is not None:
+        all_docs = [d for d in all_docs if d.id in doc_ids]
+        mentioned = {
+            r[0]
+            for r in db.query(KbEdge.target_concept_id)
+            .filter(
+                KbEdge.user_id == user_id,
+                KbEdge.source_document_id.in_(doc_ids),
+                KbEdge.relation == "MENTIONS",
+                KbEdge.target_type == "concept",
+                KbEdge.target_concept_id.isnot(None),
+            )
+            .all()
+        }
+        if mentioned:
+            concept_q = concept_q.filter(KbConcept.id.in_(mentioned))
+        else:
+            concept_q = concept_q.filter(KbConcept.id < 0)  # nothing
+
     all_concepts = concept_q.all()
 
     # ── Build node lookup ──
@@ -576,18 +619,23 @@ def build_graph(
     concept_degree: dict[int, int] = defaultdict(int)
 
     # Collect all relevant edges
-    doc_ids = {d.id for d in all_docs}
+    filtered_doc_ids = {d.id for d in all_docs}
     concept_ids = {c.id for c in all_concepts}
 
     edge_q = db.query(KbEdge).filter(KbEdge.user_id == user_id)
     if relation is not None:
         edge_q = edge_q.filter(KbEdge.relation == relation.upper())
+    if filtered_doc_ids:
+        edge_q = edge_q.filter(
+            (KbEdge.source_document_id.in_(filtered_doc_ids))
+            | (KbEdge.target_document_id.in_(filtered_doc_ids))
+        )
     all_edges = edge_q.all()
 
     for e in all_edges:
-        if e.source_document_id in doc_ids:
+        if e.source_document_id in filtered_doc_ids:
             doc_degree[e.source_document_id] += 1
-        if e.target_document_id in doc_ids:
+        if e.target_document_id in filtered_doc_ids:
             doc_degree[e.target_document_id] += 1
         if e.target_concept_id in concept_ids:
             concept_degree[e.target_concept_id] += 1
@@ -624,7 +672,12 @@ def build_graph(
             ).model_dump()
         )
 
-    # Build edges
+    # Build edges. When the node list is truncated by ``limit``, only return
+    # edges whose BOTH endpoints made it into the returned node set — dangling
+    # edges (hundreds/thousands on large subjects) wasted payload and never
+    # rendered anyway. ``total_edges`` still reports the full graph count so
+    # the “Load more (X nodes, Y edges)” affordance stays truthful.
+    returned_node_ids = {n["id"] for n in nodes}
     edges: list[dict] = []
     for e in all_edges:
         if e.weight < settings.KB_EDGE_MIN_WEIGHT:
@@ -637,6 +690,8 @@ def build_graph(
             target_id = f"concept:{e.target_concept_id}"
 
         if source_id is None or target_id is None:
+            continue
+        if source_id not in returned_node_ids or target_id not in returned_node_ids:
             continue
 
         edges.append(

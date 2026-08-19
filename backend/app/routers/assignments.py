@@ -15,7 +15,7 @@ from app.schemas.assignment import (
     ExamResponse,
 )
 from app.schemas.study_stats import AssignmentAnalyticsResponse
-from app.services.security import get_current_user
+from app.services.users import current_user
 from app.services.study_stats import compute_assignment_analytics
 from app.services.kb.assignment_intel import plan_assignment
 import uuid
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api", tags=["assignments"])
 @router.get("/assignments/analytics", response_model=AssignmentAnalyticsResponse)
 def assignment_analytics(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
 ):
     return compute_assignment_analytics(db, current_user.id)
 
@@ -149,7 +149,7 @@ def plan_assignment_endpoint(
     assignment_id: int,
     body: PlanAssignmentRequest | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
 ):
     """LLM subtask breakdown + task/reminder creation + hint chunks.
 

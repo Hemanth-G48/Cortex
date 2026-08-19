@@ -1,9 +1,0 @@
-FROM node:20-alpine
-WORKDIR /app
-
-COPY server/package*.json ./
-RUN npm ci --prefer-offline --omit=dev
-
-COPY server/ .
-EXPOSE 3001
-CMD ["node", "index.js"]

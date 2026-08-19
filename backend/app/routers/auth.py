@@ -14,9 +14,8 @@ from app.services.security import (
     hash_password,
     verify_password,
     create_bearer_token,
-    get_current_user,
-    require_teacher,
 )
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -173,19 +172,19 @@ async def login(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=dict)
-def me(current_user: User = Depends(get_current_user)):
+def me(current_user: User = Depends(current_user)):
     return {"user": UserResponse.model_validate(current_user).model_dump(exclude_none=True)}
 
 
 @router.post("/logout", response_model=dict)
-def logout(current_user: User = Depends(get_current_user)):
+def logout(current_user: User = Depends(current_user)):
     return {"ok": True}
 
 
 @router.put("/enrollment", response_model=dict)
 def update_enrollment(
     body: EnrollmentUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     # Validate institution exists and is active (Institution model).

@@ -24,7 +24,7 @@ from app.schemas.kb import (
 from app.services.kb import KbService
 from app.services.kb import query as query_service
 from app.services.kb.search import KbSearcher
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-search"])
 
@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-search"])
 @router.post("/search", response_model=KbSearchResponse)
 def search(
     body: KbSearchRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Run retrieval in the requested mode (keyword|semantic|hybrid).
@@ -107,7 +107,7 @@ def search_get(
     mode: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """GET variant of the search endpoint (simple curl / linkable results)."""
@@ -127,7 +127,7 @@ def search_get(
 @router.post("/search/feedback", response_model=dict)
 def search_feedback(
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Record explicit thumbs up/down (or implicit click) on a search result.
@@ -158,7 +158,7 @@ def search_feedback(
 
 @router.get("/search/events", response_model=dict)
 def search_events(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
     limit: int = 100,
 ):
@@ -192,7 +192,7 @@ def search_events(
 
 @router.delete("/search/events", response_model=dict)
 def purge_search_events(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """Privacy: delete this user's search events (phrase 89)."""

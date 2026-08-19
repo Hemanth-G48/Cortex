@@ -30,6 +30,8 @@ GEN_KINDS = (
     "mistake", "skills",
     # Phase 8 (Personalization & Learning Memory, Ideas 71–80)
     "contradiction", "suggestions", "adapt", "personalized_explain",
+    # Book Knowledge Gap Analyzer (per-chapter concept refinement).
+    "book",
 )
 
 

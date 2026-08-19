@@ -12,7 +12,7 @@ from app.services.kb.citation_registry import (
     build_bibtex,
     list_citations,
 )
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-citations"])
 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/kb", tags=["kb-citations"])
 def citations(
     year: int | None = Query(default=None),
     venue: str | None = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     items = list_citations(
@@ -33,7 +33,7 @@ def citations(
 @router.get("/documents/{document_id}/citations")
 def document_citations(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     doc = KbService.get_document(db, current_user.id, document_id)
@@ -71,7 +71,7 @@ def document_citations(
 @router.get("/citations/export")
 def export_citations(
     format: str = Query(default="bibtex"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> Response:
     if format != "bibtex":

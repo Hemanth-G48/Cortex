@@ -3,14 +3,33 @@ import { toIso } from '../utils/vaultDates';
 const BASE = '/api';
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts?.headers as Record<string, string> || {}) };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
     headers,
     ...opts,
   });
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  if (!res.ok) {
+    // Surface the backend's real error (FastAPI `detail`, `error`, or `message`)
+    // instead of the generic statusText, so users see e.g. "Invalid email or
+    // password" rather than "API 400: Bad Request".
+    let detail: string | null = null;
+    try {
+      const body = (await res.json()) as {
+        detail?: unknown;
+        error?: unknown;
+        message?: unknown;
+      };
+      const raw = body?.detail ?? body?.error ?? body?.message;
+      if (typeof raw === 'string') detail = raw;
+      else if (Array.isArray(raw) && raw.length > 0) {
+        const first = raw[0] as { msg?: string } | undefined;
+        detail = first?.msg ?? JSON.stringify(raw);
+      } else if (raw !== undefined && raw !== null) detail = JSON.stringify(raw);
+    } catch {
+      // non-JSON error body — fall back to the status text
+    }
+    throw new Error(detail ? `API ${res.status}: ${detail}` : `API ${res.status}: ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -26,11 +45,11 @@ export const api = {
 };
 
 /**
- * Download a backend file that requires the Authorization header (e.g.
- * BibTeX / mind-map exports) as a browser download.
+ * Download a backend file as a browser download. The application is
+ * single-user and tokenless, so no Authorization header is attached.
  */
 export async function downloadAsFile(url: string, filename: string): Promise<void> {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Download failed (${res.status})`);
   const blob = await res.blob();
   const a = document.createElement('a');
@@ -39,9 +58,6 @@ export async function downloadAsFile(url: string, filename: string): Promise<voi
   a.click();
   URL.revokeObjectURL(a.href);
 }
-
-// ----- Auth types -----
-export type UserRole = 'student' | 'teacher';
 
 export interface User {
   id: number;
@@ -61,7 +77,7 @@ export interface User {
   // Auth (Phase 3)
   username?: string | null;
   email?: string | null;
-  role?: UserRole;
+  role?: string;
   // SyllabusAI (G1): local curator/admin flag.
   is_admin?: boolean;
   // SyllabusAI (G2): curriculum enrollment binding.
@@ -69,45 +85,11 @@ export interface User {
   program_id?: number | null;
 }
 
-export interface AuthUser extends User {
-  role: UserRole;
-  token: string;
-}
-
-// ----- Token helpers -----
-export function getToken(): string | null {
-  return localStorage.getItem('student_os_token');
-}
-
-export function setToken(t: string): void {
-  localStorage.setItem('student_os_token', t);
-}
-
-export function clearToken(): void {
-  localStorage.removeItem('student_os_token');
-}
-
-// ----- Auth API -----
-export const authApi = {
-  signup: (d: { name: string; username?: string; email?: string; password: string; role: UserRole; teacher_secret?: string }) =>
-    request<{ user: AuthUser; token: string }>('/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify(d),
-    }),
-  login: (d?: { identifier?: string; password?: string }) =>
-    request<{ user: AuthUser; token: string }>('/auth/login', {
-      method: 'POST',
-      body: d !== undefined ? JSON.stringify(d) : undefined,
-    }).then((r) => {
-      setToken(r.token);
-      return r;
-    }),
-  me: () => request<{ user: AuthUser }>('/auth/me'),
-  logout: () =>
-    request<{ ok: boolean }>('/auth/logout', { method: 'POST' }).then(() => {
-      clearToken();
-      return { ok: true } as const;
-    }),
+// ----- Profile API (single-owner app — no login/tokens) -----
+export const profileApi = {
+  get: () => request<{ user: User }>('/profile'),
+  update: (d: Partial<User>) =>
+    request<{ user: User }>('/profile', { method: 'PUT', body: JSON.stringify(d) }),
 };
 
 // ----- Upload API -----
@@ -132,8 +114,360 @@ export interface Course {
   next_exam: number | null; total_exams: number;
   status: string; user_id: number;
   credits: number;
+  progress_percentage?: number;
+  kb_document_count?: number;
   // SyllabusAI G12 (Phase 78): optional link to a catalog subject.
   curriculum_subject_id?: number | null;
+  // Origin of the row: manual | classroom | kb_tag | kb_folder.
+  source_type?: string | null;
+  kb_tag_id?: number | null;
+  // Set when derived from a top-level vault folder (source + folder path).
+  kb_source_id?: number | null;
+  kb_folder_path?: string | null;
+  // Folder-derived subjects: metadata read from the folder's index.md
+  // frontmatter (description / status / color keys).
+  description?: string | null;
+  color?: string | null;
+  google_id?: string | null;
+  classroom_url?: string | null;
+}
+
+export interface CourseDocument {
+  id: number;
+  title: string;
+  doc_type: string;
+  path_rel: string | null;
+  char_count: number;
+  outline: { level: number; text: string; char_start: number }[] | null;
+  tags: string[] | null;
+  wikilinks: string[] | null;
+  quality_score: number | null;
+  reading_time_seconds: number | null;
+  author: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface CourseSyncResult {
+  created: number;
+  updated: number;
+  removed: number;
+  courses: number;
+  // Always returned by the backend derivation summary.
+  sources: number;
+  documents: number;
+  course_tags: number;
+  course_folders: number;
+  errors: string[];
+  synced_at: string;
+}
+
+export interface CourseSyncLog {
+  created: number;
+  updated: number;
+  removed: number;
+  courses: number;
+  sources: number;
+  documents: number;
+  course_tags: number;
+  course_folders: number;
+  errors: string[];
+  synced_at: string | null;
+}
+
+export interface CourseSyncStatus {
+  sources: number;
+  documents: number;
+  course_tags: number;
+  course_folders: number;
+  last_sync: CourseSyncLog | null;
+  google: { configured: boolean; connected: boolean; email: string | null };
+}
+
+// ----- Subject Details page (Second Brain + Classroom content) -----
+
+/** One nested topic/subtopic with the documents that contain its heading. */
+export interface CourseTopicNode {
+  id: string;
+  name: string;
+  level: number;
+  // folder → this topic is a vault folder under the subject (folder-derived
+  // subjects only; the UI shows a folder icon + path breadcrumb); heading →
+  // built from document headings. Absent on older payloads → treat as heading.
+  origin?: 'folder' | 'heading';
+  documents: CourseDocument[];
+  children: CourseTopicNode[];
+}
+
+/** A concept mentioned by the subject's documents (related concepts). */
+export interface CourseConcept {
+  concept_id: number;
+  name: string;
+  definition: string | null;
+  mentions: number;
+  document_count: number;
+  sources: { document_id: number; title: string }[];
+}
+
+/** A Classroom-sourced assignment for this course. */
+export interface CourseClassroomAssignment {
+  id: number;
+  title: string;
+  description: string | null;
+  status: string;
+  due_date: string | null;
+}
+
+/** One canonical folder/domain under a course (Second Brain folder hierarchy). */
+export interface KbDomainNode {
+  id: number;
+  name: string;
+  path: string;
+  depth: number;
+  doc_count: number;
+  description: string | null;
+  status: string | null;
+  color: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  // Present on tree payloads (domain page / course domains grid).
+  children?: KbDomainNode[];
+}
+
+export interface KbDomainListResponse {
+  items: KbDomainNode[];
+}
+
+export interface KbDomainDetail {
+  id: number;
+  name: string;
+  path: string;
+  depth: number;
+  doc_count: number;
+  description: string | null;
+  status: string | null;
+  color: string | null;
+  course: { id: number; title: string } | null;
+  breadcrumb: { id: number | null; name: string; path: string }[];
+  documents: {
+    id: number;
+    title: string;
+    doc_type: string;
+    path_rel: string | null;
+    char_count: number;
+    quality_score: number | null;
+    reading_time_seconds: number | null;
+    author: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+  }[];
+  subfolders: KbDomainNode[];
+}
+
+/** Domain-scoped gap analysis — same actionable engine shape as course gaps. */
+export interface KbDomainGapsResponse {
+  summary?: GapAnalysisResponse['summary'] | null;
+  strengths?: GapItem[];
+  gaps?: GapItem[];
+  path?: GapPathPhase[];
+  next?: GapItem | null;
+  domain?: string | null;
+  coverage?: GapCoverage;
+  document_count: number;
+  folder: { id: number; name: string; path: string };
+  // Saved-analysis metadata: cached=true means reused, not recomputed.
+  cached?: boolean;
+  analyzed_at?: string | null;
+  new_notes_since_analysis?: number;
+}
+
+export interface CourseContentResponse {
+  course: Course;
+  second_brain: {
+    documents: CourseDocument[];
+    topics: CourseTopicNode[];
+    // Canonical folder-derived domains (the Second Brain hierarchy).
+    domains?: KbDomainNode[];
+    unorganized_documents: CourseDocument[];
+    concepts: CourseConcept[];
+    graph: KbGraphResponse;
+    document_count: number;
+  };
+  classroom: {
+    linked: boolean;
+    google_id: string | null;
+    course_url: string | null;
+    assignments: CourseClassroomAssignment[];
+    total_assignments: number;
+  };
+}
+
+/** Topic coverage gap reported by the subject gap analysis. */
+export interface CourseTopicGap {
+  topic: string;
+  normalized: string;
+  coverage: number;
+  documents: number;
+  is_gap: boolean;
+}
+
+// ----- Redesigned Gap Analysis (actionable learning/skill-gap engine) -----
+
+export type GapLevel = 'Mastered' | 'Strong' | 'Familiar' | 'Weak' | 'Not Found' | 'Prerequisite Missing';
+export type GapPriority = 'High' | 'Medium' | 'Low';
+
+export interface GapPrerequisite {
+  name: string;
+  level: GapLevel;
+  known: boolean;
+}
+
+/** One actionable strength or gap entry produced by the gap engine. */
+export interface GapItem {
+  name: string;
+  level: GapLevel;
+  skill: string | null;
+  domain: string | null;
+  importance: number;
+  priority?: GapPriority | null;
+  why: string | null;
+  prerequisites: GapPrerequisite[];
+  blocked: boolean;
+  learn: string[];
+  practice: string[];
+  next: string | null;
+  sources: { document_id: number; title: string }[];
+  related_known: string[];
+  evidence: {
+    strength: number;
+    exposure: number;
+    mentions: number;
+    documents: number;
+    quiz_errors: number;
+    retrieval_misses: number;
+  };
+}
+
+export interface GapPathItem {
+  name: string;
+  level: GapLevel;
+  priority: GapPriority | null;
+  // Real Second Brain documents linked to this gap — deep-linkable from the path.
+  sources?: { document_id: number; title: string }[];
+}
+
+export interface GapPathPhase {
+  phase: number;
+  title: string;
+  items: GapPathItem[];
+}
+
+export interface GapCoverage {
+  known: number;
+  gaps: number;
+  total: number;
+  percent: number;
+}
+
+export interface GapAnalysisResponse {
+  goal: string | null;
+  goal_key?: string | null;
+  domain: string | null;
+  summary: { text: string; priorities: string[]; strong_areas: string[] };
+  strengths: GapItem[];
+  gaps: GapItem[];
+  path: GapPathPhase[];
+  next: GapItem | null;
+  coverage: GapCoverage;
+  domain_breakdown?: {
+    domain: string;
+    total: number;
+    strong: string[];
+    developing: string[];
+    gaps: string[];
+    status: string;
+    strong_ratio: number;
+    gap_ratio: number;
+  }[];
+  // Saved-analysis metadata: cached=true means this is the previously stored
+  // result (reused, not recomputed); analyzed_at is when it was computed.
+  cached?: boolean;
+  analyzed_at?: string | null;
+  // Staleness: how many Second Brain documents were added since this analysis
+  // was computed (present on cached loads; 0 when nothing changed since).
+  new_notes_since_analysis?: number;
+}
+
+export interface GapGoalInfo {
+  key: string;
+  title: string;
+  description: string;
+  domains: string[];
+}
+
+/** One historical snapshot of a subject's or goal's gap analysis. */
+export interface GapHistorySnapshot {
+  analyzed_at: string | null;
+  document_count?: number | null;
+  gap_count: number;
+  strength_count: number;
+  coverage: GapCoverage | null;
+  next: string | null;
+  gaps: {
+    name: string;
+    level: GapLevel | null;
+    priority?: GapPriority | null;
+    domain?: string | null;
+  }[];
+  strengths: { name: string; level: GapLevel | null }[];
+}
+
+export interface GapHistoryResponse {
+  history: GapHistorySnapshot[];
+}
+
+export interface CourseGapsResponse {
+  topics: CourseTopicGap[];
+  concepts: KbConceptGap[];
+  classroom: { assignments: CourseClassroomAssignment[]; total: number; pending: number };
+  threshold: number;
+  document_count: number;
+  // Redesigned actionable gap engine (absent only on legacy backends).
+  summary?: GapAnalysisResponse['summary'] | null;
+  strengths?: GapItem[];
+  gaps?: GapItem[];
+  path?: GapPathPhase[];
+  next?: GapItem | null;
+  domain?: string | null;
+  coverage?: GapCoverage;
+  // Saved-analysis metadata: cached=true means this is the previously stored
+  // result (reused, not recomputed); analyzed_at is when it was computed.
+  cached?: boolean;
+  analyzed_at?: string | null;
+  // Staleness: how many Second Brain documents were added since this analysis
+  // was computed (present on cached loads; 0 when nothing changed since).
+  new_notes_since_analysis?: number;
+}
+
+export interface CourseResyncResult {
+  kb: CourseSyncResult;
+  classroom: {
+    courses?: number;
+    assignments?: number;
+    source?: string;
+    warning?: string;
+    error?: string;
+  } | null;
+  course_removed?: boolean;
+  content: CourseContentResponse | null;
+}
+
+export interface AcademicResource {
+  id: string;
+  title: string;
+  type: string;
+  url: string | null;
+  description: string | null;
 }
 
 export interface Task {
@@ -419,7 +753,7 @@ export interface DatabaseCounts {
 // ----- Second Brain / Knowledge Base types (Phase 1) -----
 export type KbSourceType = 'vault_folder' | 'local_dir' | 'upload' | 'cloud';
 
-export type KbSyncType = 'none' | 'git' | 'drive' | 'clip';
+export type KbSyncType = 'none' | 'git' | 'drive' | 'clip' | 'local';
 
 export interface KbSource {
   id: number;
@@ -438,6 +772,9 @@ export interface KbSource {
   // Phase 9 (Idea 89): external sync adapter + per-source cursor.
   sync_type: KbSyncType;
   sync_cursor: Record<string, unknown> | null;
+  // "local" adapter (Copy Recent Notes): external vault dir mirrored into
+  // the source's knowledge root (second_brain/notes).
+  sync_source_path: string | null;
 }
 
 export type KbDocumentStatus = 'new' | 'changed' | 'unchanged' | 'deleted' | 'failed' | 'draft';
@@ -590,6 +927,8 @@ export interface KbTagSuggestion {
 export interface KbDocumentTagsResponse {
   document_id: number;
   tags: KbTagSuggestion[];
+  // Rule + manual tags already linked to the document (applied chips).
+  applied?: KbTagSuggestion[];
 }
 
 export interface KbConcept {
@@ -1169,6 +1508,9 @@ export interface AIInsightsResponse {
   stats: AIInsightsStats;
   cached: boolean;
   ai_used: boolean;
+  // When the persisted insight snapshot was generated (present on both
+  // cached loads and fresh computes) — lets the UI show "last updated".
+  analyzed_at?: string | null;
 }
 
 export interface AIClientModels {
@@ -1435,6 +1777,18 @@ export interface ClassroomAssignment {
   description: string;
   dueDate: string | null;
   status: string;
+}
+
+// ``source`` labels whether the payload is live Google data or the
+// deterministic offline demo (used when Google is not connected).
+export type ClassroomSource = 'live' | 'mock';
+export interface ClassroomCoursesResponse {
+  courses: ClassroomCourse[];
+  source: ClassroomSource;
+}
+export interface ClassroomAssignmentsResponse {
+  assignments: ClassroomAssignment[];
+  source: ClassroomSource;
 }
 
 export interface GmailMessage {
@@ -1842,6 +2196,10 @@ export interface KbSourceSyncResult {
   failed?: number;
   skipped?: boolean;
   reason?: string;
+  // "local" adapter (Copy Recent Notes) counters.
+  copied?: number;
+  removed?: number;
+  scanned?: Record<string, number | undefined>;
 }
 
 export interface KbSourceSyncStatus {
@@ -2012,12 +2370,542 @@ export interface KbPromptVersion {
   created_at: string | null;
 }
 
+// ----- Workflow glue types (Today / Triage / Backup / Weekly Review) -----
+
+export interface TodayReviewDue {
+  schedule_id: number;
+  topic_id: number;
+  topic_name: string;
+  subject_id: number | null;
+  interval_days: number;
+  ease: number;
+  repetitions: number;
+  due_date: string | null;
+}
+
+export interface TodayScheduleItem {
+  id: number;
+  time_range: string;
+  activity: string;
+  category: string;
+  done: boolean;
+}
+
+export interface TodayDeadline {
+  kind: 'assignment' | 'exam' | 'task';
+  id: number;
+  title: string;
+  course_id?: number | null;
+  due_date: string | null;
+  status: string;
+}
+
+export interface TodayCapturedDoc {
+  id: number;
+  title: string;
+  doc_type: string;
+  char_count: number;
+  quality_score: number | null;
+}
+
+export interface TodayPomodoro {
+  id: number;
+  duration_minutes: number | null;
+  task_description: string | null;
+  completed: boolean;
+}
+
+export interface TodayJournal {
+  id: number;
+  mood: string | null;
+  content: string;
+  tags: string | null;
+}
+
+export interface TodayOverview {
+  date: string;
+  day_name: string;
+  morning: {
+    reviews_due: TodayReviewDue[];
+    next_actions: KbRecommendItem[];
+    schedule: TodayScheduleItem[];
+    deadlines: TodayDeadline[];
+    captured_documents: TodayCapturedDoc[];
+  };
+  evening: {
+    focus_minutes: number;
+    pomodoros: TodayPomodoro[];
+    journal: TodayJournal[];
+    daily: KbDailyNotes;
+  };
+  captured_today_count: number;
+}
+
+export interface TriageCategorizeProposal {
+  id: number;
+  proposed_path: string;
+  rule: string;
+}
+
+export interface TriageItem {
+  id: number;
+  title: string;
+  path_rel: string | null;
+  doc_type: string;
+  status: KbDocumentStatus;
+  char_count: number;
+  quality_score: number | null;
+  created_at: string | null;
+  detected_subjects: string[];
+  tags: string[];
+  categorize: TriageCategorizeProposal | null;
+}
+
+export interface TriageStats {
+  pending: number;
+  total_in_window: number;
+  triaged: number;
+  window_days: number;
+}
+
+export interface TriageQueueResponse {
+  items: TriageItem[];
+  stats: TriageStats;
+}
+
+export interface TriageBulkResult {
+  ok: boolean;
+  // accept-all
+  processed?: number;
+  accepted?: number;
+  skipped_no_subjects?: number;
+  subjects_applied?: number;
+  // dismiss-all
+  dismissed?: number;
+  // shared
+  remaining_pending: number;
+}
+
+export interface BackupRestoreResult {
+  ok: boolean;
+  restored_files: number;
+  sources_matched: number;
+  database_restored: boolean;
+  database_skipped: boolean;
+  warnings: string[];
+  user_id?: number | null;
+  exported_at?: string | null;
+}
+
+// ----- Learning Path Planner (workflow glue) -----
+
+export type LearningTopicStatus = 'known' | 'partial' | 'unknown' | 'advanced_unknown';
+
+export interface LearningTopic {
+  name: string;
+  status: LearningTopicStatus;
+  resources: { resource_index: number; title: string }[];
+  difficulty?: string | null;
+  est_time?: string | null;
+}
+
+export interface LearningDependency {
+  from: string;
+  to: string;
+  // provenance: "platform" (the site stated it) vs "ai" (inferred).
+  source?: string;
+  note?: string | null;
+  from_url?: string | null;
+  to_url?: string | null;
+}
+
+export interface LearningResource {
+  title: string;
+  platform: string | null;
+  url: string | null;
+  type: string;
+  topics: string[];
+  skills: string[];
+  difficulty: string;
+  prerequisites: string[];
+  estimated_time: string;
+  learning_objectives: string[];
+  completion_requirement: string;
+  related_resources?: string[];
+  dependencies?: string[];
+  // Honest crawl state of the underlying source resource (Layer 1).
+  crawl_status?: string | null;
+}
+
+export interface LearningPhase {
+  phase: number;
+  title: string;
+  tasks: {
+    title: string;
+    resource_index: number | null;
+    topics: string[];
+    description?: string | null;
+    difficulty?: string | null;
+    est_time?: string | null;
+  }[];
+}
+
+export interface LearningTask {
+  id: number;
+  phase: number;
+  phase_title: string | null;
+  sort_order: number;
+  title: string;
+  description: string | null;
+  resource_title: string | null;
+  resource_url: string | null;
+  resource_type: string | null;
+  difficulty: string | null;
+  est_time: string | null;
+  topics: string[];
+  skills: string[];
+  prerequisites: string[];
+  resource_id: number | null;
+  path_id: number | null;
+  source_crawled: boolean;
+  done: boolean;
+}
+
+export interface LearningPlanDetail {
+  id: number;
+  goal: string;
+  goal_key: string | null;
+  description: string | null;
+  status: string;
+  engine: string;
+  created_at: string | null;
+  generated_at: string | null;
+  resources: LearningResource[];
+  topics: LearningTopic[];
+  dependencies: LearningDependency[];
+  overview: string;
+  phases: LearningPhase[];
+  tasks: LearningTask[];
+  stats: { total_tasks: number; done_tasks: number; progress_percent: number; truncated?: boolean };
+  next_task: LearningTask | null;
+  // Layer-1 source hierarchy (the REAL platform structure — source of truth).
+  source: LearningPlanSource;
+  // Per-learning-path progress rolled up from task states.
+  path_progress: LearningPathProgress[];
+}
+
+/** One task inside a scheduled study day (roadmap → study schedule). */
+export interface LearningScheduleTask {
+  task_id: number;
+  phase: number;
+  phase_title: string | null;
+  title: string;
+  est_time: string;
+  minutes: number;
+  resource_title: string | null;
+  resource_url: string | null;
+  resource_type: string | null;
+  done: boolean;
+}
+
+/** One day of the roadmap-derived study schedule. */
+export interface LearningScheduleDay {
+  day: number;
+  date: string;
+  label: string;
+  total_minutes: number;
+  slots: string[];
+  tasks: LearningScheduleTask[];
+}
+
+/**
+ * Roadmap → day-by-day study schedule (built on an explicit user action;
+ * reading it never calls the LLM). ``stale`` is recomputed on read from the
+ * live task rows so the UI can suggest a manual regeneration.
+ */
+export interface LearningSchedule {
+  plan_id: number;
+  goal: string;
+  mode: string;
+  params: {
+    daily_hours: number;
+    modules_per_day: number;
+    budget_minutes: number;
+    time_slots: string[];
+    instruction: string | null;
+  };
+  generated_at: string;
+  engine: string;
+  stale: boolean;
+  note: string | null;
+  stats: {
+    days: number;
+    total_minutes: number;
+    total_hours: number;
+    tasks_scheduled: number;
+    done_tasks: number;
+    remaining_tasks: number;
+    estimated_end_date: string | null;
+  };
+  days: LearningScheduleDay[];
+}
+
+export interface LearningSourceResource {
+  id: number;
+  title: string;
+  url: string | null;
+  resource_type: string;
+  difficulty: string | null;
+  section: string | null;
+  sort_order: number;
+  crawl_status: string;
+  status_code: number | null;
+  error: string | null;
+}
+
+export interface LearningSourcePath {
+  id: number;
+  platform: string;
+  title: string;
+  description: string | null;
+  difficulty: string | null;
+  source_url: string;
+  first_resource_url: string | null;
+  resource_total: number | null;
+  section_count: number | null;
+  resource_count: number | null;
+  crawl_status: string;
+  status_code: number | null;
+  error: string | null;
+  resources: LearningSourceResource[];
+}
+
+export interface LearningCrawlReport {
+  platform: string | null;
+  source_url: string | null;
+  paths_discovered: number;
+  paths_crawled: number;
+  paths_failed: number;
+  resources_extracted: number;
+  resources_with_url: number;
+  resources_verified: number;
+  resources_failed: number;
+  statuses: Record<string, number>;
+}
+
+export interface PortswiggerSessionStatus {
+  configured: boolean;
+  authenticated: boolean;
+  email: string | null;
+  expires_at: string | null;
+  last_login_at: string | null;
+  has_cookies: boolean;
+}
+
+export interface LearningReverifyReport {
+  paths_rechecked: number;
+  resources_unlocked: number;
+  resources_verified: number;
+  resources_failed: number;
+  statuses: Record<string, number>;
+}
+
+export interface LearningPlanSource {
+  report: LearningCrawlReport;
+  paths: LearningSourcePath[];
+}
+
+export interface LearningPathProgress {
+  path_id: number;
+  title: string;
+  done_tasks: number;
+  total_tasks: number;
+  progress_percent: number;
+}
+
+export interface LearningPlanSummary {
+  id: number;
+  goal: string;
+  goal_key: string | null;
+  status: string;
+  engine: string;
+  created_at: string | null;
+  generated_at: string | null;
+  source: {
+    platform: string | null;
+    paths_discovered: number;
+    paths_crawled: number;
+    paths_failed: number;
+    resources_extracted: number;
+    resources_verified: number;
+    resources_failed: number;
+  };
+}
+
+// ----- Workflow loops (Study-Session Loop / Health Audit / Focus / Re-sync) -----
+
+/** One micro-session tied to a learning-plan task (Study-Session Loop). */
+export interface PlanSessionItem {
+  id: number;
+  learning_plan_id: number | null;
+  learning_task_id: number | null;
+  practice_task: string | null;
+  duration_mins: number;
+  status: string;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+/** Read-only Study-Session Loop state for one plan. */
+export interface PlanSessionState {
+  plan_id: number;
+  live_session: PlanSessionItem | null;
+  last_session: PlanSessionItem | null;
+  next_task: LearningTask | null;
+  progress: { total_tasks: number; done_tasks: number; progress_percent: number };
+  completed: boolean;
+}
+
+/** Plan Re-sync report (explicit action — refreshes Layer 1 only). */
+export interface PlanResyncReport {
+  resynced_at: string;
+  urls_checked: number;
+  paths_added: { id: number; title: string; source_url: string }[];
+  paths_refreshed: number;
+  paths_removed: { id: number; title: string; source_url: string }[];
+  paths_failed: number;
+  resources_extracted: number;
+  errors: string[];
+}
+
+/** One near-duplicate pair with titles (Vault Health Audit). */
+export interface HealthAuditDuplicate {
+  document_id: number;
+  duplicate_of_id: number;
+  similarity: number;
+  method: string;
+  title: string | null;
+  duplicate_of_title: string | null;
+}
+
+/** Vault Health Audit — read-only aggregate of existing signals. */
+export interface HealthAudit {
+  health: {
+    score: number | null;
+    document_count: number | null;
+    edge_count: number | null;
+    dead_links: number;
+    orphans: number;
+    stale_notes: number;
+    unindexed_files: number;
+  };
+  sections: {
+    missing_notes: KbMissingNoteSuggestion[];
+    outdated_notes: KbOutdatedNote[];
+    duplicates: HealthAuditDuplicate[];
+    low_quality: KbQualityItem[];
+  };
+  counts: {
+    missing_notes: number;
+    outdated_notes: number;
+    duplicates: number;
+    low_quality: number;
+  };
+  scanned_at: string | null;
+}
+
+/** One subject readiness row (Focus/Readiness Loop). */
+export interface FocusSubject {
+  subject_id: number;
+  forecast: number;
+  readiness: number;
+  at_risk: boolean;
+  risk_threshold: number | null;
+  exam_days_until: number | null;
+  series_points: number;
+  model: string;
+}
+
+/** Focus/Readiness Loop board — read-only, exam-aware. */
+export interface FocusBoard {
+  subjects: FocusSubject[];
+  recommendations: (KbRecommendItem & { subject_readiness?: FocusSubject | null })[];
+  at_risk_count: number;
+  exam_approaching: FocusSubject[];
+  total_subjects: number;
+}
+
+export interface WeeklyReviewCapture {
+  id: number;
+  title: string;
+  doc_type: string;
+  quality_score: number | null;
+}
+
+export interface WeeklyReviewWeakTopic {
+  topic_id: number;
+  topic_name: string;
+  subject_id: number | null;
+  score: number;
+  classification: string;
+}
+
+export interface WeeklyQuest {
+  id: number;
+  title: string;
+  description: string | null;
+  xp_reward: number;
+  status: string;
+  due_date: string | null;
+}
+
+export interface WeeklyReviewResponse {
+  week_start: string;
+  week_end: string;
+  week_label: string;
+  activity: {
+    captures: WeeklyReviewCapture[];
+    captures_count: number;
+    sessions_done: number;
+    learning_events: number;
+    focus_minutes: number;
+    pomodoro_count: number;
+  };
+  reflection: KbReflection | null;
+  goals: KbGoalItem[];
+  derived_goals: KbDerivedGoal[];
+  weak_topics: WeeklyReviewWeakTopic[];
+  weekly_quests: WeeklyQuest[];
+  week_start_monday: string;
+}
+
+export interface WeeklyReflectionResult {
+  reflection: KbReflection;
+  week_start: string;
+}
+
+// ----- Micro-session types (Idea 60 — launched from Today's next actions) -----
+export interface MicroSession {
+  id: number;
+  topic_id: number | null;
+  topic_name: string | null;
+  chunk_id: number | null;
+  practice_task: string | null;
+  duration_mins: number | null;
+  status: string;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export interface SessionPomodoroResult {
+  ok: boolean;
+  pomodoro_id: number;
+  duration_minutes: number;
+  task_description: string;
+}
+
 // ----- API endpoint helpers -----
 export const endpoints = {
-  // LEGACY BOOT ONLY — no-body login returns the FIRST user and calls
-  // setToken(), overwriting any logged-in user's token. Do NOT use this in
-  // components; read the authenticated user from useAuth() instead.
-  login: () => authApi.login().then((r) => ({ user: r.user })),
   curriculum: {
     institutions: () => api.get<Institution[]>('/curriculum/institutions'),
     institution: (id: number) => api.get<Institution>(`/curriculum/institutions/${id}`),
@@ -2043,7 +2931,6 @@ export const endpoints = {
       form.append('file', file);
       return fetch(`${BASE}/curriculum/units/${unitId}/materials`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
         body: form,
       }).then((res) => {
         if (!res.ok) throw new Error(`Upload ${res.status}: ${res.statusText}`);
@@ -2068,7 +2955,7 @@ export const endpoints = {
   enrollment: {
     summary: () => api.get<EnrollmentSummary>('/enrollment/summary'),
     update: (d: { institution_id: number; program_id: number }) =>
-      api.put<{ user: AuthUser }>('/auth/enrollment', d),
+      api.put<{ user: User }>('/profile/enrollment', d),
   },
   admin: {
     allInstitutions: () => api.get<Institution[]>('/curriculum/institutions/admin/all'),
@@ -2103,8 +2990,8 @@ export const endpoints = {
     disconnect: () => api.post<{ connected: boolean }>('/auth/google/disconnect'),
   },
   classroom: {
-    courses: () => api.get<ClassroomCourse[]>('/classroom/courses'),
-    assignments: () => api.get<ClassroomAssignment[]>('/classroom/assignments'),
+    courses: () => api.get<ClassroomCoursesResponse>('/classroom/courses'),
+    assignments: () => api.get<ClassroomAssignmentsResponse>('/classroom/assignments'),
   },
   gmail: {
     unread: () => api.get<GmailUnread>('/gmail/unread'),
@@ -2177,7 +3064,7 @@ export const endpoints = {
       api.post<AIGradeAnswerResponse>('/ai/grade-answer', d),
     chat: (d: { message: string }) => api.post<AIChatResponse>('/ai/chat', d),
     // QuestLog (Idea 95): cached productivity insights from real user stats.
-    insights: () => api.post<AIInsightsResponse>('/ai/insights'),
+    insights: (force = false) => api.post<AIInsightsResponse>('/ai/insights', { force }),
     // Local-first provider registry (configurable AI models).
     providers: {
       list: () => api.get<AIProvidersResponse>('/ai/providers'),
@@ -2214,6 +3101,19 @@ export const endpoints = {
     create: (d: Partial<Course>) => api.post<Course>('/courses/', d),
     update: (id: number, d: Partial<Course>) => api.put<Course>(`/courses/${id}`, d),
     delete: (id: number) => api.del<{ ok: boolean }>(`/courses/${id}`),
+    syncKb: () => api.post<CourseSyncResult>('/courses/sync-kb'),
+    syncStatus: () => api.get<CourseSyncStatus>('/courses/sync-status'),
+    resources: () => api.get<AcademicResource[]>('/courses/resources'),
+    documents: (id: number) => api.get<CourseDocument[]>(`/courses/${id}/documents`),
+    // Subject Details page.
+    content: (id: number) => api.get<CourseContentResponse>(`/courses/${id}/content`),
+    // Saved per course: returns the stored analysis (cached) or computes it
+    // once on first request. Use analyzeGaps to force a fresh computation.
+    gaps: (id: number) => api.get<CourseGapsResponse>(`/courses/${id}/gaps`),
+    analyzeGaps: (id: number) => api.post<CourseGapsResponse>(`/courses/${id}/gaps/analyze`),
+    // Snapshot log of this subject's past gap analyses (oldest → newest).
+    gapHistory: (id: number) => api.get<GapHistoryResponse>(`/courses/${id}/gaps/history`),
+    resync: (id: number) => api.post<CourseResyncResult>(`/courses/${id}/resync`),
   },
   assignments: {
     list: (filters?: { type?: string; status?: string; course_id?: number }) => {
@@ -2235,7 +3135,6 @@ export const endpoints = {
       form.append('file', file);
       return fetch(`${BASE}/assignments/${id}/attachment`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
         body: form,
       }).then((r) => {
         if (!r.ok) throw new Error(`Attach ${r.status}: ${r.statusText}`);
@@ -2469,15 +3368,27 @@ export const endpoints = {
     sources: {
       list: () => api.get<{ items: KbSource[]; total: number }>('/kb/sources'),
       get: (id: number) => api.get<KbSource>(`/kb/sources/${id}`),
-      create: (d: { name: string; source_type?: string; root_path: string; enabled?: boolean; sync_type?: string }) =>
+      create: (d: { name: string; source_type?: string; root_path: string; enabled?: boolean; sync_type?: string; sync_source_path?: string }) =>
         api.post<KbSource>('/kb/sources', d),
-      update: (id: number, d: { name?: string; source_type?: string; root_path?: string; enabled?: boolean; sync_type?: string }) =>
+      update: (id: number, d: { name?: string; source_type?: string; root_path?: string; enabled?: boolean; sync_type?: string; sync_source_path?: string }) =>
         api.put<KbSource>(`/kb/sources/${id}`, d),
       remove: (id: number) => api.del<{ ok: boolean; deleted_documents: number }>(`/kb/sources/${id}`),
-      scan: (id: number) => api.post<KbScanResult>(`/kb/sources/${id}/scan`),
+      // ``path`` (optional) scopes the scan to one folder inside the source
+      // root — the manual "update from folder" action.
+      scan: (id: number, path?: string) =>
+        api.post<KbScanResult>(`/kb/sources/${id}/scan${path ? `?path=${encodeURIComponent(path)}` : ''}`),
       // Phase 9 (Idea 89): external repo sync.
       sync: (id: number) => api.post<KbSourceSyncResult>(`/kb/sources/${id}/sync`),
       syncStatus: (id: number) => api.get<KbSourceSyncStatus>(`/kb/sources/${id}/sync-status`),
+    },
+    folders: {
+      // Canonical Second Brain folder/domain hierarchy (source of truth).
+      tree: (courseId: number) => api.get<KbDomainListResponse>(`/kb/folders?course_id=${courseId}`),
+      get: (folderId: number) => api.get<KbDomainDetail>(`/kb/folders/${folderId}`),
+      // Persisted domain gap analysis: saved copy (cached) or first compute.
+      gaps: (folderId: number) => api.get<KbDomainGapsResponse>(`/kb/folders/${folderId}/gaps`),
+      // Explicit Re-analyze — the only path that recomputes on demand.
+      analyzeGaps: (folderId: number) => api.post<KbDomainGapsResponse>(`/kb/folders/${folderId}/gaps/analyze`),
     },
     documents: {
       list: (params?: { source_id?: number; status?: string; q?: string; page?: number; page_size?: number }) => {
@@ -2497,7 +3408,6 @@ export const endpoints = {
         form.append('file', file);
         return fetch(`${BASE}/kb/documents/upload${sourceId ? `?source_id=${sourceId}` : ''}`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${getToken()}` },
           body: form,
         }).then((r) => {
           if (!r.ok) throw new Error(`Upload ${r.status}: ${r.statusText}`);
@@ -2556,11 +3466,18 @@ export const endpoints = {
     },
     tags: {
       forDocument: (documentId: number) => api.get<KbDocumentTagsResponse>(`/kb/documents/${documentId}/tags`),
+      // Explicit user action — re-runs the AI (or fallback) tag proposal and
+      // persists it. The GET endpoint only reads persisted suggestions, so
+      // opening a document never spends a model call.
+      propose: (documentId: number) =>
+        api.post<KbDocumentTagsResponse>(`/kb/documents/${documentId}/tags/propose`),
       apply: (documentId: number, tagIds: number[]) =>
         api.post<KbDocumentTagsResponse>(`/kb/documents/${documentId}/tags`, {
           document_id: documentId,
           tag_ids: tagIds,
         }),
+      create: (documentId: number, name: string) =>
+        api.post<KbDocumentTagsResponse>(`/kb/documents/${documentId}/tags/create`, { name }),
       reject: (documentId: number, tagId: number) =>
         api.del<{ ok: boolean; removed: number }>(`/kb/documents/${documentId}/tags/${tagId}`),
     },
@@ -2610,6 +3527,22 @@ export const endpoints = {
     gaps: {
       all: () => api.get<KbGapsResponse>('/kb/gaps'),
       concepts: (limit = 20) => api.get<{ items: KbConceptGap[] }>(`/kb/gaps/concepts?limit=${limit}`),
+      // Redesigned actionable gap analysis (goals + domains).
+      domains: () => api.get<{ goals: GapGoalInfo[] }>('/kb/gaps/domains'),
+      goal: (goal: string) => api.get<GapAnalysisResponse>(`/kb/gaps/goal?goal=${encodeURIComponent(goal)}`),
+      // Explicit recompute — the only path that refreshes a saved analysis.
+      analyzeGoal: (goal: string) => api.post<GapAnalysisResponse>(`/kb/gaps/goal/analyze?goal=${encodeURIComponent(goal)}`),
+      // Snapshot log of this goal's past gap analyses (oldest → newest).
+      goalHistory: (goal: string) => api.get<GapHistoryResponse>(`/kb/gaps/goal/history?goal=${encodeURIComponent(goal)}`),
+      // Draft a ready-to-edit capture note for one gap (idempotent).
+      createNote: (d: {
+        name: string;
+        subject?: string | null;
+        why?: string | null;
+        learn?: string[];
+        practice?: string[];
+        sources?: { document_id: number; title?: string | null }[];
+      }) => api.post<{ document: { id: number; title: string; status: string }; created: boolean }>('/kb/gaps/note', d),
     },
     // ----- Phase 4: note intelligence & content generation (Ideas 31-40) -----
     summaries: {
@@ -2814,6 +3747,156 @@ export const endpoints = {
       goals: () => api.get<{ items: KbGoalItem[] }>('/kb/goals'),
       goalProgress: (goalId: number) => api.get<{ goal_id: number; title: string; progress_percentage: number; topics_mastered: number; topics_total: number }>(`/kb/goals/${goalId}/progress`),
     },
+    today: {
+      overview: (date?: string) => api.get<TodayOverview>(`/kb/today${date ? `?date=${encodeURIComponent(date)}` : ''}`),
+    },
+    triage: {
+      list: (limit = 50) => api.get<TriageQueueResponse>(`/kb/triage?limit=${limit}`),
+      stats: () => api.get<TriageStats>('/kb/triage/stats'),
+      applySubjects: (documentId: number) =>
+        api.post<{ ok: boolean; subjects_applied: number; subjects: string[] }>(`/kb/triage/${documentId}/apply-subjects`),
+      tag: (documentId: number, name: string) =>
+        api.post<{ ok: boolean; applied: number }>(`/kb/triage/${documentId}/tag`, { name }),
+      dismiss: (documentId: number) =>
+        api.post<{ ok: boolean }>(`/kb/triage/${documentId}/dismiss`),
+      acceptAll: (limit = 200) => api.post<TriageBulkResult>(`/kb/triage/accept-all?limit=${limit}`),
+      dismissAll: (limit = 200) => api.post<TriageBulkResult>(`/kb/triage/dismiss-all?limit=${limit}`),
+    },
+    backup: {
+      export: () => downloadAsFile(`${BASE}/kb/backup/export`, `vault-backup-${new Date().toISOString().slice(0, 10)}.zip`),
+      restore: (file: File, replaceDb = false) => {
+        const form = new FormData();
+        form.append('file', file);
+        return fetch(`${BASE}/kb/backup/restore${replaceDb ? '?replace_db=true' : ''}`, {
+          method: 'POST',
+          body: form,
+        }).then((res) => {
+          if (!res.ok) return res.json().then((b) => Promise.reject(new Error(b?.detail ?? b?.error ?? `Restore ${res.status}`)));
+          return res.json() as Promise<BackupRestoreResult>;
+        });
+      },
+    },
+    weeklyReview: {
+      overview: () => api.get<WeeklyReviewResponse>('/kb/weekly-review'),
+      generateReflection: (regenerate = false) =>
+        api.post<WeeklyReflectionResult>('/kb/weekly-review/generate-reflection', { regenerate }),
+      confirmGoal: (d: { title: string; subject_id: number; quarter?: string; year?: number | null; target_date?: string | null; roadmap_id?: number | null }) =>
+        api.post<{ ok: boolean; goal_id: number }>('/kb/weekly-review/goals/confirm', d),
+    },
+    learningPlans: {
+      create: (d: {
+        goal: string;
+        description?: string | null;
+        resources: { label?: string | null; url?: string | null }[];
+        known?: string[];
+        unknown?: string[];
+        goal_key?: string | null;
+      }) => api.post<{ plan: LearningPlanDetail }>('/kb/learning-plans', d),
+      // Layer 1 only: crawl the supplied URL and persist the real platform
+      // structure (paths → resources) without generating a roadmap.
+      discover: (d: {
+        goal: string;
+        description?: string | null;
+        resources: { label?: string | null; url?: string | null }[];
+        known?: string[];
+        unknown?: string[];
+        goal_key?: string | null;
+      }) => api.post<{ plan: LearningPlanDetail }>('/kb/learning-plans/discover', d),
+      // Layer 2 (explicit user action): build the personalised roadmap on top
+      // of the persisted source structure.
+      generate: (planId: number, d?: { known?: string[]; unknown?: string[] }) =>
+        api.post<{ plan: LearningPlanDetail }>(`/kb/learning-plans/${planId}/generate`, d ?? {}),
+      list: () => api.get<{ items: LearningPlanSummary[] }>('/kb/learning-plans'),
+      get: (planId: number) => api.get<{ plan: LearningPlanDetail }>(`/kb/learning-plans/${planId}`),
+      toggleTask: (planId: number, taskId: number, done: boolean) =>
+        api.post<{ ok: boolean; task: LearningTask }>(`/kb/learning-plans/${planId}/tasks/${taskId}/toggle`, { done }),
+      remove: (planId: number) => api.del<{ ok: boolean }>(`/kb/learning-plans/${planId}`),
+      // PortSwigger sign-in: lets the crawler verify auth-gated resource URLs.
+      session: {
+        status: () => api.get<{ session: PortswiggerSessionStatus }>('/kb/learning-plans/session'),
+        login: (d: { email: string; password: string; remember?: boolean }) =>
+          api.post<{ session: PortswiggerSessionStatus }>('/kb/learning-plans/session/login', d),
+        logout: (d?: { clear_credentials?: boolean }) =>
+          api.post<{ session: PortswiggerSessionStatus }>('/kb/learning-plans/session/logout', d ?? {}),
+      },
+      reverify: (planId: number) =>
+        api.post<{ plan: LearningPlanDetail; reverify: LearningReverifyReport }>(`/kb/learning-plans/${planId}/reverify`),
+      // Study-Session Loop: read-only state + explicit start/complete.
+      // (Distinct from ``session`` above, which is the PortSwigger sign-in.)
+      planSession: {
+        state: (planId: number) => api.get<{ session: PlanSessionState }>(`/kb/learning-plans/${planId}/session`),
+        // ``task_id`` starts the session on a specific roadmap task (e.g. the
+        // first incomplete task of a scheduled study day).
+        start: (planId: number, d?: { duration_mins?: number; task_id?: number }) =>
+          api.post<{ ok: boolean; session: PlanSessionItem; state: PlanSessionState }>(
+            `/kb/learning-plans/${planId}/session/start`,
+            d ?? {},
+          ),
+        complete: (planId: number, sessionId: number) =>
+          api.post<{
+            ok: boolean;
+            session: PlanSessionItem;
+            task_completed: boolean;
+            // Full fresh state (matches PlanSessionState, with live_session null).
+            plan_id: number;
+            live_session: PlanSessionItem | null;
+            last_session: PlanSessionItem | null;
+            next_task: LearningTask | null;
+            progress: { total_tasks: number; done_tasks: number; progress_percent: number };
+            completed: boolean;
+          }>(`/kb/learning-plans/${planId}/session/${sessionId}/complete`),
+      },
+      // Plan Re-sync (explicit): refresh Layer 1 — new paths added, removed
+      // ones flagged; the personalised roadmap is left untouched.
+      resync: (planId: number) =>
+        api.post<{ plan: LearningPlanDetail; resync: PlanResyncReport }>(`/kb/learning-plans/${planId}/resync`),
+      // Study Schedule — roadmap → day-by-day plan. Building is an explicit
+      // user action; reading is read-only and never calls the LLM.
+      schedule: {
+        get: (planId: number) =>
+          api.get<{ schedule: LearningSchedule | null }>(`/kb/learning-plans/${planId}/schedule`),
+        create: (planId: number, d: {
+          mode: string;
+          daily_hours?: number | null;
+          modules_per_day?: number | null;
+          time_slots?: string[];
+          instruction?: string | null;
+        }) => api.post<{ schedule: LearningSchedule }>(`/kb/learning-plans/${planId}/schedule`, d),
+        remove: (planId: number) =>
+          api.del<{ ok: boolean }>(`/kb/learning-plans/${planId}/schedule`),
+      },
+    },
+    // Vault Health Audit: read-only aggregate + explicit dismiss/resolve actions.
+    healthAudit: {
+      audit: (limit = 12) => api.get<HealthAudit>(`/kb/health-audit?limit=${limit}`),
+      rescan: () => api.post<{ ok: boolean; created_outdated: number; health_score: number }>('/kb/health-audit/rescan'),
+      dismissMissing: (suggestionId: number) =>
+        api.post<{ id: number; status: string }>(`/kb/health-audit/missing/${suggestionId}/dismiss`),
+      resolveOutdated: (noteId: number, action: 'updated' | 'archived' | 'dismissed') =>
+        api.post<{ id: number; document_id: number; status: string }>(`/kb/health-audit/outdated/${noteId}/resolve`, { action }),
+      archiveDuplicate: (documentId: number) =>
+        api.post<{ ok: boolean }>(`/kb/health-audit/duplicates/${documentId}/archive`),
+    },
+    // Focus/Readiness Loop: read-only board + explicit session start.
+    focus: {
+      board: (limit = 5) => api.get<FocusBoard>(`/kb/focus?limit=${limit}`),
+      start: (topicId: number, durationMins?: number) =>
+        api.post<{ ok: boolean; session: MicroSession }>('/kb/focus/start', {
+          topic_id: topicId,
+          ...(durationMins ? { duration_mins: durationMins } : {}),
+        }),
+    },
+    sessions: {
+      start: (topicId: number, durationMins?: number) =>
+        api.post<{ session: MicroSession }>('/sessions/start', {
+          topic_id: topicId,
+          ...(durationMins ? { duration_mins: durationMins } : {}),
+        }),
+      complete: (sessionId: number) =>
+        api.post<{ ok: boolean; session: MicroSession }>(`/sessions/${sessionId}/complete`),
+      pomodoro: (sessionId: number) =>
+        api.post<SessionPomodoroResult>(`/sessions/${sessionId}/pomodoro`),
+    },
     forecast: {
       get: (subjectId: number) => api.get<KbForecast>(`/kb/forecast/${subjectId}`),
       scan: () => api.post<{ processed: number; at_risk: number; alerted: number }>('/kb/forecast/scan'),
@@ -2837,7 +3920,6 @@ export const endpoints = {
       form.append('file', file);
       return fetch(`${BASE}/subjects/import-file`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
         body: form,
       }).then((r) => {
         if (!r.ok) throw new Error(`Import ${r.status}: ${r.statusText}`);
@@ -3192,6 +4274,157 @@ export interface AppNotification {
   created_at: string;
 }
 
+// ----- Book Knowledge Gap Analyzer types (TOC-first workflow) -----
+export type BookGapStatus = 'KNOWN' | 'PARTIALLY_KNOWN' | 'UNKNOWN' | 'NEEDS_REVIEW';
+export type BookGapMyStatus = 'UNKNOWN' | 'LEARNING' | 'LEARNED' | 'MASTERED';
+// Stage-2 per-topic deep-analysis state.
+export type BookGapDeepStatus = 'NOT_ANALYZED' | 'ANALYZING' | 'ANALYZED' | 'FAILED';
+
+export interface BookGapAnalysis {
+  book_id: number;
+  status: string;
+  total_pages: number;
+  chapters: number;
+  total_concepts: number;
+  known: number;
+  partial: number;
+  unknown: number;
+  needs_review?: number;
+  deep_analyzed?: number;
+  historical: number;
+  recommended_pages: number;
+  recommended_pct: number;
+  analyzed_at: string | null;
+  errors: string[];
+}
+
+/** One missing sub-concept found by a deep topic analysis (page evidence). */
+export interface BookGapItem {
+  id: number;
+  book_id: number;
+  deep_topic_id?: number | null;
+  concept: string;
+  display_name: string;
+  chapter: string | null;
+  section: string | null;
+  page_start: number | null;
+  page_end: number | null;
+  snippet: string | null;
+  why: string | null;
+  status: BookGapStatus;
+  my_status: BookGapMyStatus;
+  knowledge_level: number;
+  difficulty: string;
+  est_minutes: number;
+  is_historical: boolean;
+  historical_note: string | null;
+}
+
+/** A deep-analysis missing sub-concept with its page evidence + rationale. */
+export interface BookGapDeepMissing {
+  concept: string;
+  why: string | null;
+  deterministic?: boolean;
+}
+
+/** Persisted Stage-2 result for one topic. */
+export interface BookGapDeepResult {
+  summary: string | null;
+  covered: string[];
+  missing: BookGapDeepMissing[];
+  ai_used: boolean;
+  deterministic?: boolean;
+  error?: string;
+}
+
+/** One Stage-1 TOC topic (chapter/section/subsection) with its SB match. */
+export interface BookGapTopic {
+  id: number;
+  book_id: number;
+  title: string;
+  level: number;
+  parent_title: string | null;
+  page_start: number | null;
+  page_end: number | null;
+  status: BookGapStatus;
+  match_source: string | null;
+  second_brain_match: string | null;
+  confidence: number;
+  deep_status: BookGapDeepStatus;
+  deep_result: BookGapDeepResult | null;
+  analyzed_at: string | null;
+}
+
+export interface BookGapOverviewBook {
+  book_id: number;
+  title: string;
+  author: string | null;
+  file_url: string | null;
+  analyzed: boolean;
+  total_concepts: number;
+  known: number;
+  partial: number;
+  unknown: number;
+  needs_review?: number;
+  deep_analyzed?: number;
+  recommended_pct: number;
+}
+
+export interface BookGapOverview {
+  books: BookGapOverviewBook[];
+  total_concepts: number;
+  total_known: number;
+  total_partial: number;
+  total_unknown: number;
+  learned_concepts: number;
+  recommended_minutes: number;
+}
+
+export interface BookGapChapter {
+  chapter: string;
+  known: number;
+  partial: number;
+  unknown: number;
+  historical: number;
+}
+
+export interface BookGapDashboard {
+  analysis: BookGapAnalysis | null;
+  chapters: BookGapChapter[];
+  topics: BookGapTopic[];
+}
+
+export const bookGapApi = {
+  overview: () => api.get<BookGapOverview>('/kb/books/overview'),
+  analyze: (bookId: number) =>
+    api.post<{
+      analysis: BookGapAnalysis;
+      chapters: BookGapChapter[];
+      topics: BookGapTopic[];
+      items: number;
+    }>(`/kb/books/${bookId}/analyze`),
+  dashboard: (bookId: number) => api.get<BookGapDashboard>(`/kb/books/${bookId}/dashboard`),
+  topics: (bookId: number) => api.get<{ topics: BookGapTopic[] }>(`/kb/books/${bookId}/topics`),
+  analyzeTopic: (bookId: number, topicId: number) =>
+    api.post<BookGapTopic>(`/kb/books/${bookId}/topics/${topicId}/analyze`),
+  addTopicToBrain: (bookId: number, topicId: number) =>
+    api.post<{
+      document: { id: number; title: string; status: string };
+      created: boolean;
+      topic_id: number;
+    }>(`/kb/books/${bookId}/topics/${topicId}/add-to-brain`),
+  items: (bookId: number, params?: { status?: BookGapStatus; chapter?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set('status', params.status);
+    if (params?.chapter) qs.set('chapter', params.chapter);
+    const q = qs.toString();
+    return api.get<{ items: BookGapItem[] }>(`/kb/books/${bookId}/items${q ? `?${q}` : ''}`);
+  },
+  queue: (bookId: number) => api.get<{ items: BookGapItem[] }>(`/kb/books/${bookId}/queue`),
+  setStatus: (bookId: number, itemId: number, status: 'learning' | 'learned' | 'mastered') =>
+    api.post<BookGapItem>(`/kb/books/${bookId}/items/${itemId}/status`, { status }),
+};
+
 export const bookApi = {
   list: (params?: { category?: BookCategory; page?: number; page_size?: number }) => {
     const qs = new URLSearchParams();
@@ -3210,10 +4443,20 @@ export const bookApi = {
     form.append('file', file);
     return fetch(`${BASE}/books/upload`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${getToken()}` },
       body: form,
-    }).then((r) => {
-      if (!r.ok) throw new Error(`Upload ${r.status}: ${r.statusText}`);
+    }).then(async (r) => {
+      if (!r.ok) {
+        // Surface the backend's detail (e.g. "File too large (max 100 MB)")
+        // instead of a raw status line.
+        let detail: string | null = null;
+        try {
+          const body = await r.json();
+          detail = body?.detail?.error ?? body?.detail ?? null;
+        } catch {
+          /* non-JSON error body */
+        }
+        throw new Error(detail ? `Upload failed: ${detail}` : `Upload ${r.status}: ${r.statusText}`);
+      }
       return r.json();
     }) as Promise<{ url: string; filename: string }>;
   },
@@ -3251,67 +4494,7 @@ export const notificationApi = {
   clearAll: () => api.del<{ ok: boolean; deleted: number }>('/notifications'),
 };
 
-export interface TeacherStudentStats {
-  courses: number;
-  assignments: number;
-  todos: number;
-  books: number;
-  braindump: boolean;
-}
-
-export interface TeacherStudent {
-  id: number;
-  name: string;
-  stats: TeacherStudentStats;
-}
-
-export interface TeacherStudentDetail {
-  id: number;
-  name: string;
-  assignments: Assignment[];
-  todos: Task[];
-  braindump: { content: string | null } | null;
-  books: Book[];
-}
-
-export interface TeacherBroadcastResult {
-  created: number;
-}
-
-function broadcastForm(payload: Record<string, unknown>, file?: File | null): FormData {
-  const form = new FormData();
-  Object.entries(payload).forEach(([k, v]) => {
-    if (v !== undefined && v !== null) form.append(k, JSON.stringify(v));
-  });
-  if (file) form.append('file', file);
-  return form;
-}
-
-function multipartPost(path: string, form: FormData): Promise<TeacherBroadcastResult> {
-  return fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${getToken()}` },
-    body: form,
-  }).then((r) => {
-    if (!r.ok) throw new Error(`Broadcast ${r.status}: ${r.statusText}`);
-    return r.json();
-  }) as Promise<TeacherBroadcastResult>;
-}
-
-export const teacherApi = {
-  students: () => api.get<TeacherStudent[]>('/teacher/students'),
-  studentDetail: (studentId: number) => api.get<TeacherStudentDetail>(`/teacher/students/${studentId}/detail`),
-  broadcastCourses: (course: Partial<Course>, studentIds?: number[]) =>
-    api.post<TeacherBroadcastResult>('/teacher/broadcast/courses', { course, student_ids: studentIds ?? null }),
-  broadcastTodos: (todo: { title: string; due_date?: string | null; priority_tag?: string; subject_tag?: string }, studentIds?: number[]) =>
-    api.post<TeacherBroadcastResult>('/teacher/broadcast/todos', { todo, student_ids: studentIds ?? null }),
-  broadcastSchedule: (item: { date: string; time_range: string; activity: string; category?: string; energy?: string; location?: string | null; notes?: string | null }, studentIds?: number[]) =>
-    api.post<TeacherBroadcastResult>('/teacher/broadcast/schedule', { item, student_ids: studentIds ?? null }),
-  broadcastAssignments: (assignment: { title: string; description?: string; due_date?: string; status?: string; type?: string }, studentIds?: number[], file?: File | null) =>
-    multipartPost('/teacher/broadcast/assignments', broadcastForm({ assignment, student_ids: studentIds ?? null }, file)),
-  broadcastBooks: (book: { title: string; author?: string; category?: string }, studentIds?: number[], file?: File | null) =>
-    multipartPost('/teacher/broadcast/books', broadcastForm({ book, student_ids: studentIds ?? null }, file)),
-};
+// (Teacher broadcast/student APIs removed — the application is single-user.)
 
 // ----- SyllabusAI API clients (aliases over `endpoints` for named imports) -----
 export const curriculumApi = endpoints.curriculum;

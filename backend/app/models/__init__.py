@@ -1,5 +1,5 @@
 from app.models.user import User
-from app.models.course import Course
+from app.models.course import Course, CourseGapAnalysis, CourseSyncLog
 from app.models.grade import Grade, CourseWeight
 from app.models.assignment import Assignment, Exam
 from app.models.note import Note, Goal
@@ -40,6 +40,7 @@ from app.models.summary import Summary
 from app.models.quiz import Quiz
 from app.models.quiz_attempt import QuizAttempt
 from app.models.book import Book
+from app.models.book_gap import BookGapAnalysis, BookGapItem, BookGapTopic, BookConceptState
 from app.models.braindump import BrainDump
 from app.models.daily_schedule_item import DailyScheduleItem
 from app.models.notification import Notification
@@ -83,21 +84,35 @@ from app.models.kb import (
     UserSkill,
     UserPreference,
     UserMemory,
+    GoalGapAnalysis,
+    GapAnalysisHistory,
     MissingNoteSuggestion,
     OutdatedNote,
     CategorizeSuggestion,
+    AiInsight,
     AgentRun,
     EpisodicMemory,
     Reflection,
     AiLog,
     PromptVersion,
     ContextOverride,
+    LearningDependency,
+    LearningPath,
+    LearningPathResource,
+    LearningPlan,
+    LearningResource,
+    LearningTask,
+    PortswiggerSession,
+    KbFolder,
+    FolderGapAnalysis,
 )
 
 __all__ = [
     "Assignment",
     "Character",
     "Course",
+    "CourseGapAnalysis",
+    "CourseSyncLog",
     "CourseWeight",
     "Grade",
     "DailyLog",
@@ -166,6 +181,7 @@ __all__ = [
     "KbSummary",
     "KbTag",
     "KbVersion",
+    "AiInsight",
     "Roadmap",
     "SubjectProfile",
     "Topic",
@@ -187,6 +203,8 @@ __all__ = [
     "UserSkill",
     "UserPreference",
     "UserMemory",
+    "GoalGapAnalysis",
+    "GapAnalysisHistory",
     "MissingNoteSuggestion",
     "OutdatedNote",
     "CategorizeSuggestion",
@@ -196,4 +214,10 @@ __all__ = [
     "AiLog",
     "PromptVersion",
     "ContextOverride",
+    "BookGapAnalysis",
+    "BookGapItem",
+    "BookGapTopic",
+    "BookConceptState",
+    "KbFolder",
+    "FolderGapAnalysis",
 ]

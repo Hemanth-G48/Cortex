@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def _owned_question(db: Session, user_id: int, question_id: int) -> PracticeQuestion:
-    row = db.query(PracticeQuestion).get(question_id)
+    row = db.get(PracticeQuestion, question_id)
     if row is None or row.user_id != user_id:
         from fastapi import HTTPException
 
@@ -42,7 +42,7 @@ def analyze(
     """Full mistake walkthrough (phrases 72–77)."""
     question = _owned_question(db, user_id, question_id)
     model_solution = question.answer or question.explanation or ""
-    topic = db.query(Topic).get(question.topic_id)
+    topic = db.get(Topic, question.topic_id)
 
     # Recommendation chunk (phrase 73): most relevant vault note.
     items = retrieve_chunks(db, user_id, question.question, limit=3)

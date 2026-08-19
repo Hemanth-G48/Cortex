@@ -23,6 +23,42 @@ COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
     "courses": [
         ("google_id", "VARCHAR(100)"),
         ("curriculum_subject_id", "INTEGER"),
+        ("source_type", "VARCHAR(20) DEFAULT 'manual'"),
+        ("kb_tag_id", "INTEGER"),
+        # Folder-derived subjects (top-level vault folders).
+        ("kb_source_id", "INTEGER"),
+        ("kb_folder_path", "VARCHAR(500)"),
+        ("classroom_url", "VARCHAR(1000)"),
+        # Second Brain course sync: KB doc count is a distinct field from
+        # total_assignments (which counts real Assignment rows).
+        ("kb_document_count", "INTEGER DEFAULT 0"),
+        # Folder-derived subjects: metadata read from the folder's index.md
+        # frontmatter (description / status / color keys).
+        ("description", "TEXT"),
+        ("color", "VARCHAR(50)"),
+    ],
+    "learning_tasks": [
+        # Layer-1 source references (Learning Path Planner): which discovered
+        # resource/path a roadmap task points at (progress per path).
+        ("resource_id", "INTEGER"),
+        ("path_id", "INTEGER"),
+    ],
+    "learning_plans": [
+        # Layer-1 source snapshot (Learning Path Planner): the real platform
+        # hierarchy the crawler persisted (platform, paths, resources, crawl
+        # report). Added with the two-layer planner; legacy rows lack it.
+        ("source_json", "TEXT"),
+        # Roadmap → study schedule (day-by-day plan built from the roadmap).
+        ("schedule_json", "TEXT"),
+    ],
+    "micro_sessions": [
+        # Study-Session Loop (workflow): micro-sessions may be tied to a
+        # learning-plan task instead of a curriculum topic.
+        ("learning_plan_id", "INTEGER"),
+        ("learning_task_id", "INTEGER"),
+    ],
+    "course_sync_log": [
+        ("course_folders", "INTEGER DEFAULT 0"),
     ],
     "assignments": [
         ("google_id", "VARCHAR(100)"),
@@ -155,6 +191,9 @@ COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
     "kb_sources": [
         ("sync_type", "VARCHAR(20) DEFAULT 'none'"),
         ("sync_cursor_json", "TEXT"),
+        # "local" adapter: external Obsidian vault dir mirrored into this
+        # source's knowledge root (Copy Recent Notes).
+        ("sync_source_path", "VARCHAR(500)"),
     ],
     # Phase 9 (Idea 85, phrase 44): auto-vs-manual flashcard candidates.
     "kb_flashcard_candidates": [
@@ -179,6 +218,15 @@ COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
         ("reps", "INTEGER DEFAULT 0"),
         ("lapses", "INTEGER DEFAULT 0"),
     ],
+    # Book Knowledge Gap Analyzer — TOC-first workflow (Stage 1 rollup
+    # buckets + deep-analysis linkage).
+    "book_gap_analysis": [
+        ("needs_review", "INTEGER DEFAULT 0"),
+        ("deep_analyzed", "INTEGER DEFAULT 0"),
+    ],
+    "book_gap_items": [
+        ("deep_topic_id", "INTEGER"),
+    ],
 }
 
 
@@ -201,6 +249,11 @@ def migrate_schema() -> None:
         # but MENTIONS edges target concepts via ``target_concept_id`` (NULL
         # target document). Rebuild the table to make it nullable.
         _relax_kb_edges_target_document_id(conn)
+        # Concept-targeted lookups (MENTIONS edges, gap analysis) scan
+        # ``kb_edges`` by ``target_concept_id`` — the model column has no
+        # ``index=True`` and older table rebuilds dropped it, so ensure the
+        # index exists on every startup. SQLite: IF NOT EXISTS is idempotent.
+        _ensure_kb_edges_concept_index(conn)
 
 
 def _relax_quizzes_unit_id(conn) -> None:
@@ -313,6 +366,26 @@ def _relax_kb_edges_target_document_id(conn) -> None:
         )
     )
     conn.execute(text("CREATE INDEX ix_kb_edges_relation ON kb_edges (relation)"))
+    # Concept-targeted lookups (MENTIONS edges) need this index; the rebuild
+    # above drops whatever the model had, so it is re-created here too.
+    conn.execute(
+        text("CREATE INDEX IF NOT EXISTS ix_kb_edges_target_concept_id ON kb_edges (target_concept_id)")
+    )
+
+
+def _ensure_kb_edges_concept_index(conn) -> None:
+    """Idempotently create the ``kb_edges(target_concept_id)`` index.
+
+    Gap analysis and concept links filter MENTIONS edges by target concept;
+    without this index every lookup is a full table scan of ``kb_edges``.
+    """
+    try:
+        conn.execute(text("PRAGMA table_info(kb_edges)"))
+    except Exception:
+        return  # table does not exist yet
+    conn.execute(
+        text("CREATE INDEX IF NOT EXISTS ix_kb_edges_target_concept_id ON kb_edges (target_concept_id)")
+    )
 
 
 def get_db():

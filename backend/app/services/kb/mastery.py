@@ -62,7 +62,7 @@ def recompute_mastery(db: Session, user_id: int, topic_id: int) -> float:
     events = topic_events(db, user_id, topic_id)
     score = _mastery_from_events(events)
     classification = classify(score, len(events))
-    topic = db.query(Topic).get(topic_id)
+    topic = db.get(Topic, topic_id)
     if topic is not None and topic.user_id == user_id:
         topic.mastery_score = round(score, 4)
         topic.mastery_classification = classification

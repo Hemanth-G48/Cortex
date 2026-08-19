@@ -10,14 +10,14 @@ from app.schemas.notification import (
     NotificationResponse,
     NotificationUnreadCount,
 )
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
 
 @router.get("", response_model=List[NotificationResponse])
 def list_notifications(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     return (
@@ -30,7 +30,7 @@ def list_notifications(
 
 @router.get("/unread-count", response_model=NotificationUnreadCount)
 def unread_count(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     count = db.query(Notification).filter(
@@ -43,7 +43,7 @@ def unread_count(
 @router.post("/{notification_id}/read", response_model=NotificationResponse)
 def mark_read(
     notification_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     notification = db.query(Notification).filter(
@@ -60,7 +60,7 @@ def mark_read(
 
 @router.post("/mark-all-read")
 def mark_all_read(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     db.query(Notification).filter(
@@ -73,7 +73,7 @@ def mark_all_read(
 @router.delete("/{notification_id}")
 def delete_notification(
     notification_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     notification = db.query(Notification).filter(
@@ -89,7 +89,7 @@ def delete_notification(
 
 @router.delete("")
 def clear_all_notifications(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     notifications = db.query(Notification).filter(

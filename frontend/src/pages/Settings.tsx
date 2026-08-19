@@ -6,7 +6,7 @@ import GoogleSyncCard from '../components/settings/GoogleSyncCard';
 import AIProviderSettings from '../components/settings/AIProviderSettings';
 import ModelPicker from '../components/settings/ModelPicker';
 import { LearningPreferences } from '../components/kb/LearningPreferences';
-import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
 
 const AI_MODEL_KEY = 'slos-ai-model';
 
@@ -20,13 +20,17 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export const Settings = () => {
-  // Use the authenticated user from AuthContext (see Header.tsx note about
-  // why the legacy ``endpoints.login()`` first-user call was removed).
-  const { user } = useAuth();
+  // Single-owner app: the owner profile (no login).
+  const { profile: user } = useProfile();
   const [aiHealth, setAiHealth] = useState<AIHealth | null>(null);
   const [aiModels, setAiModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem(AI_MODEL_KEY) ?? '');
   const [exporting, setExporting] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [backupFile, setBackupFile] = useState<File | null>(null);
+  const [replaceDb, setReplaceDb] = useState(false);
+  const [backupNotice, setBackupNotice] = useState<string | null>(null);
 
   useEffect(() => {
     endpoints.ai.health().then(setAiHealth).catch(() => setAiHealth(null));
@@ -76,6 +80,40 @@ export const Settings = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setExporting(false);
+  };
+
+  const exportBackup = async () => {
+    setBackingUp(true);
+    setBackupNotice(null);
+    try {
+      await endpoints.kb.backup.export();
+      setBackupNotice('✅ Backup downloaded.');
+    } catch (e) {
+      setBackupNotice(`⚠ ${e instanceof Error ? e.message : 'Backup failed'}`);
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
+  const restoreBackup = async () => {
+    if (!backupFile) return;
+    setRestoring(true);
+    setBackupNotice(null);
+    try {
+      const res = await endpoints.kb.backup.restore(backupFile, replaceDb);
+      const lines = [
+        `✅ Restored ${res.restored_files} vault file(s) across ${res.sources_matched} source(s).`,
+      ];
+      if (res.database_restored) lines.push('🗄️ Database snapshot applied — restart the backend to reconnect.');
+      if (res.database_skipped) lines.push('🗄️ Database snapshot was not applied (safe default).');
+      res.warnings.forEach((w) => lines.push(`⚠ ${w}`));
+      setBackupNotice(lines.join('\n'));
+      setBackupFile(null);
+    } catch (e) {
+      setBackupNotice(`⚠ ${e instanceof Error ? e.message : 'Restore failed'}`);
+    } finally {
+      setRestoring(false);
+    }
   };
 
   const initial = (user?.name ?? 'S')[0]?.toUpperCase() ?? 'S';
@@ -163,6 +201,66 @@ export const Settings = () => {
               <span className="emoji">⬇️</span> {exporting ? 'Exporting…' : 'Export JSON'}
             </button>
           </div>
+        </Section>
+
+        <Section title="🗄️ Vault Backup">
+          <div className="settings-row">
+            <div>
+              <div>Download full vault backup</div>
+              <div className="muted">
+                A timestamped zip of your Second Brain vault files plus a consistent snapshot of the database.
+                Keep it somewhere safe and use Restore to recover.
+              </div>
+            </div>
+            <button className="btn" onClick={() => void exportBackup()} disabled={backingUp}>
+              <span className="emoji">📦</span> {backingUp ? 'Building…' : 'Backup vault'}
+            </button>
+          </div>
+          <div className="settings-row">
+            <div>
+              <div>Restore from backup</div>
+              <div className="muted">
+                Pick a vault-backup zip. Vault files are always restored into their original folders; the database
+                snapshot is only applied when the checkbox below is enabled (safe default — never overwrites live data).
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={replaceDb}
+                  onChange={(e) => setReplaceDb(e.target.checked)}
+                />
+                Also replace the database snapshot (restart backend afterwards)
+              </label>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'flex-end' }}>
+              <input
+                type="file"
+                accept=".zip,application/zip"
+                onChange={(e) => setBackupFile(e.target.files?.[0] ?? null)}
+                style={{ fontSize: '0.75rem', maxWidth: 260 }}
+              />
+              <button
+                className="btn"
+                onClick={() => void restoreBackup()}
+                disabled={restoring || !backupFile}
+              >
+                <span className="emoji">♻️</span> {restoring ? 'Restoring…' : 'Restore backup'}
+              </button>
+            </div>
+          </div>
+          {backupNotice && (
+            <p
+              className="muted"
+              style={{
+                fontSize: '0.78rem', marginTop: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: 8,
+                background: backupNotice.startsWith('⚠') ? 'var(--warning-muted)' : 'var(--success-muted)',
+                color: backupNotice.startsWith('⚠') ? 'var(--warning)' : 'var(--success)',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {backupNotice}
+            </p>
+          )}
         </Section>
 
         <Section title="ℹ️ About">

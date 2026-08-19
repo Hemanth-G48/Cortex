@@ -536,7 +536,7 @@ function ObserveTab() {
       .catch((e) => setError((e as Error).message));
   }, []);
 
-  if (error) return <p style={{ fontSize: '0.75rem', color: '#ef4444' }}>Admin/teacher access required — {error}</p>;
+  if (error) return <p style={{ fontSize: '0.75rem', color: '#ef4444' }}>Could not load observability — {error}</p>;
   if (!payload) return <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Loading dashboard…</p>;
 
   return (

@@ -10,7 +10,7 @@
 #   ./start.sh                  # default: dev mode (uvicorn --reload)
 #   ./start.sh --no-reload      # backend without auto-reload
 #   ./start.sh --install        # pip install + npm install first
-#   ./start.sh --host 0.0.0.0   # override backend host (default 0.0.0.0)
+#   ./start.sh --host 0.0.0.0   # expose to the network (default 127.0.0.1)
 #   ./start.sh --no-open        # don't auto-open the browser
 # ═════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -19,7 +19,9 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$ROOT/backend"
 FRONTEND_DIR="$ROOT/frontend"
 
-BACKEND_HOST="0.0.0.0"
+# Single-user local app: bind the backend to loopback by default. Use
+# `--host 0.0.0.0` only if you deliberately want LAN access.
+BACKEND_HOST="127.0.0.1"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 RELOAD=1

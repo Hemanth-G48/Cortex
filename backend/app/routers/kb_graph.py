@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models import KbDocument, User
 from app.schemas.kb import KbGraphResponse
 from app.services.kb.graph import build_graph, neighbors
-from app.services.security import get_current_user
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-graph"])
 
@@ -19,7 +19,7 @@ DEFAULT_GRAPH_LIMIT = 200
 
 @router.get("/graph", response_model=KbGraphResponse)
 def get_graph(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
     source: str | None = None,
     tag: str | None = None,
@@ -42,7 +42,7 @@ def get_graph(
 @router.get("/documents/{document_id}/neighbors")
 def get_neighbors(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> list[dict]:
     doc = (

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
+import { useProfile } from '../../hooks/useProfile';
 
 interface NavGroup {
   label: string;
@@ -7,6 +7,15 @@ interface NavGroup {
 }
 
 const studentGroups: NavGroup[] = [
+  {
+    label: 'Workflows',
+    links: [
+      { to: '/today', label: 'Today', icon: '📅' },
+      { to: '/weekly-review', label: 'Weekly Review', icon: '🗓️' },
+      { to: '/learning-planner', label: 'Learning Path Planner', icon: '🗺️' },
+      { to: '/workflows', label: 'Workflows', icon: '⚙️' },
+    ],
+  },
   {
     label: 'Academics',
     links: [
@@ -21,10 +30,12 @@ const studentGroups: NavGroup[] = [
       { to: '/subjects', label: 'Subjects', icon: '📘' },
       { to: '/analytics', label: 'Analytics', icon: '📈' },
       { to: '/reading', label: 'Reading', icon: '📖' },
+      { to: '/book-gaps', label: 'Book Gaps', icon: '🔍' },
       { to: '/knowledge-base', label: 'Second Brain', icon: '🧠' },
       { to: '/knowledge-graph', label: 'Graph', icon: '🕸️' },
       { to: '/vault-search', label: 'Search', icon: '🔎' },
       { to: '/kb-insights', label: 'Insights', icon: '🩺' },
+      { to: '/gap-analysis', label: 'Gap Analysis', icon: '🕳️' },
       { to: '/tutor', label: 'AI Tutor', icon: '🧑‍🏫' },
       { to: '/practice', label: 'Practice', icon: '🎯' },
       { to: '/mocks', label: 'Mock Exams', icon: '📝' },
@@ -100,15 +111,6 @@ const studentGroups: NavGroup[] = [
   },
 ];
 
-const teacherGroups: NavGroup[] = [
-  {
-    label: 'Teacher',
-    links: [
-      { to: '/teacher', label: 'Teacher Dashboard', icon: '👨‍🏫' },
-    ],
-  },
-];
-
 const adminGroups: NavGroup[] = [
   {
     label: 'Admin',
@@ -120,9 +122,9 @@ const adminGroups: NavGroup[] = [
 
 /** Categorised navigation links replacing the flat sidebar nav */
 export const NavLinks = () => {
-  const { role, user } = useAuth();
-  const base = role === 'teacher' ? [...teacherGroups, ...studentGroups] : studentGroups;
-  // Admin is the `is_admin` flag (SyllabusAI G11); teachers/students may also be admins.
+  // Single-owner app: no teacher role; admin is the owner's `is_admin` flag.
+  const { profile: user } = useProfile();
+  const base = studentGroups;
   const groups = user?.is_admin ? [...base, ...adminGroups] : base;
 
   return (

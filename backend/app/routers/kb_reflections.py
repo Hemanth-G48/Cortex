@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
+from app.services.kb import daily_notes
 from app.services.kb import reflections as reflection_service
 from app.services.users import current_user
 
@@ -51,6 +52,35 @@ def generate_reflection(
     )
     db.commit()
     return result
+
+
+class CreateReflectionRequest(BaseModel):
+    """Audit defect #52: a reflection line recorded into the vault's day note."""
+
+    content: str
+    # ``goal`` / ``habit`` / ``note`` — kept for provenance in the daily note.
+    kind: str | None = None
+
+
+@router.post("/reflections")
+def create_reflection(
+    body: CreateReflectionRequest,
+    current_user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Append a reflection entry to today's ``daily-life/YYYY-MM-DD.md``.
+
+    Used by surfaces that complete something meaningful (e.g. finishing a goal
+    on the Goals page) so the event is written into the user's own vault day
+    note rather than only into the app database.
+    """
+    content = (body.content or "").strip()
+    if not content:
+        raise HTTPException(400, "content is required")
+    text = f"{content}" if not body.kind else f"[{body.kind}] {content}"
+    return daily_notes.append_daily_entry(
+        db, current_user.id, text, section="Reflections"
+    )
 
 
 @router.post("/reflections/adjust")

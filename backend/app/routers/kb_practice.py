@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -182,17 +183,35 @@ def build_mock(
 
 @router.get("/mocks")
 def list_mocks(
+    status: str | None = Query(
+        default=None,
+        description="Filter by paper status (draft | active | completed). Omit for all.",
+    ),
     current_user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    rows = (
-        db.query(MockTest)
-        .filter(MockTest.user_id == current_user.id)
-        .order_by(MockTest.id.desc())
-        .limit(50)
+    """List mock papers, optionally filtered server-side (audit defect #75).
+
+    Each item also carries ``attempt_count`` so the UI does not have to fetch
+    and filter every paper's attempt history to know whether it was attempted.
+    """
+    q = db.query(MockTest).filter(MockTest.user_id == current_user.id)
+    if status:
+        q = q.filter(MockTest.status == status)
+    rows = q.order_by(MockTest.id.desc()).limit(50).all()
+
+    counts = dict(
+        db.query(MockTestAttempt.mock_test_id, func.count(MockTestAttempt.id))
+        .filter(MockTestAttempt.user_id == current_user.id)
+        .group_by(MockTestAttempt.mock_test_id)
         .all()
     )
-    return {"items": [mocks_service.mock_dict(m) for m in rows]}
+    items = []
+    for m in rows:
+        payload = mocks_service.mock_dict(m)
+        payload["attempt_count"] = counts.get(m.id, 0)
+        items.append(payload)
+    return {"items": items}
 
 
 @router.post("/mocks/{mock_id}/start")

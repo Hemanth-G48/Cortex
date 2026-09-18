@@ -783,6 +783,10 @@ _LIVE_EMAIL = os.environ.get("PS_PORT_SWIGGER_EMAIL", "").strip()
 _LIVE_PASSWORD = os.environ.get("PS_PORT_SWIGGER_PASSWORD", "") or None
 
 
+# Live marker: hits the real PortSwigger site over the network (audit T2).
+# Excluded from the default fast suite via ``-m "not live"``; the opt-in env
+# guard below remains the second layer of defense.
+@pytest.mark.live
 @pytest.mark.skipif(
     not _LIVE_TESTS,
     reason="set PS_LIVE_TESTS=1 to run live PortSwigger network tests",

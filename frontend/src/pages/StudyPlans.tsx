@@ -20,6 +20,25 @@ export const StudyPlans = () => {
     } catch {
       /* silent */
     }
+    // Defect #72: prefer the plan the vault's focus board recommends. The board
+    // reports readiness per curriculum subject, so the recommended subject's
+    // name is resolved via the mastery read model and matched to a saved plan.
+    try {
+      const board = await endpoints.kb.focus.board();
+      const top = board.recommendations[0];
+      if (!top) return;
+      const mastery = await endpoints.kb.mastery({ subject: top.subject_id });
+      const name = mastery.subject_name?.trim().toLowerCase();
+      if (!name) return;
+      const recommended = (await endpoints.studyPlans.list()).find(
+        (plan) =>
+          plan.subject.trim().toLowerCase() === name ||
+          plan.subject.trim().toLowerCase().includes(name),
+      );
+      if (recommended) setActiveId(recommended.id);
+    } catch {
+      /* the focus board is advisory — keep the user's selection */
+    }
   }, []);
 
   useEffect(() => {

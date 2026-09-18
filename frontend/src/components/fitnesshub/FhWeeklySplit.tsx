@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { endpoints } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
-import type { SplitDay, Workout } from '../../services/api';
+import type { SplitDay, WeekActualDay, Workout } from '../../services/api';
 
 interface Props {
   week1: SplitDay[];
@@ -25,6 +25,19 @@ export const FhWeeklySplit = ({ week1, week2, workouts, onWorkoutLogged }: Props
   const [type, setType] = useState('PUSH');
   const [duration, setDuration] = useState('45');
   const [calories, setCalories] = useState('');
+  // Defect #84: what was actually trained each day this week (plan + actuals).
+  const [actuals, setActuals] = useState<Record<number, WeekActualDay>>({});
+
+  useEffect(() => {
+    endpoints.fitness
+      .weekActuals()
+      .then((r) => {
+        const byDow: Record<number, WeekActualDay> = {};
+        for (const d of r.days) byDow[d.day_of_week] = d;
+        setActuals(byDow);
+      })
+      .catch(() => setActuals({}));
+  }, [workouts]);
 
   const days = tab === '1' ? week1 : week2;
   const today = new Date().toISOString().slice(0, 10);
@@ -98,8 +111,11 @@ export const FhWeeklySplit = ({ week1, week2, workouts, onWorkoutLogged }: Props
               <span>No split configured for Week {tab} yet.</span>
             </div>
           )}
-          {days.map((d) => (
-            <div key={d.day} className={`fh-day-card${loggedToday ? ' done' : ''}`}>
+          {days.map((d) => {
+            const actual = actuals[d.day_of_week];
+            const didToday = actual?.logged && actual.date === today;
+            return (
+            <div key={d.day} className={`fh-day-card${loggedToday && actual?.date === today ? ' done' : ''}`}>
               <div className="fh-day-head">
                 <span className="fh-day-label">{d.day}</span>
                 <span className={`fh-split-badge ${SPLIT_CLASS[d.split_name.toUpperCase()] ?? 'rest'}`}>
@@ -112,13 +128,25 @@ export const FhWeeklySplit = ({ week1, week2, workouts, onWorkoutLogged }: Props
                 ))}
                 {d.exercises.length === 0 && <li>Rest / Recovery</li>}
               </ul>
-              {loggedToday && (
+              {actual && actual.workouts.length > 0 && (
+                <div className="fh-day-exercises" style={{ fontSize: '0.7rem', color: 'var(--fh-text-muted, #999)' }}>
+                  Actual: {actual.workouts.map((w) => w.type).join(', ')}
+                  {actual.total_minutes > 0 ? ` · ${actual.total_minutes}m` : ''}
+                </div>
+              )}
+              {actual?.vault_mentions && actual.workouts.length === 0 && (
+                <div className="fh-day-exercises" style={{ fontSize: '0.7rem', color: 'var(--fh-text-muted, #999)' }}>
+                  📓 Vault note mentions a workout
+                </div>
+              )}
+              {didToday && (
                 <span className="fh-day-done-chip">
                   ✓ Logged today
                 </span>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

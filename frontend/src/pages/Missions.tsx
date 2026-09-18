@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { RpgLayout } from '../components/rpg/RpgLayout';
 import { RpgCard } from '../components/rpg/RpgCard';
 import { RpgBadge } from '../components/rpg/RpgBadge';
 import { RpgTabs } from '../components/rpg/RpgTabs';
-import { endpoints, api } from '../services/api';
-import type { Mission, MissionTask } from '../services/api';
+import { endpoints } from '../services/api';
+import { confirmDelete } from '../utils/confirm';
+import type { Mission, MissionTask, QuestCentreBoard } from '../services/api';
 
 const sidebar = (
   <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -22,22 +23,57 @@ type TabId = 'all' | 'in-progress' | 'not-started' | 'completed';
 export const Missions = () => {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [tasks, setTasks] = useState<Record<number, MissionTask[]>>({});
+  // Defect #88 fix: authoritative mission counts from the server board.
+  const [board, setBoard] = useState<QuestCentreBoard | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ title: '', description: '', xp_reward: 50 });
 
-  useEffect(() => {
-    endpoints.missions.list().then(setMissions).catch(() => {});
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    endpoints.missions.list()
+      .then(setMissions)
+      .catch(() => setError('Could not load missions — is the backend running?'))
+      .finally(() => setLoading(false));
+    endpoints.questCentre.board().then(setBoard).catch(() => {});
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     missions.forEach((m) => {
       const missionId = m.id;
-      const url = `/missions/${missionId}/tasks`;
-      const endpoint = { list: () => api.get<MissionTask[]>(url) };
-      endpoint.list().then((ts) => {
+      // Defect #24 fix: typed endpoints object instead of inline api.get.
+      endpoints.missions.listTasks(missionId).then((ts) => {
         setTasks((prev) => ({ ...prev, [missionId]: ts }));
       }).catch(() => {});
     });
   }, [missions]);
+
+  // Defect #82 fix: mission creation from this page.
+  const handleCreate = async () => {
+    if (!form.title.trim()) return;
+    try {
+      await endpoints.missions.create({
+        title: form.title.trim(),
+        description: form.description || null,
+        xp_reward: Number(form.xp_reward) || 50,
+      });
+      setForm({ title: '', description: '', xp_reward: 50 });
+      setShowCreate(false);
+      load();
+    } catch {
+      setError('Could not create mission');
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    if (!confirmDelete('this mission')) return;
+    endpoints.missions.delete(id).then(load).catch(() => setError('Could not delete mission'));
+  };
 
   const filtered = missions.filter((m) => {
     if (activeTab === 'all') return true;
@@ -47,11 +83,13 @@ export const Missions = () => {
     return true;
   });
 
+  // Prefer the authoritative server counts; fall back to the loaded page.
+  const byStatus = board?.missions.by_status;
   const tabs: { id: TabId; label: string; count?: number }[] = [
-    { id: 'all', label: 'All', count: missions.length },
-    { id: 'in-progress', label: 'In Progress', count: missions.filter((m) => m.status === 'In progress').length },
-    { id: 'not-started', label: 'Not Started', count: missions.filter((m) => m.status === 'Not started').length },
-    { id: 'completed', label: 'Completed', count: missions.filter((m) => m.status === 'Completed').length },
+    { id: 'all', label: 'All', count: board?.missions.total ?? missions.length },
+    { id: 'in-progress', label: 'In Progress', count: byStatus?.['In progress'] ?? missions.filter((m) => m.status === 'In progress').length },
+    { id: 'not-started', label: 'Not Started', count: byStatus?.['Not started'] ?? missions.filter((m) => m.status === 'Not started').length },
+    { id: 'completed', label: 'Completed', count: byStatus?.['Completed'] ?? missions.filter((m) => m.status === 'Completed').length },
   ];
 
   return (
@@ -60,8 +98,40 @@ export const Missions = () => {
         <h2 className="pixel-text" style={{ color: '#ff9800', fontSize: '1rem', marginBottom: '16px' }}>
           🎯 Mission Center
         </h2>
+        <button
+          type="button"
+          className="rpg-btn"
+          style={{ marginBottom: '12px', cursor: 'pointer' }}
+          onClick={() => setShowCreate(!showCreate)}
+        >
+          {showCreate ? '− Cancel' : '+ New Mission'}
+        </button>
+
+        {showCreate && (
+          <RpgCard style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <input placeholder="Mission title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              <input placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="number" placeholder="XP reward" value={form.xp_reward} onChange={(e) => setForm({ ...form, xp_reward: Number(e.target.value) })} style={{ width: 120 }} />
+                <button type="button" className="rpg-btn" onClick={() => void handleCreate()} disabled={!form.title.trim()}>Create</button>
+              </div>
+            </div>
+          </RpgCard>
+        )}
+
         <RpgTabs tabs={tabs} activeTab={activeTab} onChange={(id) => setActiveTab(id as TabId)} />
-        {filtered.length === 0 ? (
+
+        {/* Defect #86/#88 fix: explicit loading/error feedback. */}
+        {loading && <div className="rpg-empty" style={{ marginTop: '16px' }}><div className="rpg-empty-text">Loading missions…</div></div>}
+        {error && (
+          <div className="rpg-empty" style={{ marginTop: '16px' }}>
+            <div className="rpg-empty-icon">⚠</div>
+            <div className="rpg-empty-text">{error}</div>
+            <button type="button" className="rpg-btn" onClick={load}>Retry</button>
+          </div>
+        )}
+        {!loading && !error && filtered.length === 0 ? (
           <div className="rpg-empty" style={{ marginTop: '16px' }}>
             <div className="rpg-empty-icon">🎯</div>
             <div className="rpg-empty-text">No missions found.</div>
@@ -93,6 +163,9 @@ export const Missions = () => {
                       </div>
                     </div>
                   )}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                    <button onClick={() => handleDelete(m.id)} style={{ background: 'none', border: 'none', color: 'var(--habit-red)', cursor: 'pointer', fontSize: '0.7rem' }}>Delete</button>
+                  </div>
                 </RpgCard>
               );
             })}

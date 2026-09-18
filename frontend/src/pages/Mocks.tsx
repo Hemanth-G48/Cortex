@@ -29,6 +29,10 @@ export const Mocks = () => {
   const [attemptsByMock, setAttemptsByMock] = useState<Record<number, MockAttemptItem[]>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Defect #75: paper status filter is a server query, and the ready-to-practice
+  // bank size is hydrated from the practice question bank.
+  const [statusFilter, setStatusFilter] = useState('');
+  const [bankReady, setBankReady] = useState<number | null>(null);
 
   const loadSubjects = useCallback(async () => {
     try {
@@ -43,12 +47,19 @@ export const Mocks = () => {
 
   const loadMocks = useCallback(async () => {
     try {
-      const res = await endpoints.kb.mocks.list();
+      const res = await endpoints.kb.mocks.list(statusFilter || undefined);
       setMocks(res.items ?? []);
     } catch (e) {
       setError((e as Error).message);
     }
-  }, []);
+    // Hydrate the practice bank readiness (approved questions = practice-ready).
+    try {
+      const bank = await endpoints.kb.practice.questions({ status: 'approved' });
+      setBankReady(bank.items?.length ?? 0);
+    } catch {
+      setBankReady(null);
+    }
+  }, [statusFilter]);
 
   useEffect(() => {
     void loadSubjects();
@@ -272,6 +283,25 @@ export const Mocks = () => {
           <button type="button" className="btn btn-primary" onClick={() => void build()} disabled={busy || subjectId == null}>
             {busy ? 'Building…' : '＋ Build paper'}
           </button>
+          {/* Defect #75: which papers to list is decided by the server. */}
+          <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+            Show
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ display: 'block', marginTop: '0.25rem', width: 140 }}
+            >
+              <option value="">All papers</option>
+              <option value="draft">Draft</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+            </select>
+          </label>
+          {bankReady !== null && (
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              {bankReady} approved practice question{bankReady === 1 ? '' : 's'} in the bank
+            </span>
+          )}
         </div>
       </div>
 
@@ -288,6 +318,7 @@ export const Mocks = () => {
                   <strong style={{ fontSize: '0.85rem', flex: 1 }}>{mock.title}</strong>
                   <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                     {mock.question_count} Qs · {mock.duration_mins} min
+                    {mock.attempt_count ? ` · ${mock.attempt_count} attempt${mock.attempt_count === 1 ? '' : 's'}` : ''}
                   </span>
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => void start(mock)} disabled={busy}>
                     ▶ Start

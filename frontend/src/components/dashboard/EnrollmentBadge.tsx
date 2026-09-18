@@ -12,6 +12,9 @@ export const EnrollmentBadge = () => {
       .summary()
       .then(setSummary)
       .catch(() => undefined);
+    const onFocus = () => { void endpoints.enrollment.summary().then(setSummary).catch(() => {}); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   if (!summary?.institution_name) {

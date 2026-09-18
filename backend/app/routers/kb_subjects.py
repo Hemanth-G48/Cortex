@@ -116,6 +116,7 @@ async def import_syllabus_file(
     db: Session = Depends(get_db),
 ):
     """Import a syllabus file (PDF/DOCX/MD/TXT) via the text extractor."""
+    from fastapi.concurrency import run_in_threadpool
     from app.services.text_extractor import extract
 
     data = await file.read()
@@ -131,14 +132,21 @@ async def import_syllabus_file(
         tmp.write(data)
         tmp_path = tmp.name
     try:
-        text = extract(tmp_path, ext) or ""
+        # Text extraction (PDF/DOCX) is CPU/IO-heavy — keep it off the event
+        # loop (audit P6).
+        text = await run_in_threadpool(extract, tmp_path, ext) or ""
     finally:
         import os
 
         os.unlink(tmp_path)
     if not text.strip():
         raise HTTPException(422, "No text could be extracted from that file")
-    result = subjects_service.propose(db, current_user.id, text, filename=name)
+    # ``propose`` → ``parse_syllabus`` makes blocking LLM calls; offload so the
+    # ASGI event loop can keep serving other requests during inference
+    # (audit P6).
+    result = await run_in_threadpool(
+        subjects_service.propose, db, current_user.id, text, name
+    )
     db.commit()
     return {
         "profile": _profile_dict(db, result["profile"]),

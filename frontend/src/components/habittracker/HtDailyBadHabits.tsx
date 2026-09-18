@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { endpoints } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
 import { HtTabs } from './HtTabs';
@@ -26,6 +26,35 @@ export const HtDailyBadHabits = ({ habits, todayItems, overviewDays, onChanged }
   const { toast } = useToast();
   const [tab, setTab] = useState('all');
   const [busy, setBusy] = useState<number | null>(null);
+  // Defect #48: days_caught comes from each bad habit's real log rows
+  // (GET /habits/{id}/logs), not from the cached counter on the habit row.
+  const [caughtByHabit, setCaughtByHabit] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    if (habits.length === 0) {
+      setCaughtByHabit({});
+      return;
+    }
+    let stale = false;
+    Promise.all(
+      habits.map((h) =>
+        endpoints.habits
+          .logs(h.id)
+          .then((logs) => [h.id, logs.filter((l) => l.completed).length] as const)
+          .catch(() => null),
+      ),
+    ).then((rows) => {
+      if (stale) return;
+      const next: Record<number, number> = {};
+      for (const row of rows) {
+        if (row) next[row[0]] = row[1];
+      }
+      setCaughtByHabit(next);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [habits]);
 
   const loggedToday = useMemo(
     () => new Set(todayItems.filter((i) => i.log_today).map((i) => i.id)),
@@ -110,6 +139,7 @@ export const HtDailyBadHabits = ({ habits, todayItems, overviewDays, onChanged }
               loggedToday={loggedToday.has(h.id)}
               busy={busy === h.id}
               onAdmit={admit}
+              daysCaught={caughtByHabit[h.id]}
             />
           ))}
         </div>

@@ -22,6 +22,9 @@ class HabitBase(BaseModel):
     # Fitness Hub (Phase 3)
     goal: Optional[str] = None
     heatmap_data: Optional[str] = None
+    # Audit defect #49: archive provenance shown on the Archived Habits page.
+    archived_reason: Optional[str] = None
+    archived_document_id: Optional[int] = None
 
 
 class HabitCreate(HabitBase):
@@ -45,6 +48,13 @@ class HabitLogBase(BaseModel):
     xp_change: int = 0
     # Phase 91: drag-and-drop sort within a calendar day column
     sort_order: int = 0
+
+
+class HabitArchiveRequest(BaseModel):
+    """Optional provenance for an archive action (audit defect #49)."""
+
+    reason: Optional[str] = None
+    document_id: Optional[int] = None
 
 
 class HabitLogReorder(BaseModel):

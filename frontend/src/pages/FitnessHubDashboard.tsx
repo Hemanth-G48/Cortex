@@ -50,6 +50,8 @@ export const FitnessHubDashboard = () => {
         workoutCount={data.workouts.length}
         totalCalories={totalCalories}
         activePlans={activePlans}
+        level={data.board?.characters.level ?? null}
+        totalXp={data.board?.characters.total_xp ?? null}
       />
 
       {errors.length > 0 && (
@@ -75,10 +77,17 @@ export const FitnessHubDashboard = () => {
               <FhWeightGoal
                 weightGoal={summary?.weight_goal ?? null}
                 onEdit={() => setModalKind('weight-goal')}
+                vaultNotes={data.vaultNotes.filter((n) => n.kind === 'weight')}
               />
-              <FhPRTracker records={summary?.pr_tracker ?? []} />
+              <FhPRTracker
+                records={summary?.pr_tracker ?? []}
+                vaultNotes={data.vaultNotes.filter((n) => n.kind === 'pr')}
+              />
               <FhMembership membership={summary?.membership ?? null} />
-              <FhDietPlan plans={data.dietPlans} />
+              <FhDietPlan
+                plans={data.dietPlans}
+                vaultNotes={data.vaultNotes.filter((n) => n.kind === 'diet')}
+              />
             </>
           )}
         </aside>

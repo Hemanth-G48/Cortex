@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Header } from '../components/layout/Header';
+import { confirmDelete } from '../utils/confirm';
 import { endpoints } from '../services/api';
 import type { FlashcardDeck, Note } from '../services/api';
 
@@ -66,6 +67,9 @@ export const Flashcards = () => {
       .health()
       .then((h) => setAiMode(h.available && h.model ? `AI · ${h.model}` : 'Offline'))
       .catch(() => setAiMode('Offline'));
+    const onFocus = () => { void refresh(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, [refresh]);
 
   const loadDeck = async (id: number) => {
@@ -95,6 +99,7 @@ export const Flashcards = () => {
   };
 
   const handleDeleteDeck = async (id: number) => {
+    if (!confirmDelete('this deck and all its cards')) return;
     try {
       await endpoints.flashcards.delete(id);
       void refresh();

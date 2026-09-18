@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
 import {
   HabitHeatmapCard,
@@ -22,9 +22,13 @@ import { toIso, type LogEntry } from '../utils/vaultDates';
 import { today as fToday, unrelated as fUnrelated, thisWeek as fThisWeek, inbox as fInbox, completed as fCompleted } from '../utils/vaultFilters';
 import { endpoints, type Habit, type Task, type Project, type ProjectSummary, type VaultCalendar, type VaultSummary, type HabitStats } from '../services/api';
 import { getGridCols, setGridCols } from '../utils/vaultGrid';
+import { onHabitChange } from './HabitTracker';
 
 /** habitId -> heatmap days (LogEntry[]), loaded in parallel for Row 1. */
 type HeatmapStore = Record<number, LogEntry[]>;
+
+const TAB_KEY = 'slos-vault-active-tab';
+const VALID_TABS = ['Today', 'Unrelated Tasks', "This Week's Progress", 'Inbox', 'Completed'];
 
 /**
  * Vault Dashboard shell (Phase 48).
@@ -34,6 +38,7 @@ type HeatmapStore = Record<number, LogEntry[]>;
 export const VaultDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [gridCols, setGridColsState] = useState(getGridCols()); // Change Grid (1/2/3/4)
   const [firstHabitStats, setFirstHabitStats] = useState<HabitStats | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -46,11 +51,23 @@ export const VaultDashboard = () => {
   const [heatmaps, setHeatmaps] = useState<HeatmapStore>({});
   const [tabTasks, setTabTasks] = useState<Task[]>([]);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
-  const [activeTab, setActiveTab] = useState('Today');
+  // Defects #53/#97 fix: tab persisted via URL param with localStorage fallback.
+  const [activeTab, setActiveTab] = useState(() => {
+    const fromUrl = searchParams.get('tab');
+    if (fromUrl && VALID_TABS.includes(fromUrl)) return fromUrl;
+    const stored = localStorage.getItem(TAB_KEY);
+    return stored && VALID_TABS.includes(stored) ? stored : 'Today';
+  });
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Persist tab changes to URL + localStorage.
+  const changeTab = useCallback((tab: string) => {
+    setActiveTab(tab);
+    try { localStorage.setItem(TAB_KEY, tab); } catch { /* storage unavailable */ }
+  }, []);
 
   /** Map project_id -> name for task cards. */
   const projectNames: Record<number, string> = Object.fromEntries(
@@ -107,13 +124,13 @@ export const VaultDashboard = () => {
   const refreshProjectSummaries = () => {
     endpoints.projects.list().then((ps) => {
       setProjects(ps);
-      Promise.all(
-        ps.map((p) =>
-          endpoints.projects.summary(p.id).then((s) =>
-            setProjectSummaries((prev) => ({ ...prev, [p.id]: s })),
-          ),
-        ),
-      );
+      endpoints.projects.summaries()
+        .then((batch) => {
+          const mapped: Record<number, ProjectSummary> = {};
+          for (const [id, s] of Object.entries(batch)) mapped[Number(id)] = s;
+          setProjectSummaries(mapped);
+        })
+        .catch(() => {});
     });
     setEditingProject(null);
   };
@@ -143,24 +160,44 @@ export const VaultDashboard = () => {
         if (habitsData[0]) {
           endpoints.habits.stats(habitsData[0].id).then(setFirstHabitStats).catch(() => {});
         }
-        // Load each habit's heatmap in parallel for Row 1 streak grids.
+        // Defect #51 fix: one batched heatmap call instead of one per habit.
+        // Defect #52 fix: one batched project-summaries call instead of one per project.
         return Promise.all([
-          ...habitsData.map((h) => reloadHabit(h.id)),
-          // Project summaries for Row 4 project cards.
-          ...projectsData.map((p) =>
-            endpoints.projects.summary(p.id).then((s) =>
-              setProjectSummaries((prev) => ({ ...prev, [p.id]: s })),
-            ),
-          ),
+          endpoints.habits.heatmaps()
+            .then((batch) => {
+              const store: HeatmapStore = {};
+              for (const [id, hm] of Object.entries(batch)) store[Number(id)] = hm.days;
+              setHeatmaps(store);
+            })
+            .catch(() => {}),
+          endpoints.projects.summaries()
+            .then((batch) => {
+              const mapped: Record<number, ProjectSummary> = {};
+              for (const [id, s] of Object.entries(batch)) mapped[Number(id)] = s;
+              setProjectSummaries(mapped);
+            })
+            .catch(() => {}),
         ]);
       })
       .catch(() => setError('Could not load vault data'))
       .finally(() => setLoading(false));
-  }, [reloadHabit]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Defects #12/#77 fix: refresh when habits change on other pages.
+  useEffect(() => onHabitChange(() => {
+    endpoints.habits.list().then((hs) => {
+      setHabits(hs);
+      endpoints.habits.heatmaps().then((batch) => {
+        const store: HeatmapStore = {};
+        for (const [id, hm] of Object.entries(batch)) store[Number(id)] = hm.days;
+        setHeatmaps(store);
+      }).catch(() => {});
+    }).catch(() => {});
+  }), []);
 
   useEffect(() => { loadTab(activeTab); }, [activeTab, loadTab]);
 
@@ -169,6 +206,8 @@ export const VaultDashboard = () => {
       .then(() => {
         toast('Habit logged today', 'success');
         reloadHabit(habitId);
+        // Defect #77 fix: keep HabitTracker in sync with this log.
+        window.dispatchEvent(new CustomEvent('habits:changed'));
       })
       .catch(() => toast('Could not log habit', 'error'));
   };
@@ -281,11 +320,15 @@ export const VaultDashboard = () => {
 
               {/* Row 3: Task section with vault tabs (Phase 51) */}
               <section className="vault-section">
-                <div className="vault-heading" style={{ marginBottom: 10 }}>Tasks</div>
+                <div className="vault-heading" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Tasks</span>
+                  {/* Defect #54 fix: prominent create button right at the section heading. */}
+                  <QuickActionLink label="＋ New Task" onClick={() => setShowCreate(true)} />
+                </div>
                 <VaultTabs
                   tabs={['Today', 'Unrelated Tasks', "This Week's Progress", 'Inbox', 'Completed']}
                   active={activeTab}
-                  onChange={setActiveTab}
+                  onChange={changeTab}
                 />
                 {activeTab === "This Week's Progress" && (
                   <div style={{ marginTop: 12 }}>

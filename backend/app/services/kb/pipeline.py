@@ -23,6 +23,70 @@ logger = logging.getLogger(__name__)
 
 SNAPSHOT_DIR = "kb_snapshots"
 
+# ---------------------------------------------------------------------------
+# Post-ingest hook registry (Idea 35/36/39 extended — event-driven ingest)
+# ---------------------------------------------------------------------------
+# Features that need to react to a successful document ingestion register a
+# hook here instead of being called inline. This keeps ``ingest_document``
+# stable and lets new features opt into the ingestion lifecycle without
+# modifying pipeline code.
+#
+# Each hook is ``callable[[Session, KbDocument], None]`` and is best-effort:
+# a hook that raises is logged and swallowed — it never fails the ingest.
+_POST_INGEST_HOOKS: list[tuple[str, callable]] = []
+
+
+def register_post_ingest(name: str, hook: callable) -> None:
+    """Register a post-ingest hook by name.
+
+    Hooks run in registration order after a successful ingest (extract + chunk
+    committed). Each hook receives the db session and the document. If a hook
+    raises, the error is logged and the next hook runs — no hook can fail the
+    pipeline.
+    """
+    _POST_INGEST_HOOKS.append((name, hook))
+
+
+def run_post_ingest_hooks(db: Session, doc: KbDocument) -> None:
+    """Run all registered post-ingest hooks for ``doc`` (best-effort).
+
+    Core hooks (daily-note tag + capture XP, citation parse, quality
+    recompute) are registered at pipeline import (see ``_register_core_hooks``
+    below); new features add themselves via ``register_post_ingest``.
+    """
+    for name, hook in _POST_INGEST_HOOKS:
+        try:
+            hook(db, doc)
+            db.commit()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("%s hook failed for doc %s: %s", name, doc.id, exc)
+            db.rollback()
+
+
+def _register_core_hooks() -> None:
+    """Eagerly register the core post-ingest hooks at import time.
+
+    Importing each feature module here calls its ``register_hook_once``,
+    so the registry is fully populated before the first ingest. Import
+    failures (e.g. a missing optional dependency) are non-fatal — the
+    pipeline still works, just without that hook.
+    """
+    for module_name in ("daily_notes", "citation_registry", "quality"):
+        if any(name.startswith(f"{module_name}.") for name, _ in _POST_INGEST_HOOKS):
+            continue
+        try:
+            import importlib
+
+            mod = importlib.import_module(f"app.services.kb.{module_name}")
+            register_once = getattr(mod, "register_hook_once", None)
+            if register_once is not None:
+                register_once()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not register post-ingest hook %s: %s", module_name, exc)
+
+
+_register_core_hooks()
+
 
 # ---------------------------------------------------------------------------
 # Chunking (Idea 7)
@@ -230,9 +294,9 @@ def ingest_document(db: Session, doc: KbDocument) -> dict:
         doc.indexed_at = utcnow()
         db.add(doc)
         db.commit()
-        # Phase 4 post-ingest hooks (each best-effort; never fail the job):
-        # daily-note auto-tag (Idea 35), citation parsing (Idea 36), and
-        # quality recompute (Idea 39) since content changed.
+        # Post-ingest hooks (each best-effort; never fail the job): daily-note
+        # auto-tag + capture XP, citation parsing, quality recompute, and any
+        # other registered hooks (``register_post_ingest``).
         run_post_ingest_hooks(db, doc)
         return result
     except Exception as exc:  # noqa: BLE001 — never crash the job
@@ -241,42 +305,3 @@ def ingest_document(db: Session, doc: KbDocument) -> dict:
         db.add(doc)
         db.commit()
         return {**result, "status": "failed", "error": str(exc)[:500]}
-
-
-def run_post_ingest_hooks(db: Session, doc: KbDocument) -> None:
-    """Phase 4 best-effort hooks after a successful ingest (phrases 42, 56, 84).
-
-    Phase 7 (Idea 69, phrase 82): a *new* daily-note document (``doc_date``
-    set, first time seen) awards ``daily_note`` capture XP — once per document.
-    """
-    try:
-        from app.services.kb.daily_notes import tag_daily_note
-
-        tag_daily_note(db, doc)
-        if doc.doc_date is not None:
-            from app.models import User
-            from app.services.kb.capture_xp import award_capture_xp
-
-            user = db.get(User, doc.user_id)
-            if user is not None:
-                award_capture_xp(db, user, "daily_note", f"doc:{doc.id}")
-        db.commit()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Daily-note tag hook failed for doc %s: %s", doc.id, exc)
-        db.rollback()
-
-    try:
-        from app.services.kb.citation_registry import extract_for_document
-
-        extract_for_document(db, doc)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Citation hook failed for doc %s: %s", doc.id, exc)
-        db.rollback()
-
-    try:
-        from app.services.kb.quality import recompute_for_document
-
-        recompute_for_document(db, doc)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Quality recompute hook failed for doc %s: %s", doc.id, exc)
-        db.rollback()

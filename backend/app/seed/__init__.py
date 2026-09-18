@@ -63,11 +63,10 @@ def seed_database(db: Session) -> None:
         user.is_admin = True
         db.commit()
     seed_rpg_additions(db)
-    # Default vault habits are intentionally re-seeded on every startup (they are
-    # the app's built-in defaults), unlike the demo projects/tasks/goals below
-    # which are only seeded on first run so UI deletions are never resurrected.
-    seed_vault_habits(db)
+    # Vault demo data seeded only on first boot (like other demo data) so user
+    # deletions are never resurrected on restart.
     if fresh:
+        seed_vault_habits(db)
         seed_vault_demo(db)
     # Life Planner demo data (daily logs + events) is append-only: entries are
     # keyed on (date / title) so re-runs never duplicate them.
@@ -265,9 +264,8 @@ def seed_full(db: Session) -> None:
     db.add(ProjectTask(project_id=proj1.id, title="Implement user auth"))
 
     # -- Life Areas --
-    db.add(LifeArea(user_id=user.id, name="Academics", satisfaction_score=7, goal="Maintain 3.5+ GPA"))
-    db.add(LifeArea(user_id=user.id, name="Health", satisfaction_score=6, goal="Exercise 5x per week"))
-    db.add(LifeArea(user_id=user.id, name="Social", satisfaction_score=8, goal="Stay connected with friends"))
+    # LifeArea seeding is owned by seed_rpg_additions (the richer canonical
+    # set: progress/target_days/status) so fresh boots get exactly one set.
 
     # -- Rewards --
     seed_rewards(db, user)
@@ -982,8 +980,8 @@ def seed_rpg_additions(db: Session) -> None:
         seed_rewards(db, user)
     existing_areas = db.query(LifeArea).count()
     if existing_areas < 4:
-        # Clear existing and re-seed RPG life areas
-        db.query(LifeArea).delete()
+        # Only seed life areas if none exist (first boot or user deleted all).
+        # Do NOT delete existing areas — respect user modifications.
         seed_life_areas(db, user)
     if not db.query(Mission).first():
         seed_missions(db, user)

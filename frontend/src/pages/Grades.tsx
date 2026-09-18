@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Header } from '../components/layout/Header';
 import { GradeTrendChart } from '../components/grades/GradeTrendChart';
 import { endpoints } from '../services/api';
-import type { Course, CourseWeight, GPAResponse, Grade } from '../services/api';
+import { confirmDelete } from '../utils/confirm';
+import type { Course, CourseWeight, GPAResponse, Grade, KbMastery } from '../services/api';
 
 const EMPTY_COURSE = { title: '', credits: 3 };
 const EMPTY_GRADE = { course_id: 0, title: '', points_earned: '', points_possible: '', category_id: '' };
@@ -26,6 +27,8 @@ export const Grades = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [gpaData, setGpaData] = useState<GPAResponse | null>(null);
   const [allGrades, setAllGrades] = useState<Grade[]>([]);
+  // Defect #71: vault-derived competency shown beside the GPA.
+  const [vaultMastery, setVaultMastery] = useState<KbMastery | null>(null);
   const [weights, setWeights] = useState<Record<number, CourseWeight[]>>({});
   const [needed, setNeeded] = useState<number | null>(null);
 
@@ -44,14 +47,16 @@ export const Grades = () => {
 
   const refresh = useCallback(async () => {
     try {
-      const [cs, gpa, grs] = await Promise.all([
+      const [cs, gpa, grs, mastery] = await Promise.all([
         endpoints.courses.list(),
         endpoints.grades.gpa(),
         endpoints.grades.list(),
+        endpoints.kb.mastery().catch(() => null),
       ]);
       setCourses(cs);
       setGpaData(gpa);
       setAllGrades(grs);
+      setVaultMastery(mastery);
       if (trendCourse === null && gpa.courses.length > 0) {
         setTrendCourse(gpa.courses[0].course_id);
       }
@@ -66,6 +71,38 @@ export const Grades = () => {
           }
         }),
       );
+      // Defect #70: courses with no weights yet are seeded from the enrolled
+      // curriculum's credit hours (GET /enrollment/summary) — the real
+      // weighting factor the curriculum records — rather than starting empty.
+      const missing = gpa.courses.filter((c) => (wMap[c.course_id] ?? []).length === 0);
+      if (missing.length > 0) {
+        const enrollmentSummary = await endpoints.enrollment.summary().catch(() => null);
+        const subjects = enrollmentSummary?.subjects ?? [];
+        const totalCredits = subjects.reduce((s, sub) => s + (sub.credits ?? 0), 0);
+        if (totalCredits > 0) {
+          await Promise.all(
+            missing.map(async (c) => {
+              const title = c.title.trim().toLowerCase();
+              const subject =
+                subjects.find((s) => s.name.trim().toLowerCase() === title) ??
+                subjects.find((s) => title.includes(s.name.trim().toLowerCase()));
+              if (!subject) return;
+              const share = Math.round(((subject.credits ?? 0) / totalCredits) * 100);
+              if (share <= 0) return;
+              try {
+                const created = await endpoints.grades.createWeight({
+                  course_id: c.course_id,
+                  name: `${subject.name} (curriculum credits)`,
+                  weight: share,
+                });
+                wMap[c.course_id] = [created];
+              } catch {
+                /* leave the course without weights */
+              }
+            }),
+          );
+        }
+      }
       setWeights(wMap);
     } catch {
       /* silent */
@@ -76,22 +113,41 @@ export const Grades = () => {
     void refresh();
   }, [refresh]);
 
-  const predict = useCallback(async () => {
-    try {
-      const res = await endpoints.grades.neededOnFinal({
-        current_pct: currentPct,
-        final_weight_pct: finalWeight,
-        desired_pct: desiredGrade,
-      });
-      setNeeded(res.needed_pct);
-    } catch {
-      setNeeded(null);
-    }
+  // Defect #42 fix: the predictor is debounced (300ms) so typing doesn't
+  // fire an API request per keystroke.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debounced, setDebounced] = useState({ currentPct, finalWeight, desiredGrade });
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebounced({ currentPct, finalWeight, desiredGrade });
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [currentPct, finalWeight, desiredGrade]);
 
   useEffect(() => {
-    void predict();
-  }, [predict]);
+    endpoints.grades.neededOnFinal({
+      current_pct: debounced.currentPct,
+      final_weight_pct: debounced.finalWeight,
+      desired_pct: debounced.desiredGrade,
+    })
+      .then((res) => setNeeded(res.needed_pct))
+      .catch(() => setNeeded(null));
+  }, [debounced]);
+
+  // Defect #43 fix: delete a grade entry.
+  const handleDeleteGrade = async (gradeId: number) => {
+    if (!confirmDelete('this grade entry')) return;
+    try {
+      await endpoints.grades.delete(gradeId);
+      void refresh();
+    } catch {
+      /* non-fatal: refresh keeps current view */
+    }
+  };
 
   const gradedCount = gpaData?.courses.filter((c) => c.percentage !== null).length ?? 0;
 
@@ -220,6 +276,15 @@ export const Grades = () => {
           <div style={{ marginTop: '0.25rem' }}>
             Out of <strong style={{ color: 'var(--text-primary)' }}>{courses.length}</strong> total courses
           </div>
+          {/* Defect #71: the vault's practice-derived competency beside the
+              recorded GPA, so both signals are visible together. */}
+          {vaultMastery && vaultMastery.topics_total > 0 && (
+            <div style={{ marginTop: '0.25rem' }}>
+              Vault mastery{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>{vaultMastery.score_pct}%</strong>
+              {' '}across {vaultMastery.topics_total} topics · {vaultMastery.hours_logged}h logged
+            </div>
+          )}
         </div>
       </div>
 
@@ -316,7 +381,42 @@ export const Grades = () => {
               ))}
             </select>
           </div>
-          <GradeTrendChart grades={trendGrades} />
+          <GradeTrendChart grades={trendGrades} height={110} />
+          {/* Defect #43 fix: per-grade delete. */}
+          {trendGrades.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem' }}>
+              {trendGrades.map((g) => (
+                <div
+                  key={g.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                    padding: '0.4rem 0.6rem',
+                    background: 'var(--bg-primary)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    fontSize: '0.78rem',
+                  }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.title}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                    <span className="badge badge-info">{g.points_earned}/{g.points_possible}</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--danger)' }}
+                      onClick={() => void handleDeleteGrade(g.id)}
+                      aria-label={`Delete ${g.title}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

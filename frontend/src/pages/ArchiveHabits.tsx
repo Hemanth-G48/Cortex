@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Header } from '../components/layout/Header';
 import { useToast } from '../hooks/useToast';
 import { endpoints } from '../services/api';
@@ -34,6 +35,21 @@ export const ArchiveHabits = () => {
               <span className="vault-muted" style={{ fontSize: '0.75rem' }}>Archived</span>
             </div>
             {h.description && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>{h.description}</p>}
+            {/* Defect #49: why it was archived, plus a link to the vault note
+                that triggered an automatic archive when one is recorded. */}
+            {h.archived_reason && (
+              <p className="vault-muted" style={{ fontSize: '0.75rem', marginBottom: '0.5rem' }}>
+                📄 {h.archived_reason}
+                {h.archived_document_id != null && (
+                  <>
+                    {' · '}
+                    <Link to="/kb" style={{ color: 'var(--accent)' }}>
+                      view source note
+                    </Link>
+                  </>
+                )}
+              </p>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-complete" onClick={() => unarchive(h.id)}>Unarchive</button>
               <button className="btn-complete" onClick={() => remove(h.id)} style={{ background: 'var(--habit-red)', color: '#fff' }}>Delete</button>

@@ -5,6 +5,8 @@ import { onAIChatToggle } from '../utils/aiChatBus';
 interface Message {
   role: 'user' | 'ai';
   text: string;
+  /** true while the reply is still streaming in (not persisted). */
+  streaming?: boolean;
 }
 
 const QUICK_PROMPTS = [
@@ -14,14 +16,29 @@ const QUICK_PROMPTS = [
   'Help',
 ];
 
+const WELCOME: Message = {
+  role: 'ai',
+  text: "Hey! I'm Shiori, your AI study companion. Ask me about your assignments, deadlines, grades, or study plans!",
+};
+
+// Defect #61 fix: chat history survives closing the chat.
+const HISTORY_KEY = 'slos-ai-chat-history';
+
+const loadHistory = (): Message[] => {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [WELCOME];
+    const parsed = JSON.parse(raw) as Message[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return [WELCOME];
+    return parsed.map((m) => ({ role: m.role, text: m.text }));
+  } catch {
+    return [WELCOME];
+  }
+};
+
 export const AIChat = () => {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'ai',
-      text: "Hey! I'm Shiori, your AI study companion. Ask me about your assignments, deadlines, grades, or study plans!",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(loadHistory);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -30,6 +47,17 @@ export const AIChat = () => {
     const off = onAIChatToggle(() => setOpen((o) => !o));
     return off;
   }, []);
+
+  // Persist the conversation (cap at the last 100 messages; transient
+  // streaming frames are never saved).
+  useEffect(() => {
+    const complete = messages.filter((m) => !m.streaming).slice(-100);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(complete));
+    } catch {
+      /* storage full/unavailable — keep session-only */
+    }
+  }, [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: 'smooth' });
@@ -41,9 +69,39 @@ export const AIChat = () => {
     setMessages((m) => [...m, { role: 'user', text: trimmed }]);
     setInput('');
     setTyping(true);
+    // Defect #62 fix: progressive display — the reply streams in as it is
+    // written into state instead of appearing all at once.
+    let streamTimer: ReturnType<typeof setInterval> | null = null;
     try {
       const res = await endpoints.ai.chat({ message: trimmed });
-      setMessages((m) => [...m, { role: 'ai', text: res.message }]);
+      const full = res.message;
+      let shown = 0;
+      await new Promise<void>((resolve) => {
+        streamTimer = setInterval(() => {
+          shown = Math.min(full.length, shown + Math.ceil(full.length / 40));
+          setMessages((m) => {
+            const next = [...m];
+            const last = next[next.length - 1];
+            if (last && last.role === 'ai' && last.text !== full && last.streaming) {
+              next[next.length - 1] = { role: 'ai', text: full.slice(0, shown) };
+            } else {
+              next.push({ role: 'ai', text: full.slice(0, shown), streaming: true });
+            }
+            return next;
+          });
+          if (shown >= full.length) {
+            if (streamTimer) clearInterval(streamTimer);
+            // Final frame: mark the message complete.
+            setMessages((m) => {
+              const next = [...m];
+              const last = next[next.length - 1];
+              if (last && last.role === 'ai') next[next.length - 1] = { role: 'ai', text: full };
+              return next;
+            });
+            resolve();
+          }
+        }, 30);
+      });
     } catch {
       setMessages((m) => [...m, { role: 'ai', text: "Sorry — I couldn't reach the assistant. Check that the backend is running." }]);
     }
@@ -120,6 +178,17 @@ export const AIChat = () => {
           <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Shiori Assistant</div>
           <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Ctrl+K to toggle</div>
         </div>
+        {messages.length > 1 && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setMessages([WELCOME])}
+            aria-label="Clear chat history"
+            title="Clear chat history"
+          >
+            🧹
+          </button>
+        )}
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)} aria-label="Close AI assistant">
           ✕
         </button>

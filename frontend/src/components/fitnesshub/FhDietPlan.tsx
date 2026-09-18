@@ -1,11 +1,14 @@
 import type { DietPlan } from '../../services/api';
+import type { VaultNote } from '../../hooks/useFitnessHubData';
 
 interface Props {
   plans: DietPlan[];
+  /** Vault notes about diet/nutrition (defect #85). */
+  vaultNotes?: VaultNote[];
 }
 
 /** Sidebar Diet-Plan widget (Phase 69): phases with active highlight + pulse. */
-export const FhDietPlan = ({ plans }: Props) => {
+export const FhDietPlan = ({ plans, vaultNotes = [] }: Props) => {
   if (plans.length === 0) {
     return (
       <div className="fh-card">
@@ -28,6 +31,11 @@ export const FhDietPlan = ({ plans }: Props) => {
             <span className="fh-diet-dot" aria-label={p.is_active ? 'Active plan' : undefined} />
           </div>
         ))}
+        {vaultNotes.length > 0 && (
+          <div className="fh-diet-item" style={{ fontSize: '0.7rem', color: 'var(--fh-text-muted, #999)' }}>
+            <span title={vaultNotes[0].snippet}>📚 {vaultNotes[0].title}</span>
+          </div>
+        )}
       </div>
     </div>
   );

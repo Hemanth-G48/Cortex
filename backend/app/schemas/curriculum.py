@@ -61,6 +61,9 @@ class SubjectCreate(BaseModel):
     name: str
     code: str
     semester: Optional[int] = None
+    # Audit defect #9: the frontend renders this verbatim instead of building
+    # the "Semester N" string itself.
+    semester_label: Optional[str] = None
     credits: int = 3
     description: Optional[str] = None
 

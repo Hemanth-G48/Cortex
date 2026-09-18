@@ -24,7 +24,8 @@ export const CurriculumSection = () => {
     if (!summary?.subjects.length) return [];
     const groups = new Map<string, Subject[]>();
     for (const s of summary.subjects) {
-      const key = s.semester != null ? `Semester ${s.semester}` : 'Other';
+      // Defect #9: the label is resolved by the backend — render it verbatim.
+      const key = s.semester_label ?? 'Other';
       groups.set(key, [...(groups.get(key) ?? []), s]);
     }
     return [...groups.entries()];

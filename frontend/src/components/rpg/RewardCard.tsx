@@ -3,6 +3,7 @@ import { RpgCard } from './RpgCard';
 import { RpgBadge } from './RpgBadge';
 import { RpgButton } from './RpgButton';
 import { useToast } from '../../hooks/useToast';
+import { confirmDelete } from '../../utils/confirm';
 import type { Reward } from '../../services/api';
 
 interface RewardCardProps {
@@ -33,7 +34,7 @@ export const RewardCard = ({ reward, characterXp, onClaim, onDelete, onEdit }: R
   };
 
   const handleDelete = () => {
-    if (!window.confirm('Delete this reward?')) return;
+    if (!confirmDelete('this reward')) return;
     onDelete?.(reward);
   };
 

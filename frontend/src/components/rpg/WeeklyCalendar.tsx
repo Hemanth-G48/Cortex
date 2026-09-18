@@ -132,62 +132,16 @@ export const WeeklyCalendar = ({
         endpoints.questCentre.calendar().catch(() => null as QuestCentreCalendar | null),
       ]);
 
-      // Merge quests_by_date from API and prop
-      const mergedLookup: Record<string, CalendarQuest[]> = { ...questsByDateLookup };
+      // Defect #62: the quest-centre calendar is the AUTHORITATIVE quest
+      // overlay. Only when it has nothing for this window do we fall back to
+      // the plain quest/mission lists (and the prop supplied by the parent).
+      const calendarQuests: CalendarEvent[] = [];
       if (calendarData?.quests_by_date) {
         calendarData.quests_by_date.forEach((g) => {
-          mergedLookup[g.date] = g.quests;
-        });
-      }
-
-      const mapped: CalendarEvent[] = [
-        ...scheduleEvents.map((e) => ({ ...e, type: 'schedule' as const, source_id: e.id })),
-        ...questList
-          .filter((q) => q.due_date && q.status !== 'Completed')
-          .map((q) => {
-            const d = new Date(q.due_date!);
-            return {
-              id: `quest-${q.id}`,
-              title: q.title,
-              day_of_week: dateToDayOfWeek(d),
-              start_time: null,
-              end_time: null,
-              reference_type: 'quest' as const,
-              color: '#ff9800',
-              type: 'quest' as const,
-              source_id: q.id,
-              due_date: q.due_date!,
-            };
-          }),
-        ...missionList
-          .filter((m) => m.due_date && m.status !== 'Completed')
-          .map((m) => {
-            const d = new Date(m.due_date!);
-            return {
-              id: `mission-${m.id}`,
-              title: m.title,
-              day_of_week: dateToDayOfWeek(d),
-              start_time: null,
-              end_time: null,
-              reference_type: 'mission' as const,
-              color: '#4caf50',
-              type: 'mission' as const,
-              source_id: m.id,
-              due_date: m.due_date!,
-            };
-          }),
-      ];
-
-      // Add quests from mergedLookup that are not already in mapped
-      Object.entries(mergedLookup).forEach(([dateStr, quests]) => {
-        const d = new Date(dateStr + 'T00:00:00');
-        const dow = dateToDayOfWeek(d);
-        quests.forEach((q) => {
-          const exists = mapped.some(
-            (e) => e.type === 'quest' && e.source_id === q.id,
-          );
-          if (!exists) {
-            mapped.push({
+          const d = new Date(g.date + 'T00:00:00');
+          const dow = dateToDayOfWeek(d);
+          g.quests.forEach((q) => {
+            calendarQuests.push({
               id: `quest-${q.id}`,
               title: q.title,
               day_of_week: dow,
@@ -197,11 +151,74 @@ export const WeeklyCalendar = ({
               color: '#ff9800',
               type: 'quest' as const,
               source_id: q.id,
-              due_date: dateStr,
+              due_date: g.date,
             });
-          }
+          });
         });
-      });
+      }
+
+      let questOverlay: CalendarEvent[] = calendarQuests;
+      if (questOverlay.length === 0) {
+        // Fallback 1: the parent-supplied quests_by_date prop.
+        questOverlay = Object.entries(questsByDateLookup).flatMap(([dateStr, quests]) =>
+          quests.map((q) => ({
+            id: `quest-${q.id}`,
+            title: q.title,
+            day_of_week: dateToDayOfWeek(new Date(dateStr + 'T00:00:00')),
+            start_time: null,
+            end_time: null,
+            reference_type: 'quest' as const,
+            color: '#ff9800',
+            type: 'quest' as const,
+            source_id: q.id,
+            due_date: dateStr,
+          })),
+        );
+      }
+      if (questOverlay.length === 0) {
+        // Fallback 2: the quest + mission lists.
+        questOverlay = [
+          ...questList
+            .filter((q) => q.due_date && q.status !== 'Completed')
+            .map((q) => {
+              const d = new Date(q.due_date!);
+              return {
+                id: `quest-${q.id}`,
+                title: q.title,
+                day_of_week: dateToDayOfWeek(d),
+                start_time: null,
+                end_time: null,
+                reference_type: 'quest' as const,
+                color: '#ff9800',
+                type: 'quest' as const,
+                source_id: q.id,
+                due_date: q.due_date!,
+              };
+            }),
+          ...missionList
+            .filter((m) => m.due_date && m.status !== 'Completed')
+            .map((m) => {
+              const d = new Date(m.due_date!);
+              return {
+                id: `mission-${m.id}`,
+                title: m.title,
+                day_of_week: dateToDayOfWeek(d),
+                start_time: null,
+                end_time: null,
+                reference_type: 'mission' as const,
+                color: '#4caf50',
+                type: 'mission' as const,
+                source_id: m.id,
+                due_date: m.due_date!,
+              };
+            }),
+        ];
+      }
+
+      const mapped: CalendarEvent[] = [
+        ...scheduleEvents.map((e) => ({ ...e, type: 'schedule' as const, source_id: e.id })),
+        ...questOverlay,
+      ];
 
       setEvents(mapped);
     } catch {

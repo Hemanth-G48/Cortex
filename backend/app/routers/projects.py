@@ -87,6 +87,46 @@ def delete_project_task(task_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@router.get("/projects/summaries")
+def project_summaries_batch(db: Session = Depends(get_db)):
+    """All project summaries in one call (audit defect #52 — kills the N+1 loop)."""
+    projects = db.query(Project).all()
+    tasks = db.query(ProjectTask).all()
+
+    by_project: dict = {}
+    for task in tasks:
+        by_project.setdefault(task.project_id, []).append(task)
+
+    out = {}
+    for project in projects:
+        project_tasks = by_project.get(project.id, [])
+        total_tasks = len(project_tasks)
+        incomplete_tasks = sum(1 for t in project_tasks if not t.completed)
+
+        days_to_go = None
+        if project.deadline:
+            days_to_go = (project.deadline - date.today()).days
+
+        if project.status == "Completed":
+            deadline_status = "Completed"
+        elif days_to_go is None:
+            deadline_status = "No deadline"
+        elif days_to_go < 0:
+            deadline_status = "Overdue"
+        elif days_to_go <= 7:
+            deadline_status = "7 Days to go"
+        else:
+            deadline_status = f"{days_to_go} Days to go"
+
+        out[str(project.id)] = {
+            "total_tasks": total_tasks,
+            "incomplete_tasks": incomplete_tasks,
+            "days_to_go": days_to_go,
+            "deadline_status": deadline_status,
+        }
+    return out
+
+
 @router.get("/projects/{project_id}/summary")
 def project_summary(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()

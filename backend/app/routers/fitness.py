@@ -1,3 +1,4 @@
+from datetime import date
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,7 +26,7 @@ from app.schemas.fitness import (
     PersonalRecordCreate, PersonalRecordResponse,
     DietPlanCreate, DietPlanResponse,
 )
-from app.services.fitness_hub import expenses_summary, weight_progress, membership_info
+from app.services.fitness_hub import expenses_summary, weight_progress, membership_info, week_actuals
 
 router = APIRouter(prefix="/api", tags=["fitness"])
 
@@ -38,6 +39,26 @@ def _first_user(db: Session) -> Optional[User]:
 @router.get("/workouts", response_model=List[WorkoutResponse])
 def list_workouts(db: Session = Depends(get_db)):
     return db.query(Workout).order_by(Workout.date.desc()).all()
+
+
+@router.get("/fitness/week-actuals")
+def get_week_actuals(
+    week_start: Optional[str] = Query(None, description="ISO date (Monday) to start the week."),
+    db: Session = Depends(get_db),
+):
+    """Per-day actuals for the current week (audit defect #84).
+
+    Overlays what was actually trained on each Mon-Sat card — ``Workout`` rows
+    plus whether the vault's ``daily-life/YYYY-MM-DD.md`` note mentions a
+    workout — on the configured split.
+    """
+    start = None
+    if week_start:
+        try:
+            start = date.fromisoformat(week_start)
+        except ValueError:
+            raise HTTPException(400, "week_start must be an ISO date (YYYY-MM-DD)")
+    return week_actuals(db, _first_user(db), start)
 
 
 @router.post("/workouts", response_model=WorkoutResponse)

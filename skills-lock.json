@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "code-auditor": {
+      "source": "mhattingpete/claude-skills-marketplace",
+      "sourceType": "github",
+      "skillPath": "productivity-skills-plugin/skills/code-auditor/SKILL.md",
+      "computedHash": "1a5326298297ba93266913c2eb5cd3e351e1bcbb14d75e2c57cd2f925bfd89c2"
+    },
+    "review-architecture": {
+      "source": "nesnilnehc/ai-cortex",
+      "sourceType": "github",
+      "skillPath": "skills/review-architecture/SKILL.md",
+      "computedHash": "e0f2f1417f927480ad66f6479dd8ce6bb144c2f1641a17b084e1258b8cc36ea7"
+    },
+    "reviewing-architecture-doc": {
+      "source": "bm629/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/reviewing-architecture-doc/SKILL.md",
+      "computedHash": "603c3d4a77808b582e4d6206adbe71445996f9041bc11e4ff5cb961a772aafb9"
+    }
+  }
+}

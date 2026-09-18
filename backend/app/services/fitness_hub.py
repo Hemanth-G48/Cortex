@@ -4,6 +4,7 @@ Composable helpers shared by the ``fitness`` router (weight-goal, membership)
 and the ``fitness_hub`` summary router.
 """
 import json
+import os
 from datetime import date, timedelta
 from typing import Optional
 
@@ -18,6 +19,7 @@ from app.models import (
     MuscleGroup,
     PersonalRecord,
     User,
+    Workout,
     WorkoutSplit,
 )
 
@@ -168,6 +170,73 @@ def weekly_split(db: Session, user: Optional[User], week_number: int = 1) -> lis
             }
         )
     return out
+
+
+def week_actuals(
+    db: Session, user: Optional[User], week_start: date | None = None
+) -> dict:
+    """Phase 73-79 follow-up (audit defect #84): Mon-Sat *actuals*.
+
+    The Weekly-Split cards render the configured plan; this supplies what was
+    actually trained on each day of the current week — the ``Workout`` rows for
+    that date plus whether the vault's ``daily-life/YYYY-MM-DD.md`` note
+    mentions a workout. Read-only and cheap; the frontend overlays it on the
+    existing day cards without changing their layout.
+    """
+    today = date.today()
+    start = week_start or (today - timedelta(days=today.weekday()))
+
+    q = db.query(Workout).filter(Workout.date >= start, Workout.date < start + timedelta(days=7))
+    if user:
+        q = q.filter(Workout.user_id == user.id)
+    by_date: dict[str, list[Workout]] = {}
+    for w in q.all():
+        key = w.date.isoformat() if hasattr(w.date, "isoformat") else str(w.date)
+        by_date.setdefault(key, []).append(w)
+
+    # Vault half: does the day's daily-life note mention a workout?
+    vault_root = None
+    if user:
+        from app.services.kb.daily_notes import resolve_daily_life_root
+
+        vault_root = resolve_daily_life_root(db, user.id)
+    keywords = ("workout", "gym", "trained", "bench", "squat", "deadlift", "run", "push", "pull", "leg day")
+
+    days = []
+    for dow in range(6):
+        day = start + timedelta(days=dow)
+        key = day.isoformat()
+        workouts = by_date.get(key, [])
+        note_mentions = False
+        if vault_root:
+            note_path = os.path.join(vault_root, f"{key}.md")
+            try:
+                if os.path.isfile(note_path):
+                    with open(note_path, "r", encoding="utf-8", errors="replace") as fh:
+                        text = fh.read().casefold()
+                    note_mentions = any(k in text for k in keywords)
+            except OSError:
+                note_mentions = False
+        days.append(
+            {
+                "day": WEEKDAY_LABELS[dow],
+                "day_of_week": dow,
+                "date": key,
+                "workouts": [
+                    {
+                        "id": w.id,
+                        "type": w.type,
+                        "duration_minutes": w.duration_minutes,
+                        "calories": w.calories,
+                    }
+                    for w in workouts
+                ],
+                "total_minutes": sum(w.duration_minutes or 0 for w in workouts),
+                "logged": bool(workouts) or note_mentions,
+                "vault_mentions": note_mentions,
+            }
+        )
+    return {"week_start": start.isoformat(), "days": days}
 
 
 def muscle_group_overview(db: Session, user: Optional[User]) -> list[dict]:

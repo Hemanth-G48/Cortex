@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { Header } from '../components/layout/Header';
 import { endpoints } from '../services/api';
-import type { Habit, HabitStats } from '../services/api';
+import type { Habit, HabitHeatmapDay, HabitStats } from '../services/api';
 
 export const HabitReport = () => {
   const { habitId } = useParams<{ habitId: string }>();
@@ -13,6 +13,10 @@ export const HabitReport = () => {
   const [habit, setHabit] = useState<Habit | null>(null);
   const [allHabits, setAllHabits] = useState<Habit[]>([]);
   const [stats, setStats] = useState<HabitStats | null>(null);
+  // Defect #46: the report reads the real per-day log heatmap. The endpoint
+  // covers 30 days of HabitLog rows (including vault-anchored logs), instead of
+  // relying on the derived streak series alone.
+  const [heatmapDays, setHeatmapDays] = useState<HabitHeatmapDay[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -26,7 +30,12 @@ export const HabitReport = () => {
     const id = Number(habitId);
     endpoints.habits.list().then((h) => setHabit(h.find((x) => x.id === id) ?? null));
     endpoints.habits.stats(id).then(setStats).catch(() => {});
+    endpoints.habits
+      .heatmap(id)
+      .then((hm) => setHeatmapDays(hm.days))
+      .catch(() => setHeatmapDays([]));
   }, [habitId]);
+
 
   // No habit selected → show a picker (nav link /habit-report).
   if (!habitId) {
@@ -117,6 +126,35 @@ export const HabitReport = () => {
               />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Defect #46: per-day log heatmap straight from the HabitLog rows, so
+          vault-anchored logs show up here too. */}
+      {heatmapDays.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="vault-heading" style={{ marginBottom: 8 }}>30-Day Log Heatmap</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {heatmapDays.map((d) => (
+              <div
+                key={d.date}
+                title={`${d.date} · ${d.count} log${d.count === 1 ? '' : 's'}`}
+                aria-label={`${d.date} ${d.completed ? 'logged' : 'missed'}`}
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: 3,
+                  background: d.completed
+                    ? 'var(--habit-blue)'
+                    : 'var(--vault-border)',
+                  opacity: d.completed ? 1 : 0.45,
+                }}
+              />
+            ))}
+          </div>
+          <div className="vault-muted" style={{ marginTop: 6, fontSize: '0.72rem' }}>
+            {heatmapDays.filter((d) => d.completed).length} logged days in the last 30
+          </div>
         </div>
       )}
 

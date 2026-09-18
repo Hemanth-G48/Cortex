@@ -1,0 +1,341 @@
+---
+type: community
+cohesion: 0.07
+members: 117
+---
+
+# Community 5
+
+**Cohesion:** 0.07 - loosely connected
+**Members:** 117 nodes
+
+## Members
+- [[API endpoint for auto-detecting course subjects from Second Brain.]] - rationale - backend/app/routers/kb_auto_subjects.py
+- [[Auto-categorization review queue (Idea 81, phrase 7).  Batch review endpoints fo]] - rationale - backend/app/routers/kb_categorize.py
+- [[Auto-link review queue (Idea 83, phrase 25).  Batch review endpoints for pending]] - rationale - backend/app/routers/kb_links.py
+- [[Auto-tagging endpoints (Phase 2, Idea 14, phrases 37-38).]] - rationale - backend/app/routers/kb_tags.py
+- [[Base_89]] - code
+- [[Concept extraction endpoints (Phase 2, Idea 15).]] - rationale - backend/app/routers/kb_concepts.py
+- [[Daily-note endpoints (Phase 4, Idea 35).]] - rationale - backend/app/routers/kb_daily_notes.py
+- [[Document upload endpoints.  Serves both the STUDENT-PLANAR upload flow (multipar]] - rationale - backend/app/routers/uploads.py
+- [[Enrollment progress router for SyllabusAI (G12).]] - rationale - backend/app/routers/enrollment.py
+- [[FastAPI]] - code
+- [[Fitness Hub dashboard endpoints (99-phase plan, Phase 39-40).  Composes the ``fi]] - rationale - backend/app/routers/fitness_hub.py
+- [[FocusReadiness Loop workflow endpoints.  ``GET apikbfocus`` — read-only wh]] - rationale - backend/app/routers/kb_focus.py
+- [[Global unified search (Phase 3, Idea 30, phrases 91–100).  ``POST apisearch``]] - rationale - backend/app/routers/search.py
+- [[Google Calendar sync (events → local Event table, idempotent by google_id).]] - rationale - backend/app/routers/calendar.py
+- [[Google Classroom sync endpoints (thin wrappers over classroom_sync).  The respon]] - rationale - backend/app/routers/classroom.py
+- [[Google OAuth endpoints (connectcallbackstatusdisconnect).]] - rationale - backend/app/routers/auth_google.py
+- [[Idea 100 — observability router.  - ``GET apikbobservability`` — adminteache]] - rationale - backend/app/routers/kb_observability.py
+- [[Idea 91 — multi-agent orchestration router.  - ``POST apikbagentsrun`` — run]] - rationale - backend/app/routers/kb_agents.py
+- [[Idea 92 — long-term memory router.  - ``GET apikbmemorytimeline`` — read-onl]] - rationale - backend/app/routers/kb_memory.py
+- [[Idea 95 — context-aware responses router.  - ``GET apikbcontext`` — the deriv]] - rationale - backend/app/routers/kb_context.py
+- [[Idea 96 — research assistant router.  - ``POST apikbresearchexplain`` — full]] - rationale - backend/app/routers/kb_research.py
+- [[Idea 97 — recommendation engine router.  - ``GET apikbrecommendations`` — ran]] - rationale - backend/app/routers/kb_recommendations.py
+- [[Idea 99 — trajectory forecasting router.  - ``GET apikbforecast{subject_id}`]] - rationale - backend/app/routers/kb_forecast.py
+- [[Ingestion job status endpoints (Idea 10, phrase 94).]] - rationale - backend/app/routers/kb_jobs.py
+- [[Knowledge Core stats endpoint (Phase 2, Idea 12, phrase 20).]] - rationale - backend/app/routers/kb_stats.py
+- [[Knowledge health + gap endpoints (Phase 3, Ideas 27–28).]] - rationale - backend/app/routers/kb_health.py
+- [[Knowledge metadata enrichment endpoints (Idea 13, phrases 22-27).]] - rationale - backend/app/routers/kb_metadata.py
+- [[Knowledge-graph endpoints (Phase 2, Idea 1618).]] - rationale - backend/app/routers/kb_graph.py
+- [[Leaderboard — single-owner view.  Adapted from Shiori-v1 ``loadLeaderboard``  Q]] - rationale - backend/app/routers/leaderboard.py
+- [[Mind-map endpoints (Phase 4, Idea 38).]] - rationale - backend/app/routers/kb_mindmap.py
+- [[Near-duplicate endpoints (Phase 2, G9). Filled in by G9 agent.]] - rationale - backend/app/routers/kb_duplicates.py
+- [[New-note triage queue endpoints (workflow glue).]] - rationale - backend/app/routers/kb_triage.py
+- [[Note-quality endpoints (Phase 4, Idea 39).]] - rationale - backend/app/routers/kb_quality.py
+- [[Phase 39 aggregated payload for the whole dashboard.]] - rationale - backend/app/routers/fitness_hub.py
+- [[Phase 7 — AI Tutor router (Ideas 61–62).  - ``POST apikbtutorchat`` — RAG-gr]] - rationale - backend/app/routers/kb_tutor.py
+- [[Phase 7 — Skill mapping router (Idea 70, phrases 97–98).  - ``POST apikbskill]] - rationale - backend/app/routers/kb_skills.py
+- [[Phase 9 automation endpoints (Ideas 81–90).  A single router (per the Phase 9 pl]] - rationale - backend/app/routers/kb_automation.py
+- [[Pytest configuration for the Student Life OS backend. Creates an isolated in-mem]] - rationale - backend/tests/conftest.py
+- [[Re-index endpoints (Phase 2, Idea 20, phrases 96-99).  ``POST apikbadminrein]] - rationale - backend/app/routers/kb_reindex.py
+- [[Related-documents endpoints (Phase 2, Idea 17, phrases 68-70).  ``GET apikbdo]] - rationale - backend/app/routers/kb_related.py
+- [[Research-paper import from arXiv (Idea 5, phrases 45–48).]] - rationale - backend/app/routers/kb_papers.py
+- [[Return the single application owner (the first ``users`` row).      Self-healing]] - rationale - backend/app/services/users.py
+- [[Second Brain Knowledge Core services (Phase 1, Ideas 1–10).  Every query filters]] - rationale - backend/app/services/kb/__init__.py
+- [[Session_8]] - code
+- [[Session_20]] - code
+- [[Session_76]] - code
+- [[Single-owner identity.  The application is a local, single-user app there is ex]] - rationale - backend/app/services/users.py
+- [[Today command center endpoints (workflow glue).]] - rationale - backend/app/routers/kb_today.py
+- [[User]] - code - backend/app/models/user.py
+- [[User_75]] - code
+- [[Vault Health Audit workflow endpoints.  ``GET apikbhealth-audit`` aggregates]] - rationale - backend/app/routers/kb_health_audit.py
+- [[Vault backup & restore endpoints (workflow glue).]] - rationale - backend/app/routers/kb_backup.py
+- [[Weekly review ritual endpoints (workflow glue).]] - rationale - backend/app/routers/kb_weekly_review.py
+- [[_mock_events()]] - code - backend/app/routers/calendar.py
+- [[auth_google.py]] - code - backend/app/routers/auth_google.py
+- [[calendar.py]] - code - backend/app/routers/calendar.py
+- [[calendar_events()]] - code - backend/app/routers/calendar.py
+- [[classroom.py]] - code - backend/app/routers/classroom.py
+- [[conftest.py]] - code - backend/tests/conftest.py
+- [[current_user()]] - code - backend/app/services/users.py
+- [[daily_quests.py]] - code - backend/app/routers/daily_quests.py
+- [[database.py]] - code - backend/app/database.py
+- [[enrollment.py]] - code - backend/app/routers/enrollment.py
+- [[get_db()]] - code - backend/app/database.py
+- [[get_fitness_hub_summary()]] - code - backend/app/routers/fitness_hub.py
+- [[health()]] - code - backend/main.py
+- [[kb_agents.py]] - code - backend/app/routers/kb_agents.py
+- [[kb_auto_subjects.py]] - code - backend/app/routers/kb_auto_subjects.py
+- [[kb_automation.py]] - code - backend/app/routers/kb_automation.py
+- [[kb_backup.py]] - code - backend/app/routers/kb_backup.py
+- [[kb_categorize.py]] - code - backend/app/routers/kb_categorize.py
+- [[kb_concepts.py]] - code - backend/app/routers/kb_concepts.py
+- [[kb_context.py]] - code - backend/app/routers/kb_context.py
+- [[kb_daily_notes.py]] - code - backend/app/routers/kb_daily_notes.py
+- [[kb_duplicates.py]] - code - backend/app/routers/kb_duplicates.py
+- [[kb_focus.py]] - code - backend/app/routers/kb_focus.py
+- [[kb_forecast.py]] - code - backend/app/routers/kb_forecast.py
+- [[kb_graph.py]] - code - backend/app/routers/kb_graph.py
+- [[kb_health.py]] - code - backend/app/routers/kb_health.py
+- [[kb_health_audit.py]] - code - backend/app/routers/kb_health_audit.py
+- [[kb_jobs.py]] - code - backend/app/routers/kb_jobs.py
+- [[kb_links.py]] - code - backend/app/routers/kb_links.py
+- [[kb_memory.py]] - code - backend/app/routers/kb_memory.py
+- [[kb_metadata.py]] - code - backend/app/routers/kb_metadata.py
+- [[kb_mindmap.py]] - code - backend/app/routers/kb_mindmap.py
+- [[kb_observability.py]] - code - backend/app/routers/kb_observability.py
+- [[kb_papers.py]] - code - backend/app/routers/kb_papers.py
+- [[kb_quality.py]] - code - backend/app/routers/kb_quality.py
+- [[kb_recommendations.py]] - code - backend/app/routers/kb_recommendations.py
+- [[kb_reindex.py]] - code - backend/app/routers/kb_reindex.py
+- [[kb_related.py]] - code - backend/app/routers/kb_related.py
+- [[kb_research.py]] - code - backend/app/routers/kb_research.py
+- [[kb_skills.py]] - code - backend/app/routers/kb_skills.py
+- [[kb_stats.py]] - code - backend/app/routers/kb_stats.py
+- [[kb_tags.py]] - code - backend/app/routers/kb_tags.py
+- [[kb_today.py]] - code - backend/app/routers/kb_today.py
+- [[kb_triage.py]] - code - backend/app/routers/kb_triage.py
+- [[kb_tutor.py]] - code - backend/app/routers/kb_tutor.py
+- [[kb_weekly_review.py]] - code - backend/app/routers/kb_weekly_review.py
+- [[leaderboard()]] - code - backend/app/routers/leaderboard.py
+- [[leaderboard.py]] - code - backend/app/routers/leaderboard.py
+- [[main.py]] - code - backend/main.py
+- [[modelsuser.py]] - code - backend/app/models/user.py
+- [[notifications.py]] - code - backend/app/routers/notifications.py
+- [[override_get_db()]] - code - backend/tests/conftest.py
+- [[quests.py]] - code - backend/app/routers/quests.py
+- [[rewards.py]] - code - backend/app/routers/rewards.py
+- [[routers__init__.py]] - code - backend/app/routers/__init__.py
+- [[routersfitness_hub.py]] - code - backend/app/routers/fitness_hub.py
+- [[routersjournal.py]] - code - backend/app/routers/journal.py
+- [[routerspomodoro.py]] - code - backend/app/routers/pomodoro.py
+- [[routerssearch.py]] - code - backend/app/routers/search.py
+- [[schedule_events.py]] - code - backend/app/routers/schedule_events.py
+- [[serviceskb__init__.py]] - code - backend/app/services/kb/__init__.py
+- [[uploads.py]] - code - backend/app/routers/uploads.py
+- [[users.py]] - code - backend/app/services/users.py
+- [[weekly_reset.py]] - code - backend/app/routers/weekly_reset.py
+
+## Live Query (requires Dataview plugin)
+
+```dataview
+TABLE source_file, type FROM #community/Community_5
+SORT file.name ASC
+```
+
+## Connections to other communities
+- 89 edges to [[_COMMUNITY_Community 10]]
+- 41 edges to [[_COMMUNITY_Community 21]]
+- 37 edges to [[_COMMUNITY_Community 1]]
+- 35 edges to [[_COMMUNITY_Community 2]]
+- 34 edges to [[_COMMUNITY_Community 41]]
+- 26 edges to [[_COMMUNITY_Community 14]]
+- 25 edges to [[_COMMUNITY_Community 42]]
+- 23 edges to [[_COMMUNITY_Community 51]]
+- 23 edges to [[_COMMUNITY_Community 19]]
+- 22 edges to [[_COMMUNITY_Community 7]]
+- 21 edges to [[_COMMUNITY_Community 45]]
+- 20 edges to [[_COMMUNITY_Community 62]]
+- 18 edges to [[_COMMUNITY_Community 27]]
+- 18 edges to [[_COMMUNITY_Community 37]]
+- 18 edges to [[_COMMUNITY_Community 17]]
+- 17 edges to [[_COMMUNITY_Community 13]]
+- 16 edges to [[_COMMUNITY_Community 9]]
+- 16 edges to [[_COMMUNITY_Community 94]]
+- 15 edges to [[_COMMUNITY_Community 138]]
+- 14 edges to [[_COMMUNITY_Community 18]]
+- 14 edges to [[_COMMUNITY_Community 199]]
+- 14 edges to [[_COMMUNITY_Community 166]]
+- 13 edges to [[_COMMUNITY_Community 35]]
+- 13 edges to [[_COMMUNITY_Community 109]]
+- 12 edges to [[_COMMUNITY_Community 32]]
+- 12 edges to [[_COMMUNITY_Community 136]]
+- 11 edges to [[_COMMUNITY_Community 66]]
+- 11 edges to [[_COMMUNITY_Community 20]]
+- 10 edges to [[_COMMUNITY_Community 83]]
+- 10 edges to [[_COMMUNITY_Community 162]]
+- 10 edges to [[_COMMUNITY_Community 57]]
+- 10 edges to [[_COMMUNITY_Community 244]]
+- 10 edges to [[_COMMUNITY_Community 63]]
+- 10 edges to [[_COMMUNITY_Community 47]]
+- 10 edges to [[_COMMUNITY_Community 48]]
+- 9 edges to [[_COMMUNITY_Community 69]]
+- 9 edges to [[_COMMUNITY_Community 46]]
+- 9 edges to [[_COMMUNITY_Community 161]]
+- 9 edges to [[_COMMUNITY_Community 92]]
+- 9 edges to [[_COMMUNITY_Community 60]]
+- 9 edges to [[_COMMUNITY_Community 153]]
+- 9 edges to [[_COMMUNITY_Community 55]]
+- 9 edges to [[_COMMUNITY_Community 61]]
+- 9 edges to [[_COMMUNITY_Community 201]]
+- 9 edges to [[_COMMUNITY_Community 115]]
+- 9 edges to [[_COMMUNITY_Community 110]]
+- 8 edges to [[_COMMUNITY_Community 50]]
+- 8 edges to [[_COMMUNITY_Community 38]]
+- 8 edges to [[_COMMUNITY_Community 43]]
+- 8 edges to [[_COMMUNITY_Community 52]]
+- 8 edges to [[_COMMUNITY_Community 245]]
+- 8 edges to [[_COMMUNITY_Community 154]]
+- 8 edges to [[_COMMUNITY_Community 167]]
+- 8 edges to [[_COMMUNITY_Community 186]]
+- 7 edges to [[_COMMUNITY_Community 214]]
+- 7 edges to [[_COMMUNITY_Community 28]]
+- 6 edges to [[_COMMUNITY_Community 261]]
+- 6 edges to [[_COMMUNITY_Community 77]]
+- 6 edges to [[_COMMUNITY_Community 89]]
+- 6 edges to [[_COMMUNITY_Community 105]]
+- 6 edges to [[_COMMUNITY_Community 64]]
+- 6 edges to [[_COMMUNITY_Community 30]]
+- 6 edges to [[_COMMUNITY_Community 123]]
+- 6 edges to [[_COMMUNITY_Community 200]]
+- 6 edges to [[_COMMUNITY_Community 125]]
+- 6 edges to [[_COMMUNITY_Community 262]]
+- 6 edges to [[_COMMUNITY_Community 99]]
+- 6 edges to [[_COMMUNITY_Community 285]]
+- 6 edges to [[_COMMUNITY_Community 73]]
+- 5 edges to [[_COMMUNITY_Community 159]]
+- 5 edges to [[_COMMUNITY_Community 54]]
+- 5 edges to [[_COMMUNITY_Community 185]]
+- 5 edges to [[_COMMUNITY_Community 40]]
+- 5 edges to [[_COMMUNITY_Community 12]]
+- 5 edges to [[_COMMUNITY_Community 108]]
+- 5 edges to [[_COMMUNITY_Community 307]]
+- 5 edges to [[_COMMUNITY_Community 309]]
+- 5 edges to [[_COMMUNITY_Community 155]]
+- 5 edges to [[_COMMUNITY_Community 293]]
+- 5 edges to [[_COMMUNITY_Community 263]]
+- 5 edges to [[_COMMUNITY_Community 246]]
+- 4 edges to [[_COMMUNITY_Community 102]]
+- 4 edges to [[_COMMUNITY_Community 90]]
+- 4 edges to [[_COMMUNITY_Community 29]]
+- 4 edges to [[_COMMUNITY_Community 284]]
+- 4 edges to [[_COMMUNITY_Community 126]]
+- 4 edges to [[_COMMUNITY_Community 315]]
+- 4 edges to [[_COMMUNITY_Community 274]]
+- 4 edges to [[_COMMUNITY_Community 58]]
+- 4 edges to [[_COMMUNITY_Community 252]]
+- 4 edges to [[_COMMUNITY_Community 144]]
+- 4 edges to [[_COMMUNITY_Community 271]]
+- 4 edges to [[_COMMUNITY_Community 124]]
+- 4 edges to [[_COMMUNITY_Community 272]]
+- 4 edges to [[_COMMUNITY_Community 127]]
+- 4 edges to [[_COMMUNITY_Community 313]]
+- 3 edges to [[_COMMUNITY_Community 121]]
+- 3 edges to [[_COMMUNITY_Community 85]]
+- 3 edges to [[_COMMUNITY_Community 132]]
+- 3 edges to [[_COMMUNITY_Community 84]]
+- 3 edges to [[_COMMUNITY_Community 88]]
+- 3 edges to [[_COMMUNITY_Community 49]]
+- 3 edges to [[_COMMUNITY_Community 76]]
+- 3 edges to [[_COMMUNITY_Community 156]]
+- 3 edges to [[_COMMUNITY_Community 22]]
+- 3 edges to [[_COMMUNITY_Community 78]]
+- 3 edges to [[_COMMUNITY_Community 184]]
+- 3 edges to [[_COMMUNITY_Community 310]]
+- 3 edges to [[_COMMUNITY_Community 139]]
+- 3 edges to [[_COMMUNITY_Community 292]]
+- 3 edges to [[_COMMUNITY_Community 314]]
+- 3 edges to [[_COMMUNITY_Community 31]]
+- 3 edges to [[_COMMUNITY_Community 215]]
+- 3 edges to [[_COMMUNITY_Community 135]]
+- 3 edges to [[_COMMUNITY_Community 111]]
+- 2 edges to [[_COMMUNITY_Community 16]]
+- 2 edges to [[_COMMUNITY_Community 101]]
+- 2 edges to [[_COMMUNITY_Community 198]]
+- 2 edges to [[_COMMUNITY_Community 160]]
+- 2 edges to [[_COMMUNITY_Community 97]]
+- 2 edges to [[_COMMUNITY_Community 120]]
+- 2 edges to [[_COMMUNITY_Community 36]]
+- 2 edges to [[_COMMUNITY_Community 107]]
+- 2 edges to [[_COMMUNITY_Community 151]]
+- 2 edges to [[_COMMUNITY_Community 279]]
+- 2 edges to [[_COMMUNITY_Community 122]]
+- 2 edges to [[_COMMUNITY_Community 187]]
+- 2 edges to [[_COMMUNITY_Community 169]]
+- 2 edges to [[_COMMUNITY_Community 53]]
+- 2 edges to [[_COMMUNITY_Community 176]]
+- 2 edges to [[_COMMUNITY_Community 117]]
+- 2 edges to [[_COMMUNITY_Community 86]]
+- 2 edges to [[_COMMUNITY_Community 147]]
+- 2 edges to [[_COMMUNITY_Community 230]]
+- 2 edges to [[_COMMUNITY_Community 308]]
+- 2 edges to [[_COMMUNITY_Community 79]]
+- 2 edges to [[_COMMUNITY_Community 311]]
+- 2 edges to [[_COMMUNITY_Community 325]]
+- 2 edges to [[_COMMUNITY_Community 312]]
+- 2 edges to [[_COMMUNITY_Community 188]]
+- 2 edges to [[_COMMUNITY_Community 248]]
+- 2 edges to [[_COMMUNITY_Community 189]]
+- 2 edges to [[_COMMUNITY_Community 44]]
+- 2 edges to [[_COMMUNITY_Community 203]]
+- 2 edges to [[_COMMUNITY_Community 81]]
+- 2 edges to [[_COMMUNITY_Community 56]]
+- 1 edge to [[_COMMUNITY_Community 243]]
+- 1 edge to [[_COMMUNITY_Community 335]]
+- 1 edge to [[_COMMUNITY_Community 224]]
+- 1 edge to [[_COMMUNITY_Community 225]]
+- 1 edge to [[_COMMUNITY_Community 131]]
+- 1 edge to [[_COMMUNITY_Community 351]]
+- 1 edge to [[_COMMUNITY_Community 232]]
+- 1 edge to [[_COMMUNITY_Community 103]]
+- 1 edge to [[_COMMUNITY_Community 152]]
+- 1 edge to [[_COMMUNITY_Community 257]]
+- 1 edge to [[_COMMUNITY_Community 249]]
+- 1 edge to [[_COMMUNITY_Community 264]]
+- 1 edge to [[_COMMUNITY_Community 75]]
+- 1 edge to [[_COMMUNITY_Community 70]]
+- 1 edge to [[_COMMUNITY_Community 204]]
+- 1 edge to [[_COMMUNITY_Community 116]]
+- 1 edge to [[_COMMUNITY_Community 33]]
+- 1 edge to [[_COMMUNITY_Community 87]]
+- 1 edge to [[_COMMUNITY_Community 150]]
+- 1 edge to [[_COMMUNITY_Community 134]]
+- 1 edge to [[_COMMUNITY_Community 65]]
+- 1 edge to [[_COMMUNITY_Community 98]]
+- 1 edge to [[_COMMUNITY_Community 202]]
+- 1 edge to [[_COMMUNITY_Community 190]]
+- 1 edge to [[_COMMUNITY_Community 133]]
+- 1 edge to [[_COMMUNITY_Community 171]]
+- 1 edge to [[_COMMUNITY_Community 219]]
+- 1 edge to [[_COMMUNITY_Community 172]]
+- 1 edge to [[_COMMUNITY_Community 220]]
+- 1 edge to [[_COMMUNITY_Community 277]]
+- 1 edge to [[_COMMUNITY_Community 193]]
+- 1 edge to [[_COMMUNITY_Community 221]]
+- 1 edge to [[_COMMUNITY_Community 302]]
+- 1 edge to [[_COMMUNITY_Community 95]]
+- 1 edge to [[_COMMUNITY_Community 173]]
+- 1 edge to [[_COMMUNITY_Community 222]]
+- 1 edge to [[_COMMUNITY_Community 146]]
+- 1 edge to [[_COMMUNITY_Community 240]]
+- 1 edge to [[_COMMUNITY_Community 96]]
+- 1 edge to [[_COMMUNITY_Community 280]]
+- 1 edge to [[_COMMUNITY_Community 113]]
+- 1 edge to [[_COMMUNITY_Community 72]]
+- 1 edge to [[_COMMUNITY_Community 157]]
+- 1 edge to [[_COMMUNITY_Community 234]]
+- 1 edge to [[_COMMUNITY_Community 205]]
+- 1 edge to [[_COMMUNITY_Community 235]]
+- 1 edge to [[_COMMUNITY_Community 236]]
+- 1 edge to [[_COMMUNITY_Community 71]]
+- 1 edge to [[_COMMUNITY_Community 267]]
+- 1 edge to [[_COMMUNITY_Community 287]]
+
+## Top bridge nodes
+- [[serviceskb__init__.py]] - degree 167, connects to 100 communities
+- [[database.py]] - degree 211, connects to 91 communities
+- [[User]] - degree 303, connects to 75 communities
+- [[FastAPI]] - degree 124, connects to 57 communities
+- [[main.py]] - degree 113, connects to 51 communities

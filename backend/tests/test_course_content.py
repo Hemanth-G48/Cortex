@@ -266,8 +266,8 @@ def test_folder_subject_root_docs_without_folders_remain_unorganized(client: Tes
     uid = _uid(db_session, email="sb-folderflat@test.com")
     headers = {AUTH: f"Bearer {token}"}
     src = _make_source(db_session, uid)
-    _make_doc(db_session, uid, src.id, "Flat Root", "Operating Systems/flat.md")  # no outline, at root
-    _make_doc(db_session, uid, src.id, "Nested Flat", "Operating Systems/Memory/note.md")  # no outline, in folder
+    _make_doc(db_session, uid, src.id,    "Flat Root", "Operating Systems/flat.md", outline=None)  # no outline, at root
+    _make_doc(db_session, uid, src.id, "Nested Flat", "Operating Systems/Memory/note.md", outline=None)  # no outline, in folder
 
     client.post("/api/courses/sync-kb", headers=headers)
     course = (

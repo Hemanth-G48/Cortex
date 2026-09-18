@@ -12,6 +12,9 @@ class CurriculumSubject(Base):
     name = Column(String(200), nullable=False)
     code = Column(String(50), nullable=False)
     semester = Column(Integer, nullable=True)
+    # Display label for the semester (e.g. "Fall 2026"), editable in the DB.
+    # When unset the API falls back to formatting ``semester`` (defect #9).
+    semester_label = Column(String(50), nullable=True)
     credits = Column(Integer, default=3)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)

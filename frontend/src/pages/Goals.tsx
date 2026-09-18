@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Header } from '../components/layout/Header';
 import { endpoints } from '../services/api';
+import { confirmDelete } from '../utils/confirm';
+import { SkeletonCard } from '../components/shared/Skeleton';
+import { EmptyState } from '../components/shared/EmptyState';
 import type { Goal } from '../services/api';
 
 export const Goals = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [quarter, setQuarter] = useState('Q1');
@@ -13,33 +18,69 @@ export const Goals = () => {
   const [targetDate, setTargetDate] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const load = () => endpoints.goals.list().then(setGoals).catch(() => {});
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    endpoints.goals.list()
+      .then(setGoals)
+      .catch(() => setError('Could not load goals — is the backend running?'))
+      .finally(() => setLoading(false));
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const create = async () => {
     if (!title.trim() || saving) return;
     setSaving(true);
-    await endpoints.goals.create({
-      title,
-      quarter,
-      year,
-      habit_id: habitId ? Number(habitId) : null,
-      target_date: targetDate || null,
-      progress_percentage: 0,
-      is_completed: false,
-    });
-    setTitle(''); setHabitId(''); setTargetDate('');
-    setShowForm(false); setSaving(false);
-    load();
+    try {
+      await endpoints.goals.create({
+        title,
+        quarter,
+        year,
+        habit_id: habitId ? Number(habitId) : null,
+        target_date: targetDate || null,
+        progress_percentage: 0,
+        is_completed: false,
+      });
+      setTitle(''); setHabitId(''); setTargetDate('');
+      setShowForm(false);
+      load();
+    } catch {
+      setError('Could not create the goal');
+    } finally {
+      setSaving(false);
+    }
   };
 
+  // Defect #52: completing a goal is also written into the vault's day note
+  // (POST /api/kb/reflections appends under "Reflections" in
+  // second_brain/daily-life/YYYY-MM-DD.md). Best-effort: a vault without a
+  // reachable daily-life folder still completes the goal.
   const toggleComplete = (g: Goal) => {
-    endpoints.goals.complete(g.id).then(load);
+    endpoints.goals.complete(g.id)
+      .then(() => {
+        setError(null);
+        if (!g.is_completed) {
+          endpoints.kb.reflections
+            .create({ content: `Goal achieved: ${g.title}`, kind: 'goal' })
+            .catch(() => {});
+        }
+        load();
+      })
+      .catch(() => setError('Could not complete the goal'));
   };
 
   const remove = (id: number) => {
-    endpoints.goals.delete(id).then(load);
+    if (!confirmDelete('this goal')) return;
+    endpoints.goals.delete(id).then(load).catch(() => setError('Could not delete the goal'));
+  };
+
+  // Defect #49 fix: inline progress update.
+  const setProgress = (g: Goal, pct: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+    endpoints.goals.update(g.id, { progress_percentage: clamped })
+      .then(load)
+      .catch(() => setError('Could not update progress'));
   };
 
   return (
@@ -70,9 +111,24 @@ export const Goals = () => {
         </div>
       )}
 
+      {error && (
+        <div className="card" style={{ marginBottom: 16, borderColor: 'var(--danger)' }}>
+          <div style={{ color: 'var(--danger)', marginBottom: '0.5rem' }}>⚠ {error}</div>
+          <button type="button" className="btn btn-primary" onClick={load}>Retry</button>
+        </div>
+      )}
+
       <div className="card-grid">
-        {goals.length === 0 && <div className="vault-muted">No goals yet.</div>}
-        {goals.map((g) => (
+        {loading ? (
+          <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>
+        ) : goals.length === 0 ? (
+          <EmptyState
+            icon="🎯"
+            title="No goals yet"
+            message="Set a quarterly goal to track what matters."
+            action={<button type="button" className="btn btn-primary" onClick={() => setShowForm(true)}>+ New Goal</button>}
+          />
+        ) : goals.map((g) => (
           <div className="card" key={g.id}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
               <h3 style={{ textDecoration: g.is_completed ? 'line-through' : 'none' }}>{g.title}</h3>
@@ -90,6 +146,13 @@ export const Goals = () => {
                 {g.is_completed ? '✓ Done' : 'Mark Complete'}
               </button>
             </div>
+            {/* Defect #49 fix: progress stepper. */}
+            {!g.is_completed && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.25rem', marginTop: '0.4rem' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setProgress(g, g.progress_percentage - 10)} aria-label="Decrease progress">−10%</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setProgress(g, g.progress_percentage + 10)} aria-label="Increase progress">+10%</button>
+              </div>
+            )}
           </div>
         ))}
       </div>

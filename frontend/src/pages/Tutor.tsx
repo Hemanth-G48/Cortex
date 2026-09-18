@@ -3,6 +3,8 @@ import { Header } from '../components/layout/Header';
 import { EmptyState } from '../components/shared/EmptyState';
 import {
   endpoints,
+  kbSearchApi,
+  type KbSearchResponse,
   type TutorChatResponse,
   type TutorSource,
   type TutorDoubtResponse,
@@ -105,6 +107,8 @@ export const Tutor = () => {
   const [sessionCount, setSessionCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Defect #64 fix: show the daily AI budget meter.
+  const [budget, setBudget] = useState<{ today: number; limit: number; remaining: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Phase 8 (Idea 74, phrase 37): "you studied X" chips from user_memory.
   const [known, setKnown] = useState<{ concept: string; strength: number }[]>([]);
@@ -124,6 +128,8 @@ export const Tutor = () => {
       .get(8)
       .then((r) => setKnown(r.items.filter((m) => m.strength > 0)))
       .catch(() => setKnown([]));
+    // Defect #64 fix: daily AI budget meter.
+    endpoints.ai.budget().then(setBudget).catch(() => setBudget(null));
   }, [loadSessions]);
 
   useEffect(() => {
@@ -137,7 +143,24 @@ export const Tutor = () => {
     setError(null);
     try {
       if (mode === 'chat') {
-        const res = await endpoints.kb.tutor.chat({ message: text, session_id: sessionId });
+        // Defect #89 fix: before sending to the tutor, retrieve the top KB
+        // chunks for the user's query so the tutor can ground its answer in
+        // the vault, not just the message text.
+        let grounded = text;
+        let sources: KbSearchResponse | null = null;
+        try {
+          sources = await kbSearchApi.query(text, 'hybrid', 1, 3);
+          if (sources.items.length > 0) {
+            const ctx = sources.items
+              .map((i) => `[${i.title}](${i.source_path || ''})\n${i.snippet}`)
+              .join('\n\n');
+            grounded = `Context from your knowledge base:\n${ctx}\n\n---
+User question: ${text}`;
+          }
+        } catch {
+          /* KB search is non-critical — fall back to ungrounded chat */
+        }
+        const res = await endpoints.kb.tutor.chat({ message: grounded, session_id: sessionId });
         setSessionId(res.session_id);
         setTurns((t) => [...t, { kind: 'chat', message: text, response: res }]);
       } else {
@@ -314,8 +337,13 @@ export const Tutor = () => {
             {busy ? 'Thinking…' : 'Send'}
           </button>
         </div>
-        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-          Enter to send · Shift+Enter for a new line · answers are capped by your daily AI budget
+        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.4rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <span>Enter to send · Shift+Enter for a new line</span>
+          {budget && (
+            <span title="Provider-backed AI calls today (local fallback is free)">
+              ⚡ Budget: {budget.remaining}/{budget.limit} left today
+            </span>
+          )}
         </div>
       </div>
     </div>

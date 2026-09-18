@@ -4,7 +4,7 @@ import { Header } from '../components/layout/Header';
 import { EmptyState } from '../components/shared/EmptyState';
 import { SkeletonCard } from '../components/shared/Skeleton';
 import { endpoints } from '../services/api';
-import type { SubjectProfile, SubjectProfileStatus } from '../services/api';
+import type { KbAutoSubjectPreview, SubjectProfile, SubjectProfileStatus } from '../services/api';
 
 const statusColor: Record<string, string> = {
   proposed: 'var(--warning)',
@@ -28,6 +28,10 @@ export const Subjects = () => {
   const [loading, setLoading] = useState(true);
   const [semester, setSemester] = useState('');
   const [status, setStatus] = useState<SubjectProfileStatus | ''>('');
+  // Defect #27: subjects auto-detected from the vault (Second Brain docs) are
+  // overlaid as "Suggested from Vault" pills above the imported list.
+  const [vaultSuggestions, setVaultSuggestions] = useState<KbAutoSubjectPreview | null>(null);
+  const [detecting, setDetecting] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -36,7 +40,22 @@ export const Subjects = () => {
       .then((r) => setAll(r.items))
       .catch(() => setAll([]))
       .finally(() => setLoading(false));
+    // Best-effort: a vault with no documents simply yields no suggestions.
+    endpoints.kb.autoSubjects
+      .preview()
+      .then(setVaultSuggestions)
+      .catch(() => setVaultSuggestions(null));
   }, []);
+
+  const detectVaultSubjects = async () => {
+    setDetecting(true);
+    try {
+      await endpoints.kb.autoSubjects.detect();
+      load();
+    } finally {
+      setDetecting(false);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -113,6 +132,34 @@ export const Subjects = () => {
           </button>
         ))}
       </div>
+
+      {/* Defect #27: vault-detected subjects — same pill styling as the
+          semester facets, populated from real document analysis. */}
+      {vaultSuggestions && vaultSuggestions.top_subjects.length > 0 && (
+        <div className="card" style={{ padding: '0.9rem 1rem', marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Suggested from Vault
+          </span>
+          {vaultSuggestions.top_subjects.map(([name, count]) => (
+            <span
+              key={name}
+              className="badge"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)', padding: '0.35rem 0.7rem' }}
+            >
+              🔎 {name} ({count})
+            </span>
+          ))}
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ marginLeft: 'auto' }}
+            disabled={detecting}
+            onClick={() => void detectVaultSubjects()}
+          >
+            {detecting ? 'Detecting…' : 'Detect & tag'}
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <SkeletonCard />

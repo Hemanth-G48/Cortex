@@ -9,6 +9,10 @@ vi.mock('../services/api', () => {
         user: { id: 1, name: 'Alex', current_level: 5, total_xp: 2340, current_streak: 3, avatar: null, avatar_class: 'Wizard', created_at: '2026-01-01', current_weight: null, initial_weight: null, target_weight: null, membership_status: null, next_payment_date: null },
       }),
       notes: { list: vi.fn().mockResolvedValue([]) },
+      quizzes: {
+        history: vi.fn().mockResolvedValue([]),
+        historyCreate: vi.fn().mockResolvedValue(null),
+      },
       ai: {
         health: vi.fn().mockResolvedValue({ available: false, mode: 'Offline', model: null, models: [] }),
         quiz: vi.fn().mockResolvedValue({

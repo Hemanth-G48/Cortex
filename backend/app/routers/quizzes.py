@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -89,3 +90,37 @@ def quiz_analytics(
     db: Session = Depends(get_db),
 ) -> dict:
     return reviewer_summary(db, current_user.id)
+
+
+# ── Quiz history mutations (defect #77 fix) ──────────────────────────────
+#
+# POST /api/quizzes/history creates a lightweight attempt record so the
+# quiz history page is the server truth, not localStorage.
+
+class QuizHistoryCreateRequest(BaseModel):
+    score: int = Field(ge=0)
+    total_questions: int = Field(ge=1, le=200)
+
+
+@router.post("/history", response_model=HistoryItem | None)
+def create_quiz_history(
+    body: QuizHistoryCreateRequest,
+    current_user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> HistoryItem | None:
+    """Persist a quiz attempt summary (defect #77 fix).
+
+    Returns the created HistoryItem, or None when the DB is unavailable.
+    The frontend falls back to localStorage when this endpoint 404s/500s.
+    """
+    attempt = QuizAttempt(
+        user_id=current_user.id,
+        quiz_id=body.quiz_id if hasattr(body, "quiz_id") else 0,
+        answers=[],
+        score=body.score,
+        total_questions=body.total_questions,
+    )
+    db.add(attempt)
+    db.commit()
+    db.refresh(attempt)
+    return attempt

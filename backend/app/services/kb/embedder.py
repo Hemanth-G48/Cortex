@@ -316,6 +316,14 @@ def stats(db: Session, user_id: int) -> dict:
 
     concept_count = db.query(KbConcept).filter(KbConcept.user_id == user_id).count()
 
+    # Audit defect #67: the vault's real activity window, so analytics views can
+    # size their range from the first note instead of a fixed constant.
+    oldest_created, newest_created = (
+        db.query(func.min(KbDocument.created_at), func.max(KbDocument.created_at))
+        .filter(KbDocument.user_id == user_id)
+        .first()
+    )
+
     return {
         "document_count": document_count,
         "chunk_count": chunk_count,
@@ -331,4 +339,6 @@ def stats(db: Session, user_id: int) -> dict:
         "inferences_today": 0,
         "inference_limit": settings.KB_INFER_DAILY_BUDGET,
         "dirty_documents": dirty_documents,
+        "oldest_document_date": oldest_created.date().isoformat() if oldest_created else None,
+        "newest_document_date": newest_created.date().isoformat() if newest_created else None,
     }

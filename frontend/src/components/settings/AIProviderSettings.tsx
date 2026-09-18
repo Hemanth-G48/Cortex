@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { confirmDelete } from '../../utils/confirm';
 import { endpoints } from '../../services/api';
 import type {
   AIProviderConfig,
@@ -230,7 +231,7 @@ export default function AIProviderSettings() {
   };
 
   const remove = async (p: AIProviderConfig) => {
-    if (!window.confirm(`Remove provider "${p.name}"?`)) return;
+    if (!confirmDelete(`provider "${p.name}"`)) return;
     setBusyId(p.id);
     try {
       await endpoints.ai.providers.remove(p.id);

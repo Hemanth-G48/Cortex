@@ -16,7 +16,7 @@ from app.routers import (
     daily_logs, events, life_planner, eisenhower,
     quest_centre, habit_tracker,
     fitness_hub, ai, grades, flashcards, study_plans, analytics,
-    auth_google, classroom, gmail, calendar,
+    auth, auth_google, classroom, gmail, calendar,
     uploads, curriculum, materials, summaries, quizzes,
     mood, sleep,
     books, braindumps, daily_schedule, notifications,
@@ -40,6 +40,9 @@ from app.routers import (
     kb_learning_plans,
     kb_health_audit, kb_focus,
     kb_folders,
+    kb_domains,
+    kb_capture_xp,
+    kb_mastery,
     leaderboard,
 )
 from app.seed import seed_database
@@ -143,6 +146,7 @@ app.include_router(grades.router)
 app.include_router(flashcards.router)
 app.include_router(study_plans.router)
 app.include_router(analytics.router)
+app.include_router(auth.router)
 app.include_router(auth_google.router)
 app.include_router(classroom.router)
 app.include_router(gmail.router)
@@ -159,13 +163,6 @@ app.include_router(braindumps.router)
 app.include_router(daily_schedule.router)
 app.include_router(notifications.router)
 app.include_router(enrollment.router)
-
-# Test-only auth shim: signup/login/me/logout for the legacy test suite.
-# Never mounted in production — the application is single-user and tokenless.
-if "pytest" in sys.modules:
-    from app.routers import auth_test
-
-    app.include_router(auth_test.router)
 app.include_router(kb_sources.router)
 app.include_router(kb_documents.router)
 app.include_router(kb_papers.router)
@@ -216,6 +213,9 @@ app.include_router(kb_learning_plans.router)
 app.include_router(kb_health_audit.router)
 app.include_router(kb_focus.router)
 app.include_router(kb_folders.router)
+app.include_router(kb_domains.router)
+app.include_router(kb_capture_xp.router)
+app.include_router(kb_mastery.router)
 app.include_router(leaderboard.router)
 
 

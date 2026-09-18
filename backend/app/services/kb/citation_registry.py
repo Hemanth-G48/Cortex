@@ -196,7 +196,33 @@ def _enrich_arxiv(row: KbCitation) -> None:
 
 
 def extract_for_document(db: Session, doc: KbDocument) -> int:
-    """Ingest-stage extraction: PDF reference lists + md inline ``@cite`` (phrase 56)."""
+    """Ingest-stage extraction: PDF reference lists + md inline ``@cite`` (phrase 56).
+
+    Also self-registers as a post-ingest hook so pipeline.py doesn't hardcode
+    this module.
+    """
+    register_hook_once()
+    return _citation_hook(db, doc)
+
+
+_hook_registered = False
+
+
+def register_hook_once() -> None:
+    """Self-register as a post-ingest hook (idempotent, best-effort)."""
+    global _hook_registered
+    if _hook_registered:
+        return
+    try:
+        from app.services.kb.pipeline import register_post_ingest
+        register_post_ingest("citation_registry.extract_for_document", _citation_hook)
+        _hook_registered = True
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _citation_hook(db: Session, doc: KbDocument) -> int:
+    """Post-ingest hook: parse citations from the document's text."""
     text = doc.extracted_text or ""
     added = 0
 

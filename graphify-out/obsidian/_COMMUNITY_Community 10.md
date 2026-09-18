@@ -1,0 +1,302 @@
+---
+type: community
+cohesion: 0.04
+members: 97
+---
+
+# Community 10
+
+**Cohesion:** 0.04 - loosely connected
+**Members:** 97 nodes
+
+## Members
+- [[.test_creates_task_reminder_and_session()]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[.test_force_run_via_automation_endpoint()_3]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[.test_idempotent_rerun()]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[.test_insights_persisted_reused_without_force()]] - code - backend/tests/test_ai_cache_insights.py
+- [[.test_micro_session_when_material_exists()]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[.test_skips_not_due_revisions()]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[Aggregation helpers for the Gamified Quest Centre dashboard.]] - rationale - backend/app/services/quest_centre.py
+- [[Any_15]] - code
+- [[Assemble the sidebar Status-Window payload.      Returns ``{character, xp_to_nex]] - rationale - backend/app/services/quest_centre.py
+- [[Auto revision-task job tests (Phase 9, Idea 90, phrases 91-100).]] - rationale - backend/tests/test_kb_auto_revision_tasks.py
+- [[Available create targets for the Quick-Action list.      The frontend opens its]] - rationale - backend/app/routers/quest_centre.py
+- [[Base_58]] - code
+- [[Base_72]] - code
+- [[Base_88]] - code
+- [[Best-effort the topic's first chunk (via its documents) for a micro-session.]] - rationale - backend/app/services/kb/auto_revision.py
+- [[BrainDump model (STUDENT-PLANAR G6).  A single free-text quick-capture note per]] - rationale - backend/app/models/braindump.py
+- [[Bucket open Quests + Tasks into High  Medium  Low folders.      Each item carr]] - rationale - backend/app/services/quest_centre.py
+- [[Compute Year  Month  Week  Day progress percentages.      Mirrors the calenda]] - rationale - backend/app/services/quest_centre.py
+- [[Create tasks for today's due revisions, idempotently (phrases 91–94).]] - rationale - backend/app/services/kb/auto_revision.py
+- [[Data changes do NOT trigger a new LLM call on plain page loads.          The per]] - rationale - backend/tests/test_ai_cache_insights.py
+- [[Gamified Quest Centre dashboard endpoints.  Each route composes the aggregation]] - rationale - backend/app/routers/quest_centre.py
+- [[Group quests by due date for the calendar.      Returns a list of ``{date YY]] - rationale - backend/app/services/quest_centre.py
+- [[High  Medium  Low folder buckets from open Quests + Tasks.]] - rationale - backend/app/routers/quest_centre.py
+- [[Idea 3 — folder watcher & file scanning tests.  Temp-dir fixture with new  chan]] - rationale - backend/tests/test_kb_scanner.py
+- [[Idea 90 — auto-create revision tasks (Phase 9 Automation).  The daily job turns]] - rationale - backend/app/services/kb/auto_revision.py
+- [[KbChunk_1]] - code
+- [[Life areas incl. ``target_days``, ``status`` and computed     ``complete_in_days]] - rationale - backend/app/routers/quest_centre.py
+- [[LifeArea]] - code - backend/app/models/life_area.py
+- [[Material model for SyllabusAI curriculum materials.]] - rationale - backend/app/models/material.py
+- [[Materialize today's due reviews into the daily schedule (phrase 16).      Idempo]] - rationale - backend/app/services/kb/revision.py
+- [[Notification model (STUDENT-PLANAR G10) in-app messages for teacher broadcasts.]] - rationale - backend/app/models/notification.py
+- [[Quests grouped by due date, merged with the weekly ``ScheduleEvent`` rows     so]] - rationale - backend/app/routers/quest_centre.py
+- [[Quiz attempt model for tracking student quiz submissions.]] - rationale - backend/app/models/quiz_attempt.py
+- [[Quiz model for AI-generated unit quizzes.]] - rationale - backend/app/models/quiz.py
+- [[Reminder]] - code - backend/app/models/task.py
+- [[RevisionSchedule]] - code - backend/app/models/kb/revision_schedule.py
+- [[RevisionSchedule model — FSRS spaced repetition per topic (Phase 6, Idea 52).  O]] - rationale - backend/app/models/kb/revision_schedule.py
+- [[Schedule]] - code - backend/app/models/task.py
+- [[Session_16]] - code
+- [[Session_78]] - code
+- [[Session_87]] - code
+- [[Session_129]] - code
+- [[Session_190]] - code
+- [[Session_210]] - code
+- [[Session_227]] - code
+- [[Sidebar Status-Window character card, XP-to-next, today's task checklist.]] - rationale - backend/app/routers/quest_centre.py
+- [[Summary model for AI-generated unit summaries.]] - rationale - backend/app/models/summary.py
+- [[Task]] - code - backend/app/models/task.py
+- [[TestClient_9]] - code
+- [[TestEndpoints_8]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[TestRun_6]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[The user's revision queue (phrase 15) due today or earlier.      When ``on`` is]] - rationale - backend/app/services/kb/revision.py
+- [[Unified quick task list incomplete reminders, not-completed tasks, and     toda]] - rationale - backend/app/routers/life_planner.py
+- [[User gamification profile ``avatar_class``, ``current_streak``,     ``total_xp`]] - rationale - backend/app/routers/quest_centre.py
+- [[Year  Month  Week  Day progress percentages (macroscopic bars).]] - rationale - backend/app/routers/quest_centre.py
+- [[_make_topic()]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[_recommended_chunk()]] - code - backend/app/services/kb/auto_revision.py
+- [[_signup()_19]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[_task_title()]] - code - backend/app/services/kb/auto_revision.py
+- [[_topic_by_id()]] - code - backend/app/services/kb/auto_revision.py
+- [[auto_revision.py]] - code - backend/app/services/kb/auto_revision.py
+- [[complete_eisenhower_task()]] - code - backend/app/routers/eisenhower.py
+- [[date_12]] - code
+- [[due_reviews()]] - code - backend/app/services/kb/revision.py
+- [[eisenhower.py]] - code - backend/app/routers/eisenhower.py
+- [[eisenhower_matrix()]] - code - backend/app/routers/eisenhower.py
+- [[get_gamification_profile()]] - code - backend/app/routers/quest_centre.py
+- [[get_priority_window()]] - code - backend/app/routers/quest_centre.py
+- [[get_progress()]] - code - backend/app/routers/quest_centre.py
+- [[get_quest_centre_calendar()]] - code - backend/app/routers/quest_centre.py
+- [[get_quest_centre_life_areas()]] - code - backend/app/routers/quest_centre.py
+- [[get_quick_actions()]] - code - backend/app/routers/quest_centre.py
+- [[get_status_window()]] - code - backend/app/routers/quest_centre.py
+- [[group_by_priority()]] - code - backend/app/services/quest_centre.py
+- [[life_planner.py]] - code - backend/app/routers/life_planner.py
+- [[life_planner_summary()]] - code - backend/app/routers/life_planner.py
+- [[materialize_due()]] - code - backend/app/services/kb/revision.py
+- [[models__init__.py]] - code - backend/app/models/__init__.py
+- [[modelsbraindump.py]] - code - backend/app/models/braindump.py
+- [[modelslife_area.py]] - code - backend/app/models/life_area.py
+- [[modelsmaterial.py]] - code - backend/app/models/material.py
+- [[modelsnotification.py]] - code - backend/app/models/notification.py
+- [[modelsquiz.py]] - code - backend/app/models/quiz.py
+- [[modelssummary.py]] - code - backend/app/models/summary.py
+- [[modelstask.py]] - code - backend/app/models/task.py
+- [[progress_report()]] - code - backend/app/services/quest_centre.py
+- [[quests_by_date()]] - code - backend/app/services/quest_centre.py
+- [[quick_tasks()]] - code - backend/app/routers/life_planner.py
+- [[quiz_attempt.py]] - code - backend/app/models/quiz_attempt.py
+- [[revision_schedule.py]] - code - backend/app/models/kb/revision_schedule.py
+- [[revision_state()]] - code - backend/app/services/kb/revision.py
+- [[routersquest_centre.py]] - code - backend/app/routers/quest_centre.py
+- [[run()_8]] - code - backend/app/services/kb/auto_revision.py
+- [[servicesquest_centre.py]] - code - backend/app/services/quest_centre.py
+- [[status_window_data()]] - code - backend/app/services/quest_centre.py
+- [[test_kb_auto_revision_tasks.py]] - code - backend/tests/test_kb_auto_revision_tasks.py
+- [[test_kb_scanner.py]] - code - backend/tests/test_kb_scanner.py
+
+## Live Query (requires Dataview plugin)
+
+```dataview
+TABLE source_file, type FROM #community/Community_10
+SORT file.name ASC
+```
+
+## Connections to other communities
+- 89 edges to [[_COMMUNITY_Community 5]]
+- 22 edges to [[_COMMUNITY_Community 14]]
+- 20 edges to [[_COMMUNITY_Community 1]]
+- 20 edges to [[_COMMUNITY_Community 2]]
+- 16 edges to [[_COMMUNITY_Community 51]]
+- 15 edges to [[_COMMUNITY_Community 9]]
+- 14 edges to [[_COMMUNITY_Community 12]]
+- 14 edges to [[_COMMUNITY_Community 66]]
+- 12 edges to [[_COMMUNITY_Community 27]]
+- 12 edges to [[_COMMUNITY_Community 155]]
+- 11 edges to [[_COMMUNITY_Community 41]]
+- 10 edges to [[_COMMUNITY_Community 7]]
+- 10 edges to [[_COMMUNITY_Community 86]]
+- 9 edges to [[_COMMUNITY_Community 56]]
+- 8 edges to [[_COMMUNITY_Community 46]]
+- 8 edges to [[_COMMUNITY_Community 57]]
+- 7 edges to [[_COMMUNITY_Community 35]]
+- 7 edges to [[_COMMUNITY_Community 38]]
+- 7 edges to [[_COMMUNITY_Community 121]]
+- 6 edges to [[_COMMUNITY_Community 138]]
+- 6 edges to [[_COMMUNITY_Community 69]]
+- 6 edges to [[_COMMUNITY_Community 32]]
+- 5 edges to [[_COMMUNITY_Community 214]]
+- 5 edges to [[_COMMUNITY_Community 28]]
+- 5 edges to [[_COMMUNITY_Community 18]]
+- 5 edges to [[_COMMUNITY_Community 17]]
+- 5 edges to [[_COMMUNITY_Community 36]]
+- 5 edges to [[_COMMUNITY_Community 166]]
+- 5 edges to [[_COMMUNITY_Community 204]]
+- 4 edges to [[_COMMUNITY_Community 16]]
+- 4 edges to [[_COMMUNITY_Community 94]]
+- 4 edges to [[_COMMUNITY_Community 101]]
+- 4 edges to [[_COMMUNITY_Community 77]]
+- 4 edges to [[_COMMUNITY_Community 29]]
+- 4 edges to [[_COMMUNITY_Community 54]]
+- 4 edges to [[_COMMUNITY_Community 40]]
+- 4 edges to [[_COMMUNITY_Community 123]]
+- 4 edges to [[_COMMUNITY_Community 47]]
+- 4 edges to [[_COMMUNITY_Community 79]]
+- 4 edges to [[_COMMUNITY_Community 227]]
+- 4 edges to [[_COMMUNITY_Community 144]]
+- 3 edges to [[_COMMUNITY_Community 84]]
+- 3 edges to [[_COMMUNITY_Community 159]]
+- 3 edges to [[_COMMUNITY_Community 50]]
+- 3 edges to [[_COMMUNITY_Community 89]]
+- 3 edges to [[_COMMUNITY_Community 102]]
+- 3 edges to [[_COMMUNITY_Community 97]]
+- 3 edges to [[_COMMUNITY_Community 90]]
+- 3 edges to [[_COMMUNITY_Community 30]]
+- 3 edges to [[_COMMUNITY_Community 85]]
+- 3 edges to [[_COMMUNITY_Community 43]]
+- 3 edges to [[_COMMUNITY_Community 122]]
+- 3 edges to [[_COMMUNITY_Community 152]]
+- 3 edges to [[_COMMUNITY_Community 200]]
+- 3 edges to [[_COMMUNITY_Community 42]]
+- 3 edges to [[_COMMUNITY_Community 13]]
+- 3 edges to [[_COMMUNITY_Community 187]]
+- 3 edges to [[_COMMUNITY_Community 134]]
+- 3 edges to [[_COMMUNITY_Community 237]]
+- 3 edges to [[_COMMUNITY_Community 127]]
+- 2 edges to [[_COMMUNITY_Community 88]]
+- 2 edges to [[_COMMUNITY_Community 49]]
+- 2 edges to [[_COMMUNITY_Community 75]]
+- 2 edges to [[_COMMUNITY_Community 198]]
+- 2 edges to [[_COMMUNITY_Community 160]]
+- 2 edges to [[_COMMUNITY_Community 161]]
+- 2 edges to [[_COMMUNITY_Community 224]]
+- 2 edges to [[_COMMUNITY_Community 105]]
+- 2 edges to [[_COMMUNITY_Community 92]]
+- 2 edges to [[_COMMUNITY_Community 64]]
+- 2 edges to [[_COMMUNITY_Community 225]]
+- 2 edges to [[_COMMUNITY_Community 162]]
+- 2 edges to [[_COMMUNITY_Community 120]]
+- 2 edges to [[_COMMUNITY_Community 58]]
+- 2 edges to [[_COMMUNITY_Community 98]]
+- 2 edges to [[_COMMUNITY_Community 107]]
+- 2 edges to [[_COMMUNITY_Community 150]]
+- 2 edges to [[_COMMUNITY_Community 232]]
+- 2 edges to [[_COMMUNITY_Community 132]]
+- 2 edges to [[_COMMUNITY_Community 103]]
+- 2 edges to [[_COMMUNITY_Community 151]]
+- 2 edges to [[_COMMUNITY_Community 199]]
+- 2 edges to [[_COMMUNITY_Community 20]]
+- 2 edges to [[_COMMUNITY_Community 244]]
+- 2 edges to [[_COMMUNITY_Community 76]]
+- 2 edges to [[_COMMUNITY_Community 117]]
+- 2 edges to [[_COMMUNITY_Community 37]]
+- 2 edges to [[_COMMUNITY_Community 19]]
+- 2 edges to [[_COMMUNITY_Community 99]]
+- 2 edges to [[_COMMUNITY_Community 45]]
+- 2 edges to [[_COMMUNITY_Community 48]]
+- 2 edges to [[_COMMUNITY_Community 189]]
+- 2 edges to [[_COMMUNITY_Community 62]]
+- 2 edges to [[_COMMUNITY_Community 73]]
+- 2 edges to [[_COMMUNITY_Community 274]]
+- 2 edges to [[_COMMUNITY_Community 273]]
+- 2 edges to [[_COMMUNITY_Community 145]]
+- 2 edges to [[_COMMUNITY_Community 238]]
+- 2 edges to [[_COMMUNITY_Community 180]]
+- 1 edge to [[_COMMUNITY_Community 83]]
+- 1 edge to [[_COMMUNITY_Community 335]]
+- 1 edge to [[_COMMUNITY_Community 131]]
+- 1 edge to [[_COMMUNITY_Community 185]]
+- 1 edge to [[_COMMUNITY_Community 108]]
+- 1 edge to [[_COMMUNITY_Community 60]]
+- 1 edge to [[_COMMUNITY_Community 153]]
+- 1 edge to [[_COMMUNITY_Community 109]]
+- 1 edge to [[_COMMUNITY_Community 21]]
+- 1 edge to [[_COMMUNITY_Community 55]]
+- 1 edge to [[_COMMUNITY_Community 61]]
+- 1 edge to [[_COMMUNITY_Community 52]]
+- 1 edge to [[_COMMUNITY_Community 245]]
+- 1 edge to [[_COMMUNITY_Community 201]]
+- 1 edge to [[_COMMUNITY_Community 115]]
+- 1 edge to [[_COMMUNITY_Community 63]]
+- 1 edge to [[_COMMUNITY_Community 154]]
+- 1 edge to [[_COMMUNITY_Community 110]]
+- 1 edge to [[_COMMUNITY_Community 125]]
+- 1 edge to [[_COMMUNITY_Community 70]]
+- 1 edge to [[_COMMUNITY_Community 247]]
+- 1 edge to [[_COMMUNITY_Community 284]]
+- 1 edge to [[_COMMUNITY_Community 126]]
+- 1 edge to [[_COMMUNITY_Community 100]]
+- 1 edge to [[_COMMUNITY_Community 116]]
+- 1 edge to [[_COMMUNITY_Community 139]]
+- 1 edge to [[_COMMUNITY_Community 203]]
+- 1 edge to [[_COMMUNITY_Community 177]]
+- 1 edge to [[_COMMUNITY_Community 124]]
+- 1 edge to [[_COMMUNITY_Community 81]]
+- 1 edge to [[_COMMUNITY_Community 31]]
+- 1 edge to [[_COMMUNITY_Community 188]]
+- 1 edge to [[_COMMUNITY_Community 87]]
+- 1 edge to [[_COMMUNITY_Community 65]]
+- 1 edge to [[_COMMUNITY_Community 74]]
+- 1 edge to [[_COMMUNITY_Community 135]]
+- 1 edge to [[_COMMUNITY_Community 202]]
+- 1 edge to [[_COMMUNITY_Community 169]]
+- 1 edge to [[_COMMUNITY_Community 53]]
+- 1 edge to [[_COMMUNITY_Community 206]]
+- 1 edge to [[_COMMUNITY_Community 176]]
+- 1 edge to [[_COMMUNITY_Community 156]]
+- 1 edge to [[_COMMUNITY_Community 249]]
+- 1 edge to [[_COMMUNITY_Community 44]]
+- 1 edge to [[_COMMUNITY_Community 191]]
+- 1 edge to [[_COMMUNITY_Community 171]]
+- 1 edge to [[_COMMUNITY_Community 219]]
+- 1 edge to [[_COMMUNITY_Community 216]]
+- 1 edge to [[_COMMUNITY_Community 228]]
+- 1 edge to [[_COMMUNITY_Community 250]]
+- 1 edge to [[_COMMUNITY_Community 172]]
+- 1 edge to [[_COMMUNITY_Community 193]]
+- 1 edge to [[_COMMUNITY_Community 221]]
+- 1 edge to [[_COMMUNITY_Community 302]]
+- 1 edge to [[_COMMUNITY_Community 194]]
+- 1 edge to [[_COMMUNITY_Community 95]]
+- 1 edge to [[_COMMUNITY_Community 164]]
+- 1 edge to [[_COMMUNITY_Community 22]]
+- 1 edge to [[_COMMUNITY_Community 173]]
+- 1 edge to [[_COMMUNITY_Community 208]]
+- 1 edge to [[_COMMUNITY_Community 222]]
+- 1 edge to [[_COMMUNITY_Community 240]]
+- 1 edge to [[_COMMUNITY_Community 195]]
+- 1 edge to [[_COMMUNITY_Community 96]]
+- 1 edge to [[_COMMUNITY_Community 182]]
+- 1 edge to [[_COMMUNITY_Community 280]]
+- 1 edge to [[_COMMUNITY_Community 141]]
+- 1 edge to [[_COMMUNITY_Community 210]]
+- 1 edge to [[_COMMUNITY_Community 211]]
+- 1 edge to [[_COMMUNITY_Community 113]]
+- 1 edge to [[_COMMUNITY_Community 78]]
+- 1 edge to [[_COMMUNITY_Community 184]]
+- 1 edge to [[_COMMUNITY_Community 230]]
+- 1 edge to [[_COMMUNITY_Community 71]]
+- 1 edge to [[_COMMUNITY_Community 215]]
+- 1 edge to [[_COMMUNITY_Community 111]]
+- 1 edge to [[_COMMUNITY_Community 316]]
+- 1 edge to [[_COMMUNITY_Community 278]]
+
+## Top bridge nodes
+- [[models__init__.py]] - degree 455, connects to 168 communities
+- [[Task]] - degree 45, connects to 12 communities
+- [[RevisionSchedule]] - degree 21, connects to 7 communities
+- [[test_kb_auto_revision_tasks.py]] - degree 21, connects to 7 communities
+- [[auto_revision.py]] - degree 19, connects to 7 communities

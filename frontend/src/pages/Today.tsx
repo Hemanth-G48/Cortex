@@ -76,7 +76,21 @@ export const Today = () => {
     setSessionNotice(null);
     try {
       await endpoints.kb.sessions.complete(s.id);
-      setSessionNotice('Session completed — XP and mastery logged 🎉');
+      // Defect #61: completing a micro-session moves XP + vault mastery, so
+      // re-read those exact sources (character sheet, leaderboard, mastery) and
+      // report the new totals in the same banner.
+      const [character, board, mastery] = await Promise.all([
+        endpoints.characters.get(1).catch(() => null),
+        endpoints.leaderboard.list(20).catch(() => null),
+        endpoints.kb.mastery().catch(() => null),
+      ]);
+      const bits: string[] = [];
+      if (character) bits.push(`Level ${character.level} · ${character.xp} XP`);
+      if (mastery && mastery.topics_total > 0) bits.push(`vault mastery ${mastery.score_pct}%`);
+      if (board?.me) bits.push(`rank ${board.me.rank}`);
+      setSessionNotice(
+        `Session completed — XP and mastery logged 🎉${bits.length ? ` (${bits.join(' · ')})` : ''}`,
+      );
       // Close the running panel and refresh so today's focus stats reflect the completion.
       setSession(null);
       void load();

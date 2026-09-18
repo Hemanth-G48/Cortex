@@ -139,6 +139,7 @@ export const CourseDetail = () => {
   const [resyncing, setResyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<{ kind: 'success' | 'error' | 'info'; text: string } | null>(null);
 
+  const [health, setHealth] = useState<{ stale_ids: number[] } | null>(null);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [expandedDoc, setExpandedDoc] = useState<number | null>(null);
   // Only auto-expand top-level topics on the very first load — never on reload
@@ -152,6 +153,11 @@ export const CourseDetail = () => {
     try {
       const data = await endpoints.courses.content(parseInt(id, 10));
       setContent(data);
+      // Health: badge stale/outdated documents in the list (defect #95).
+      try {
+        const h = await endpoints.kb.health();
+        setHealth({ stale_ids: h.signals.stale_notes.document_ids });
+      } catch { /* health endpoint optional — degrade gracefully */ }
       // Auto-expand top-level topics so the topic → documents mapping is
       // visible immediately (subtopics stay collapsed).
       if (!didAutoExpandRef.current) {
@@ -851,6 +857,9 @@ export const CourseDetail = () => {
                           {doc.quality_score != null && <span>⭐ {Math.round(doc.quality_score * 100)}%</span>}
                           {doc.author && <span>✍️ {doc.author}</span>}
                           {doc.updated_at && <span>Updated {formatTime(doc.updated_at)}</span>}
+                          {health?.stale_ids.includes(doc.id) && (
+                            <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }}>⚠ stale</span>
+                          )}
                         </div>
                       </div>
                       <div className="document-expand-icon">{isExpanded ? '▾' : '▸'}</div>

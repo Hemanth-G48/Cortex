@@ -1,8 +1,14 @@
 """Phase 8 connect-suggestions for new documents (Idea 76).
 
-After a document is ingested, ``connect_suggestions`` ranks the best existing
-notes to link it to: documents that share MENTIONS concepts (the deterministic
-core signal), with a best-effort embedding-similarity bonus. Already-connected
+**Responsibility (audit M8):** this module owns *link suggestion ranking* —
+after a document is ingested, ``connect_suggestions`` ranks the best existing
+notes to link it to. It reads edges via ``graph.py`` but never creates them
+directly; confirming a suggestion goes through the ``/api/kb/edges`` router
+which calls ``graph.add_edge``. Edge mechanics and the relation vocabulary
+live in ``graph.py``.
+
+Documents that share MENTIONS concepts (the deterministic core signal) are
+ranked with a best-effort embedding-similarity bonus. Already-connected
 targets are suppressed. Candidates whose shared-concepts overlap with a notably
 newer *changed* document are surfaced as ``contradiction_hints`` and handed to
 Idea 78's scan (phrase 55). Confirming a suggestion creates a manual

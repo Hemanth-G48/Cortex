@@ -22,6 +22,7 @@ const DEFAULT_PREFS: UserPreference = {
   examples_vs_theory: 0.5,
   style: 'concise',
   session_length_mins: 30,
+  pomodoro_break_mins: 5,
   explanation_style: 'plain',
   onboarding_completed: false,
 };

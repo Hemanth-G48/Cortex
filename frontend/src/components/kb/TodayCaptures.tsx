@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { endpoints, type KbDailyNotes } from '../../services/api';
 
@@ -28,16 +28,40 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const TodayCaptures = () => {
   const [data, setData] = useState<KbDailyNotes | null>(null);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
+
+  const load = () => {
+    Promise.all([
+      endpoints.kb.dailyNotes.today().catch(() => null),
+      endpoints.dailyLogs.list().catch(() => []),
+      endpoints.journal.list().catch(() => []),
+    ]).then(([notes, , journal]) => {
+      if (!mountedRef.current) return;
+      const base = notes ?? { date: new Date().toISOString().slice(0, 10), documents: [], schedule: [], journal: [] };
+      // Merge chronologically-newer journal entries created after the morning
+      // snapshot so the widget reflects the live day. DB entries carry a date;
+      // daily-note journal items have no timestamp, so they keep their order.
+      const merged: KbDailyNotes = {
+        ...base,
+        documents: base.documents,
+        schedule: base.schedule,
+        journal: [
+          ...base.journal,
+          ...journal.map((e) => ({ id: e.id, mood: e.mood ?? null, content: e.content, tags: e.tags ?? null })),
+        ].slice(-20),
+      };
+      setData(merged);
+    }).catch(() => { if (mountedRef.current) setData(null); })
+      .finally(() => { if (mountedRef.current) setLoading(false); });
+  };
 
   useEffect(() => {
-    endpoints.kb.dailyNotes
-      .today()
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, []);
+    load();
+    const tick = setInterval(load, 60_000);
+    return () => { mountedRef.current = false; window.clearInterval(tick); };
+  }, [load]);
 
-  if (loading) return null;
+  if (loading && !data) return null;
   if (!data) return null;
 
   const dayName = DAYS[new Date(data.date).getDay()] ?? '';

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Header } from '../components/layout/Header';
+import { confirmDelete } from '../utils/confirm';
 import { endpoints } from '../services/api';
 import type {
   GapGoalInfo,
@@ -504,7 +505,7 @@ export const LearningPlanner = () => {
   };
 
   const removePlan = async (id: number) => {
-    if (!window.confirm('Delete this learning plan, its discovered structure and progress?')) return;
+    if (!confirmDelete('this learning plan and its progress')) return;
     try {
       await endpoints.kb.learningPlans.remove(id);
       if (active?.id === id) setActive(null);

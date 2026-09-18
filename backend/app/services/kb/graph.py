@@ -1,5 +1,13 @@
 """Knowledge-graph helpers (Idea 16, phrases 51-58).
 
+**Responsibility (audit M8):** this module owns *graph construction and
+edge vocabulary* — creating/querying ``KbEdge`` rows (wikilinks, MENTIONS,
+RELATED), the canonical relation vocabulary (``RELATION_VOCAB``), and
+concept/document link aggregation. Sibling module ``connect.py`` owns
+*suggestion ranking* — deciding which links are worth proposing for a newly
+ingested note. Keep ranking heuristics out of here; keep edge mechanics out
+of there.
+
 Every function is user-scoped — ``user_id`` filters all queries.
 """
 

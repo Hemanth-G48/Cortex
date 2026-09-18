@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # ── Test-only auth (single-user app) ──
     # The application is single-user and tokenless: no login, no roles, no
     # bearer tokens. These settings exist solely so the pytest-only auth shim
-    # (``app/routers/auth_test.py``) and the legacy test suite's signup/login
+    # (``app/routers/auth.py``) and the legacy test suite's signup/login
     # helpers keep working. They are never used by the application itself.
     APP_SECRET: str = "student-os-dev-secret"
     # Secret key the test shim checks when a test signs up a "teacher" role

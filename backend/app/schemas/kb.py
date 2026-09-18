@@ -261,6 +261,10 @@ class KbStatsResponse(BaseModel):
     inference_limit: int = 0
     # Stale flags exposed for the re-index tooling (Idea 20).
     dirty_documents: int = 0
+    # Audit defect #67: the vault's activity window (first/last indexed note),
+    # used to derive the analytics range from real data.
+    oldest_document_date: str | None = None
+    newest_document_date: str | None = None
 
 
 # ---- Metadata enrichment (Idea 13) ----
@@ -424,3 +428,15 @@ class KbSearchResponse(BaseModel):
     mode: str
     original_query: str
     expanded_query: str
+
+
+# ---- Capture XP (Idea 69, defect #79 fix) ----
+
+class KbCaptureXpRequest(BaseModel):
+    amount: int = Field(..., ge=0, le=10000)
+    kind: str | None = None
+    trigger_key: str | None = None
+
+
+class KbCaptureXpResponse(BaseModel):
+    xp_awarded: int

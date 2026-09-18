@@ -1,32 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Header } from '../components/layout/Header';
 import { endpoints } from '../services/api';
-import type { AIQuizQuestion, Note } from '../services/api';
-
-const QUIZ_HISTORY_KEY = 'student-os-quiz-history';
-
-interface QuizHistoryEntry {
-  date: number;
-  score: number;
-  total: number;
-  title: string;
-}
-
-const loadHistory = (): QuizHistoryEntry[] => {
-  try {
-    return JSON.parse(localStorage.getItem(QUIZ_HISTORY_KEY) || '[]');
-  } catch {
-    return [];
-  }
-};
-
-const saveHistory = (h: QuizHistoryEntry[]) => {
-  try {
-    localStorage.setItem(QUIZ_HISTORY_KEY, JSON.stringify(h.slice(0, 12)));
-  } catch {
-    /* ignore */
-  }
-};
+import type { AIQuizQuestion, Note, QuizHistoryItem } from '../services/api';
 
 export const Quiz = () => {
   const [phase, setPhase] = useState<'setup' | 'quiz' | 'results'>('setup');
@@ -37,7 +12,8 @@ export const Quiz = () => {
   const [loading, setLoading] = useState(false);
   const [selectedNote, setSelectedNote] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
-  const [history, setHistory] = useState<QuizHistoryEntry[]>(loadHistory);
+  const [history, setHistory] = useState<QuizHistoryItem[]>([]);
+  const quizzesHistoryApi = { list: () => endpoints.quizzes.history(), create: (d: { score: number; total_questions: number }) => endpoints.quizzes.historyCreate(d) };
   const [aiMode, setAiMode] = useState('Offline');
 
   useEffect(() => {
@@ -46,6 +22,9 @@ export const Quiz = () => {
       .health()
       .then((h) => setAiMode(h.available && h.model ? `AI · ${h.model}` : 'Offline'))
       .catch(() => setAiMode('Offline'));
+    // Defect #77 fix: quiz history is the server truth (GET /quizzes/history),
+    // not localStorage. localStorage stays only as an in-browser cache.
+    quizzesHistoryApi.list().then((r) => setHistory(r)).catch(() => {});
   }, []);
 
   const startQuiz = async () => {
@@ -77,28 +56,47 @@ export const Quiz = () => {
         setSelected(null);
       } else {
         const score = answers.filter(Boolean).length + (correct ? 1 : 0);
-        const entry: QuizHistoryEntry = {
-          date: Date.now(),
+        const entry: QuizHistoryItem = {
+          id: 0,
+          quiz_id: 0,
+          answers: questions.map((_) => 0),
           score,
-          total: questions.length,
-          title: notes.find((n) => String(n.id) === String(selectedNote))?.title || 'Quiz',
+          total_questions: questions.length,
+          created_at: new Date().toISOString(),
         };
-        const next = [entry, ...history];
-        setHistory(next);
-        saveHistory(next);
+        // Defect #77 fix: write to the server first, then update local cache.
+        endpoints.quizzes.historyCreate({ score, total_questions: questions.length })
+          .then((posted) => {
+            if (posted) {
+              persistHistory(posted);
+            } else {
+              // Server unavailable — fall back to local-only cache.
+              persistHistory(entry);
+            }
+          })
+          .catch(() => persistHistory(entry));
         setPhase('results');
       }
     }, 700);
-  };
+  };      const score = answers.filter(Boolean).length;
 
-  const score = answers.filter(Boolean).length;
+      // Defect #77 fix: persist the result to the server so the history is the
+      // source of truth across devices, with localStorage only as cache.
+      const persistHistory = (entry: QuizHistoryItem) => {
+        setHistory((prev) => [entry, ...prev]);
+        try {
+          localStorage.setItem('student-os-quiz-history', JSON.stringify([entry, ...history].slice(0, 12)));
+        } catch {
+          /* non-critical cache */
+        }
+      };
 
-  const quit = () => {
-    setPhase('setup');
-    setCurrent(0);
-    setAnswers([]);
-    setSelected(null);
-  };
+      const quit = () => {
+        setPhase('setup');
+        setCurrent(0);
+        setAnswers([]);
+        setSelected(null);
+      };
 
   // ── Results ──
   if (phase === 'results') {
@@ -278,9 +276,9 @@ export const Quiz = () => {
             {history.slice(0, 5).map((h, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '0.4rem 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>
-                  {h.title} · {new Date(h.date).toLocaleDateString()}
+                  Attempt #{h.id}{h.created_at ? ` · ${new Date(h.created_at).toLocaleDateString()}` : ''}
                 </span>
-                <span style={{ fontWeight: 700 }}>{h.score}/{h.total}</span>
+                <span style={{ fontWeight: 700 }}>{h.score ?? 0}/{h.total_questions ?? 0}</span>
               </div>
             ))}
           </div>

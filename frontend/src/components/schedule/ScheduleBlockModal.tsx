@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { endpoints, dailyScheduleApi } from '../../services/api';
 import type { DailyScheduleItem } from '../../services/api';
 
 interface ScheduleBlockModalProps {
@@ -27,6 +28,37 @@ export const ScheduleBlockModal = ({ open, initial, date, onClose, onSave }: Sch
   const [location, setLocation] = useState(initial?.location ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [timeError, setTimeError] = useState('');
+  // Defect #60: suggest rooms/topics from the vault's concepts plus the
+  // locations actually used in recent daily-life schedule blocks.
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    let stale = false;
+    const recentDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      return d.toISOString().slice(0, 10);
+    });
+    Promise.all([
+      endpoints.kb.concepts.list('', 1, 200).catch(() => ({ items: [] })),
+      Promise.all(recentDays.map((day) => dailyScheduleApi.list(day).catch(() => []))),
+    ]).then(([concepts, dayLists]) => {
+      if (stale) return;
+      const placeLike = /\b(room|lab|hall|campus|library|block|floor|office|dept|auditorium|studio)\b|\d/;
+      const fromConcepts = concepts.items
+        .map((c) => c.canonical_name)
+        .filter((name) => placeLike.test(name.toLowerCase()));
+      const used = dayLists
+        .flat()
+        .map((item) => (item.location ?? '').trim())
+        .filter(Boolean);
+      setLocationSuggestions([...new Set([...used, ...fromConcepts])].slice(0, 50));
+    });
+    return () => {
+      stale = true;
+    };
+  }, [open]);
 
   const validateTime = useCallback((val: string) => {
     if (!TIME_RANGE_RE.test(val)) {
@@ -104,7 +136,20 @@ export const ScheduleBlockModal = ({ open, initial, date, onClose, onSave }: Sch
           </select>
 
           <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Location</label>
-          <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Room 204" className="form-input" />
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. Room 204"
+            className="form-input"
+            list="schedule-location-suggestions"
+          />
+          {/* Defect #60: vault concepts + previously used locations. */}
+          <datalist id="schedule-location-suggestions">
+            {locationSuggestions.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
 
           <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Notes</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="form-input" style={{ resize: 'vertical' }} />

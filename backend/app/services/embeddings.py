@@ -93,15 +93,29 @@ def _normalize_dim(vecs: list[list[float]], target: int | None = None) -> list[l
     return out
 
 
+def _check_fastembed_dim() -> None:
+    """Verify the configured embedding dimension matches the local model.
+
+    Mismatched dimensions produce meaningless cosine similarity (vectors are
+    zero-padded or truncated to fit), so we fail fast at startup rather than
+    silently returning wrong results. The DB column stores the configured dim,
+    not the model's native dim — a mismatch means the stored vectors are wrong.
+    """
+    expected = fastembed_dim()
+    if expected != settings.EMBEDDINGS_DIM:
+        raise RuntimeError(
+            f"EMBEDDINGS_DIM={settings.EMBEDDINGS_DIM} does not match local model "
+            f"{settings.EMBEDDINGS_LOCAL_MODEL} (expects {expected}). "
+            f"Set EMBEDDINGS_DIM={expected} or change EMBEDDINGS_LOCAL_MODEL."
+        )
+
+
 def fastembed_available() -> bool:
     """True when the local fastembed model is selectable.
 
     Requires ``EMBEDDINGS_BACKEND`` to be fastembed/auto and the optional
     ``fastembed`` package to be importable (import-guarded, so tests and
-    machines without it keep the hash fallback). Also warns when the
-    configured ``EMBEDDINGS_DIM`` doesn't match the model's native dimension
-    (cosine survives zero-padding, but storage is wasteful and the ``dim``
-    column misleads).
+    machines without it keep the hash fallback).
     """
     backend = (settings.EMBEDDINGS_BACKEND or "provider").lower()
     if backend not in ("fastembed", "auto"):
@@ -111,15 +125,7 @@ def fastembed_available() -> bool:
     except ImportError:
         return False
     if backend == "fastembed":
-        expected = fastembed_dim()
-        if expected != settings.EMBEDDINGS_DIM:
-            logger.warning(
-                "EMBEDDINGS_DIM=%d does not match local model %s (expects %d) "
-                "— vectors will be zero-padded/truncated.",
-                settings.EMBEDDINGS_DIM,
-                settings.EMBEDDINGS_LOCAL_MODEL,
-                expected,
-            )
+        _check_fastembed_dim()
     return True
 
 

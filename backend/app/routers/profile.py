@@ -23,6 +23,35 @@ def get_profile(current_user: User = Depends(current_user)):
     return {"user": UserResponse.model_validate(current_user).model_dump(exclude_none=True)}
 
 
+@router.get("/prefs", response_model=dict)
+def get_prefs(current_user: User = Depends(current_user)):
+    """Client preferences stored server-side (audit defect #96)."""
+    import json
+
+    try:
+        prefs = json.loads(current_user.prefs_json or "{}")
+    except (ValueError, TypeError):
+        prefs = {}
+    return {"prefs": prefs}
+
+
+@router.put("/prefs", response_model=dict)
+def update_prefs(body: dict, current_user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Merge client preferences (e.g. AI model choice) into the stored JSON."""
+    import json
+
+    try:
+        prefs = json.loads(current_user.prefs_json or "{}")
+    except (ValueError, TypeError):
+        prefs = {}
+    if not isinstance(body, dict):
+        raise HTTPException(400, "Body must be a JSON object")
+    prefs.update(body)
+    current_user.prefs_json = json.dumps(prefs)
+    db.commit()
+    return {"prefs": prefs}
+
+
 @router.put("", response_model=dict)
 def update_profile(
     body: UserUpdate,

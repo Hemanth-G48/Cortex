@@ -4,7 +4,8 @@ import { RpgBadge } from './RpgBadge';
 import { RpgButton } from './RpgButton';
 import { endpoints } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
-import type { Mission, MissionTask } from '../../services/api';
+import { confirmDelete } from '../../utils/confirm';
+import type { Mission, MissionTask, MissionVaultTaskSuggestion } from '../../services/api';
 
 interface MissionCardProps {
   mission: Mission;
@@ -15,6 +16,8 @@ interface MissionCardProps {
 
 export const MissionCard = ({ mission, onComplete, onDelete, onEdit }: MissionCardProps) => {
   const [tasks, setTasks] = useState<MissionTask[]>([]);
+  // Defect #80: vault-mined subtask suggestions for this mission.
+  const [vaultTasks, setVaultTasks] = useState<MissionVaultTaskSuggestion[]>([]);
   const [completing, setCompleting] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [flash, setFlash] = useState(false);
@@ -22,6 +25,11 @@ export const MissionCard = ({ mission, onComplete, onDelete, onEdit }: MissionCa
 
   useEffect(() => {
     endpoints.missions.listTasks(mission.id).then(setTasks);
+    // Defect #80 fix: mine the vault for checklist items that belong to this mission.
+    endpoints.missions
+      .vaultTasks(mission.id)
+      .then((r) => setVaultTasks(r.suggestions))
+      .catch(() => setVaultTasks([]));
   }, [mission.id]);
 
   const statusVariant =
@@ -47,7 +55,7 @@ export const MissionCard = ({ mission, onComplete, onDelete, onEdit }: MissionCa
   };
 
   const handleDelete = () => {
-    if (!window.confirm('Delete this mission?')) return;
+    if (!confirmDelete('this mission')) return;
     endpoints.missions.delete(mission.id).then(() => onDelete?.(mission));
   };
 
@@ -69,10 +77,21 @@ export const MissionCard = ({ mission, onComplete, onDelete, onEdit }: MissionCa
   };
 
   const handleDeleteTask = async (taskId: number) => {
-    if (!window.confirm('Delete this subtask?')) return;
+    if (!confirmDelete('this subtask')) return;
     await endpoints.missions.deleteTask(taskId);
     const updated = await endpoints.missions.listTasks(mission.id);
     setTasks(updated);
+  };
+
+  // Defect #80: accept a vault suggestion → create a real MissionTask.
+  const handleAddVaultTask = async (title: string) => {
+    await endpoints.missions.createTask(mission.id, {
+      title,
+      sort_order: tasks.length,
+    });
+    const updated = await endpoints.missions.listTasks(mission.id);
+    setTasks(updated);
+    setVaultTasks((prev) => prev.filter((s) => s.title !== title));
   };
 
   const taskRowStyle: React.CSSProperties = {
@@ -154,6 +173,35 @@ export const MissionCard = ({ mission, onComplete, onDelete, onEdit }: MissionCa
               >
                 ×
               </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {vaultTasks.length > 0 && (
+        <div style={{ marginBottom: '8px' }}>
+          <div style={{ fontSize: '0.7rem', color: '#808080', marginBottom: '4px' }}>
+            📚 Suggested from your vault
+          </div>
+          {vaultTasks.map((s) => (
+            <div key={`${s.document_id}-${s.title}`} style={taskRowStyle}>
+              <button
+                type="button"
+                onClick={() => void handleAddVaultTask(s.title)}
+                title={s.document_title ? `From: ${s.document_title}` : undefined}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #333',
+                  color: '#888',
+                  cursor: 'pointer',
+                  fontSize: '0.7rem',
+                  borderRadius: '4px',
+                  padding: '0 4px',
+                }}
+              >
+                +
+              </button>
+              <span style={{ flex: 1, color: '#999' }}>{s.title}</span>
             </div>
           ))}
         </div>

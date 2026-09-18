@@ -48,6 +48,15 @@ def ai_health() -> dict:
     }
 
 
+@router.get("/budget")
+def ai_budget(db: Session = Depends(get_db)) -> dict:
+    """Daily AI/embedding budget remaining (audit defect #64)."""
+    user = db.query(User).first()
+    if user is None:
+        return {"today": 0, "limit": 0, "remaining": 0}
+    return embeddings.embedding_budget(db, user.id)
+
+
 @router.get("/models")
 def ai_models() -> dict:
     active = ai_providers.get_registry().active()

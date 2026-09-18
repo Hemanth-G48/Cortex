@@ -13,14 +13,12 @@ Base = declarative_base()
 # Idempotent column migrations. `create_all` cannot ALTER existing tables, so
 # any new column added to a model must be registered here as an ALTER TABLE.
 COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
-    "courses": [
-        ("credits", "INTEGER DEFAULT 3"),
-    ],
     "notes": [
         ("pinned", "BOOLEAN DEFAULT 0"),
         ("updated_at", "DATETIME"),
     ],
     "courses": [
+        ("credits", "INTEGER DEFAULT 3"),
         ("google_id", "VARCHAR(100)"),
         ("curriculum_subject_id", "INTEGER"),
         ("source_type", "VARCHAR(20) DEFAULT 'manual'"),
@@ -60,6 +58,15 @@ COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
     "course_sync_log": [
         ("course_folders", "INTEGER DEFAULT 0"),
     ],
+    "curriculum_subjects": [
+        # Audit defect #9: curriculum semester label served to the UI instead
+        # of the frontend formatting "Semester N" from the integer.
+        ("semester_label", "VARCHAR(50)"),
+    ],
+    "user_preferences": [
+        # Audit defect #58: pomodoro break length persisted with the profile.
+        ("pomodoro_break_mins", "INTEGER DEFAULT 5"),
+    ],
     "assignments": [
         ("google_id", "VARCHAR(100)"),
         ("type", "VARCHAR(30) DEFAULT 'Homework'"),
@@ -71,6 +78,9 @@ COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
         ("google_id", "VARCHAR(100)"),
     ],
     "users": [
+        # Audit defect #96: client prefs (e.g. AI model choice) persisted
+        # server-side so they follow the user across browsers/devices.
+        ("prefs_json", "TEXT"),
         ("avatar_class", "VARCHAR(50) DEFAULT 'Wizard'"),
         ("current_streak", "INTEGER DEFAULT 0"),
         ("current_weight", "FLOAT"),
@@ -85,6 +95,7 @@ COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
         ("is_admin", "BOOLEAN DEFAULT 0"),
         ("institution_id", "INTEGER"),
         ("program_id", "INTEGER"),
+        ("pacing_multiplier", "FLOAT DEFAULT 1.0"),
     ],
     "missions": [
         ("linked_quests", "VARCHAR(500)"),
@@ -104,6 +115,9 @@ COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
         ("days_caught", "INTEGER DEFAULT 0"),
         ("goal", "VARCHAR(300)"),
         ("heatmap_data", "TEXT"),
+        # Audit defect #49: archive provenance for the Archived Habits page.
+        ("archived_reason", "VARCHAR(300)"),
+        ("archived_document_id", "INTEGER"),
     ],
     "habit_logs": [
         ("type", "VARCHAR(10) DEFAULT 'good'"),
@@ -165,12 +179,9 @@ COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
         ("quality_score", "INTEGER"),
         ("quality_detail", "TEXT"),
     ],
-    # Phase 5 (Idea 43, phrase 21): detected term on units; (Idea 49) pacing.
+    # Phase 5 (Idea 43, phrase 21): detected term on units.
     "curriculum_units": [
         ("semester", "VARCHAR(30)"),
-    ],
-    "users": [
-        ("pacing_multiplier", "FLOAT DEFAULT 1.0"),
     ],
     # Phase 6 (Idea 51, phrase 1): study plans gained an owner.
     "study_plans": [
@@ -389,8 +400,18 @@ def _ensure_kb_edges_concept_index(conn) -> None:
 
 
 def get_db():
+    """Dependency that yields a database session and guarantees cleanup.
+
+    The ``try/finally`` ensures the session is closed even if the request
+    handler raises — without this, SQLite connections accumulate under load.
+    A rollback on exception prevents a dirty session from being reused by the
+    next request in the same process (SQLite ``check_same_thread=False``).
+    """
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

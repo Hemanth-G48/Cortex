@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { RpgLayout } from '../components/rpg/RpgLayout';
 import { RpgCard } from '../components/rpg/RpgCard';
@@ -6,6 +6,7 @@ import { RpgBadge } from '../components/rpg/RpgBadge';
 import { RpgButton } from '../components/rpg/RpgButton';
 import { RpgTabs } from '../components/rpg/RpgTabs';
 import { endpoints } from '../services/api';
+import { confirmDelete } from '../utils/confirm';
 import type { Reward } from '../services/api';
 
 const sidebar = (
@@ -36,11 +37,52 @@ export const Rewards = () => {
   const [activeTab, setActiveTab] = useState<TabId>('available');
   const [claimingId, setClaimingId] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // Defect #83 fix: reward creation from this page.
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ title: '', description: '', xp_cost: 50, category: '' });
 
-  useEffect(() => {
-    endpoints.rewards.list(true).then(setAllRewards).catch(() => {});
-    endpoints.rewards.claimed().then(setClaimed).catch(() => {});
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      endpoints.rewards.list(true).catch(() => null),
+      endpoints.rewards.claimed().catch(() => null),
+    ]).then(([avail, claimedRewards]) => {
+      // Defect #86 fix: surface load failures.
+      if (avail === null && claimedRewards === null) {
+        setError('Could not load rewards — is the backend running?');
+        return;
+      }
+      setAllRewards(avail ?? []);
+      setClaimed(claimedRewards ?? []);
+    }).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async () => {
+    if (!form.title.trim()) return;
+    try {
+      await endpoints.rewards.create({
+        title: form.title.trim(),
+        description: form.description || null,
+        xp_cost: Number(form.xp_cost) || 0,
+        category: form.category || '',
+      });
+      setForm({ title: '', description: '', xp_cost: 50, category: '' });
+      setShowCreate(false);
+      load();
+    } catch {
+      setError('Could not create the reward');
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    if (!confirmDelete('this reward')) return;
+    endpoints.rewards.delete(id).then(load).catch(() => setError('Could not delete the reward'));
+  };
 
   const handleClaim = async (rewardId: number) => {
     setClaimingId(rewardId);
@@ -89,7 +131,34 @@ export const Rewards = () => {
 
         <RpgTabs tabs={tabs} activeTab={activeTab} onChange={(id) => setActiveTab(id as TabId)} />
 
-        {currentRewards.length === 0 ? (
+        <button type="button" className="rpg-btn" style={{ marginBottom: '12px', cursor: 'pointer' }} onClick={() => setShowCreate(!showCreate)}>
+          {showCreate ? '− Cancel' : '+ New Reward'}
+        </button>
+
+        {showCreate && (
+          <RpgCard style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <input placeholder="Reward title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              <input placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="number" placeholder="XP cost" value={form.xp_cost} onChange={(e) => setForm({ ...form, xp_cost: Number(e.target.value) })} style={{ width: 110 }} />
+                <input placeholder="Category (optional)" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ flex: 1 }} />
+                <button type="button" className="rpg-btn" onClick={() => void handleCreate()} disabled={!form.title.trim()}>Create</button>
+              </div>
+            </div>
+          </RpgCard>
+        )}
+
+        {loading && <div className="rpg-empty"><div className="rpg-empty-text">Loading rewards…</div></div>}
+        {error && (
+          <div className="rpg-empty">
+            <div className="rpg-empty-icon">⚠</div>
+            <div className="rpg-empty-text">{error}</div>
+            <button type="button" className="rpg-btn" onClick={load}>Retry</button>
+          </div>
+        )}
+
+        {!loading && !error && currentRewards.length === 0 ? (
           <div className="rpg-empty">
             <div className="rpg-empty-icon">🎁</div>
             <div className="rpg-empty-text">
@@ -120,6 +189,15 @@ export const Rewards = () => {
                       disabled={claimingId === r.id}
                     >
                       {claimingId === r.id ? '...' : 'Claim'}
+                    </RpgButton>
+                  )}
+                  {r.is_available && (
+                    <RpgButton
+                      variant="green"
+                      size="sm"
+                      onClick={() => handleDelete(r.id)}
+                    >
+                      ✕
                     </RpgButton>
                   )}
                 </div>

@@ -1,0 +1,20 @@
+---
+source_file: "backend/app/schemas/daily_log.py"
+type: "code"
+community: "Community 27"
+location: "L24"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_27
+---
+
+# DailyLogResponse
+
+## Connections
+- [[DailyLogBase]] - `inherits` [EXTRACTED]
+- [[daily_logs.py]] - `imports` [EXTRACTED]
+- [[schemas__init__.py]] - `imports` [EXTRACTED]
+- [[schemasdaily_log.py]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_27

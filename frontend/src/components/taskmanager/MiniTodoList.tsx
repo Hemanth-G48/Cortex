@@ -1,30 +1,36 @@
 import { useState } from 'react';
 import type { Task } from '../../services/api';
 
+/** A task row, or a vault-captured document surfaced as a pseudo-task. */
+export type MiniTodoItem = Omit<Task, 'id'> & { id: number | string };
+
 interface MiniTodoListProps {
-  tasks: Task[];
-  onToggle?: (task: Task) => void;
+  tasks: MiniTodoItem[];
+  onToggle?: (task: MiniTodoItem) => void;
 }
 
 /** Compact todo list with optimistic status toggle */
 export const MiniTodoList = ({ tasks, onToggle }: MiniTodoListProps) => {
   const [optimisticIds, setOptimisticIds] = useState<Set<number>>(new Set());
 
-  const handleToggle = (task: Task) => {
-    setOptimisticIds((prev) => new Set(prev).add(task.id));
+  const handleToggle = (task: MiniTodoItem) => {
+    const { id } = task;
+    if (typeof id === 'number') {
+      setOptimisticIds((prev) => new Set(prev).add(id));
+    }
     onToggle?.(task);
     // Optimistic revert after a timeout if backend not available
     setTimeout(() => {
       setOptimisticIds((prev) => {
         const next = new Set(prev);
-        next.delete(task.id);
+        if (typeof id === 'number') next.delete(id);
         return next;
       });
     }, 2000);
   };
 
-  const active = tasks.filter((t) => t.status !== 'Completed' && !optimisticIds.has(t.id));
-  const done = tasks.filter((t) => t.status === 'Completed' || optimisticIds.has(t.id));
+  const active = tasks.filter((t) => t.status !== 'Completed' && !(typeof t.id === 'number' && optimisticIds.has(t.id)));
+  const done = tasks.filter((t) => t.status === 'Completed' || (typeof t.id === 'number' && optimisticIds.has(t.id)));
 
   if (!tasks.length) {
     return <div className="mini-todo-empty">No tasks yet</div>;

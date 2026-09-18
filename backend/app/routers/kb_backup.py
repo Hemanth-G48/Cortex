@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.services.kb import backup as backup_service
+from app.services.path_utils import safe_path
 from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-backup"])

@@ -30,6 +30,7 @@ import os
 import shutil
 import subprocess
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable
 
 from sqlalchemy.orm import Session
@@ -55,16 +56,14 @@ def _ext_of(filename: str) -> str | None:
 
 def _stage(source: KbSource, rel_path: str, content: str | bytes) -> str:
     """Write ``content`` under the sync staging dir; returns the file path."""
-    directory = os.path.join(SYNC_STAGING, str(source.id))
-    os.makedirs(directory, exist_ok=True)
-    # Flatten nested rel paths safely (no traversal).
-    safe = rel_path.replace("..", "_").lstrip("/")
-    target = os.path.join(directory, safe)
-    os.makedirs(os.path.dirname(target), exist_ok=True)
+    from app.services.path_utils import safe_path
+    directory = Path(SYNC_STAGING) / str(source.id)
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / safe_path(rel_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
     data = content.encode("utf-8") if isinstance(content, str) else content
-    with open(target, "wb") as fh:
-        fh.write(data)
-    return target
+    target.write_bytes(data)
+    return str(target)
 
 
 def _git_changes(source: KbSource, cursor: dict) -> tuple[list[dict], dict]:

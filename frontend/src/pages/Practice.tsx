@@ -32,6 +32,11 @@ export const Practice = () => {
   const [currentQ, setCurrentQ] = useState<PracticeQuestionItem | null>(null);
   const [lastResult, setLastResult] = useState<PracticeAnswerResponse | null>(null);
   const [selected, setSelected] = useState<string>('');
+  // Defect #90: vault-graded answers — the expected span + the AI verdict.
+  const [typedAnswer, setTypedAnswer] = useState('');
+  const [vaultExpected, setVaultExpected] = useState<string | null>(null);
+  const [gradeNote, setGradeNote] = useState<string | null>(null);
+  const [grading, setGrading] = useState(false);
 
   // Mistakes state
   const [mistakeQ, setMistakeQ] = useState<PracticeQuestionItem | null>(null);
@@ -132,6 +137,9 @@ export const Practice = () => {
     setError(null);
     setLastResult(null);
     setSelected('');
+    setTypedAnswer('');
+    setVaultExpected(null);
+    setGradeNote(null);
     try {
       const res = await endpoints.kb.practice.session(topicId);
       setSession(res.session);
@@ -160,6 +168,53 @@ export const Practice = () => {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * Defect #90: pull the authoritative answer span for a question from the
+   * vault — the top hybrid-search chunk (which carries the note + heading it
+   * came from) — falling back to the question bank's own answer when the vault
+   * has nothing on the topic.
+   */
+  const resolveVaultExpected = async (q: PracticeQuestionItem): Promise<string> => {
+    try {
+      const hits = await endpoints.kb.search.run(q.question, { mode: 'hybrid', page_size: 1 });
+      const top = hits.items?.[0];
+      if (top?.snippet) return top.snippet;
+    } catch {
+      /* vault unavailable — fall through to the bank answer */
+    }
+    return q.answer;
+  };
+
+  /** Defect #90: grade the response against the vault answer instead of self-report. */
+  const gradeFromVault = async () => {
+    if (!currentQ) return;
+    const answer = selected || typedAnswer;
+    if (!answer.trim()) {
+      setError('Type or select an answer first.');
+      return;
+    }
+    setGrading(true);
+    setError(null);
+    setGradeNote(null);
+    try {
+      const expected = await resolveVaultExpected(currentQ);
+      setVaultExpected(expected);
+      const grade = await endpoints.ai.gradeAnswer({
+        question: currentQ.question,
+        expected,
+        answer,
+      });
+      setGradeNote(
+        `${grade.correct ? '✅' : '❌'} ${grade.explanation}${grade.ai_used ? '' : ' (offline heuristic)'}`,
+      );
+      await checkAnswer(grade.correct);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setGrading(false);
     }
   };
 
@@ -341,8 +396,30 @@ export const Practice = () => {
                   ))}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button type="button" className="btn btn-primary" onClick={() => void checkAnswer(true)} disabled={busy}>
+              {currentQ.options.length === 0 && (
+                <textarea
+                  value={typedAnswer}
+                  onChange={(e) => setTypedAnswer(e.target.value)}
+                  rows={3}
+                  placeholder="Write your answer — it will be graded against your vault notes"
+                  style={{ width: '100%', fontSize: '0.8rem', marginBottom: '0.6rem' }}
+                />
+              )}
+              {gradeNote && (
+                <div style={{ fontSize: '0.78rem', marginBottom: '0.6rem', color: 'var(--text-secondary)' }}>
+                  {gradeNote}
+                  {vaultExpected && (
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                      Expected (vault): {vaultExpected.slice(0, 240)}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-primary" onClick={() => void gradeFromVault()} disabled={busy || grading}>
+                  {grading ? 'Grading…' : '🔍 Grade from vault'}
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => void checkAnswer(true)} disabled={busy}>
                   ✓ I got it right
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => void checkAnswer(false)} disabled={busy}>

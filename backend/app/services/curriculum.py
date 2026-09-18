@@ -32,6 +32,22 @@ def get_program(db: Session, program_id: int) -> CurriculumCourse | None:
     return db.query(CurriculumCourse).filter(CurriculumCourse.id == program_id).first()
 
 
+def semester_label(semester: int | None, label: str | None) -> str | None:
+    """Display label for a subject's semester (audit defect #9).
+
+    Prefers the stored ``semester_label`` (editable per subject); falls back to
+    formatting the numeric ``semester`` so pre-existing rows keep rendering the
+    same text the UI used to build locally. Returns ``None`` when the subject
+    carries no semester information at all.
+    """
+    cleaned = (label or "").strip()
+    if cleaned:
+        return cleaned
+    if semester is not None:
+        return f"Semester {semester}"
+    return None
+
+
 def list_subjects(db: Session, program_id: int) -> list[CurriculumSubject]:
     return (
         db.query(CurriculumSubject)

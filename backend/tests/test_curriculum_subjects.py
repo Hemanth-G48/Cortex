@@ -53,6 +53,13 @@ class TestListSubjects:
             assert "unit_count" in s
             assert isinstance(s["unit_count"], int)
 
+        # Defect #9: the semester label is served by the backend so the UI can
+        # render it verbatim instead of formatting the integer itself.
+        for s in subjects:
+            assert "semester_label" in s
+            if s["semester"] is not None:
+                assert s["semester_label"] == f"Semester {s['semester']}"
+
     def test_unit_count_greater_than_zero_after_seed(self, client):
         token = get_token(client)
         resp = client.get(

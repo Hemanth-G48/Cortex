@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { confirmDelete } from '../utils/confirm';
 import { Header } from '../components/layout/Header';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ExplainPanel } from '../components/kb/ExplainPanel';
@@ -10,6 +11,7 @@ import { Phase10Panel } from '../components/kb/Phase10Panel';
 import {
   downloadAsFile,
   endpoints,
+  kbSearchApi,
   type KbChunk,
   type KbCitation,
   type KbDiffResponse,
@@ -19,6 +21,7 @@ import {
   type KbJob,
   type KbLinksResponse,
   type KbSource,
+  type KbSourcePathValidation,
   type KbStats,
   type KbTagSuggestion,
   type KbVersion,
@@ -82,6 +85,9 @@ export const KnowledgeBase = () => {
   const [showPaper, setShowPaper] = useState(false);
   const [sourceName, setSourceName] = useState('');
   const [sourcePath, setSourcePath] = useState('');
+  // Defect #20: live pre-flight validation of the candidate root path.
+  const [pathCheck, setPathCheck] = useState<KbSourcePathValidation | null>(null);
+  const [checkingPath, setCheckingPath] = useState(false);
   const [arxivId, setArxivId] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -160,6 +166,12 @@ export const KnowledgeBase = () => {
       setDuplicates([]);
     }
   }, []);
+
+  // Defect #21 fix: load the near-duplicate list from the live neardup service
+  // on mount (in addition to the existing scan-on-demand button).
+  useEffect(() => {
+    void loadDuplicates();
+  }, [loadDuplicates]);
 
   const loadAutoJobs = useCallback(async () => {
     try {
@@ -255,10 +267,48 @@ export const KnowledgeBase = () => {
 
   const loadDocs = useCallback(async () => {
     try {
+      if (query) {
+        // Defect #12 fix: when a search query is submitted, hit the hybrid
+        // KB search endpoint instead of the local documents.list filter, so
+        // results come from the Second Brain (FTS + semantic).
+        const res = await kbSearchApi.query(query, 'hybrid', 1, 100);
+        setDocs(res.items.map((i) => ({
+          id: i.document_id,
+          user_id: 1,
+          source_id: null,
+          path_rel: i.source_path ?? null,
+          title: i.title ?? i.snippet.slice(0, 80),
+          doc_type: i.doc_type,
+          content_hash: null,
+          char_count: i.char_end - i.char_start,
+          frontmatter: null,
+          outline: null,
+          metadata: { wikilinks: i.sources ?? undefined, tags: undefined, callouts: undefined, arxiv_id: undefined, authors: undefined, abstract: undefined },
+          ocr_used: false,
+          needs_ocr: false,
+          status: 'unchanged' as const,
+          doc_date: i.doc_date,
+          author: null,
+          source_url: null,
+          language: null,
+          reading_time_seconds: null,
+          embedding_dirty: false,
+          graph_dirty: false,
+          tags_dirty: false,
+          quality_score: null,
+          quality_detail: null,
+          summary_dirty: false,
+          created_at: null,
+          updated_at: null,
+          indexed_at: null,
+          chunk_count: 1,
+        })));
+        return;
+      }
       const res = await endpoints.kb.documents.list({
         source_id: sourceFilter ? Number(sourceFilter) : undefined,
         status: statusFilter || undefined,
-        q: query || undefined,
+        q: undefined,
         page_size: 100,
       });
       setDocs(res.items);
@@ -276,6 +326,20 @@ export const KnowledgeBase = () => {
     void loadDocs();
   }, [loadDocs]);
 
+  // Defect #13 fix: poll the documents list every 60s so new/changed files
+  // from the watcher land in the UI without a manual reload.
+  useEffect(() => {
+    const t = window.setInterval(() => { void loadDocs(); }, 60_000);
+    return () => window.clearInterval(t);
+  }, [loadDocs]);
+
+  // Defect #98 fix: poll sources every 60s so the source section reflects
+  // live sync state (last_scanned_at, document_count) without reload.
+  useEffect(() => {
+    const t = window.setInterval(() => { void loadAll(); }, 60_000);
+    return () => window.clearInterval(t);
+  }, [loadAll]);
+
   // poll job status while any job is queued/running
   useEffect(() => {
     const active = jobs.some((j) => j.status === 'queued' || j.status === 'running');
@@ -284,7 +348,32 @@ export const KnowledgeBase = () => {
     return () => window.clearInterval(t);
   }, [jobs, loadAll]);
 
+  // Defect #20: validate the candidate root path server-side (debounced) so
+  // the modal can hint before the user submits.
+  useEffect(() => {
+    const candidate = sourcePath.trim();
+    if (!showSource || !candidate) {
+      setPathCheck(null);
+      setCheckingPath(false);
+      return;
+    }
+    let stale = false;
+    setCheckingPath(true);
+    const t = window.setTimeout(() => {
+      endpoints.kb.sources
+        .validate(candidate)
+        .then((res) => !stale && setPathCheck(res))
+        .catch(() => !stale && setPathCheck(null))
+        .finally(() => !stale && setCheckingPath(false));
+    }, 400);
+    return () => {
+      stale = true;
+      window.clearTimeout(t);
+    };
+  }, [sourcePath, showSource]);
+
   const addSource = async () => {
+    if (pathCheck && (!pathCheck.exists || !pathCheck.is_dir || !pathCheck.readable)) return;
     if (!sourceName.trim() || !sourcePath.trim()) return;
     setBusy('source');
     try {
@@ -326,7 +415,7 @@ export const KnowledgeBase = () => {
   };
 
   const removeSource = async (id: number) => {
-    if (!window.confirm('Delete this source and ALL of its documents, chunks and versions?')) return;
+    if (!confirmDelete('this source and ALL of its documents, chunks and versions')) return;
     await endpoints.kb.sources.remove(id);
     if (activeDoc?.source_id === id) setActiveDoc(null);
     await loadAll();
@@ -370,7 +459,7 @@ export const KnowledgeBase = () => {
   };
 
   const removeDoc = async (id: number) => {
-    if (!window.confirm('Delete this document?')) return;
+    if (!confirmDelete('this document')) return;
     await endpoints.kb.documents.remove(id);
     if (activeDoc?.id === id) setActiveDoc(null);
     await loadDocs();
@@ -730,6 +819,7 @@ export const KnowledgeBase = () => {
               <code style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>{s.root_path}</code>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                 {s.document_count} docs · {s.files_seen} files · last scan {fmt(s.last_scanned_at)}
+                <span style={{ marginLeft: '0.5rem', color: '#10b981', fontWeight: 600 }}>● live</span>
               </div>
               {/* Knowledge-root badge: sources rooted at a `notes` folder are
                   the knowledge area — daily-life/ is never indexed. */}
@@ -838,7 +928,14 @@ export const KnowledgeBase = () => {
           placeholder="Search title / path…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && setQuery(search)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              // Defect #12 fix: wire search to hybrid KB search instead of
+              // local array filter, so results come from the Second Brain.
+              e.preventDefault();
+              setQuery(search);
+            }
+          }}
         />
       </div>
 
@@ -1346,11 +1443,41 @@ export const KnowledgeBase = () => {
             <input className="form-input" style={{ width: '100%', marginBottom: '0.75rem' }} value={sourceName}
               onChange={(e) => setSourceName(e.target.value)} placeholder="My Obsidian Vault" />
             <label className="form-label">Root path</label>
-            <input className="form-input" style={{ width: '100%', marginBottom: '1.25rem' }} value={sourcePath}
+            <input className="form-input"
+              style={{ width: '100%', marginBottom: pathCheck || checkingPath ? '0.4rem' : '1.25rem' }}
+              value={sourcePath}
               onChange={(e) => setSourcePath(e.target.value)} placeholder="/home/me/Obsidian Vault" />
+            {/* Defect #20: server-validated hint (same tokens, no new styles). */}
+            {checkingPath && (
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 1.25rem' }}>
+                Checking folder…
+              </p>
+            )}
+            {!checkingPath && pathCheck && (
+              <p
+                style={{
+                  fontSize: '0.75rem',
+                  margin: '0 0 1.25rem',
+                  color: pathCheck.exists && pathCheck.is_dir && pathCheck.readable ? '#10b981' : 'var(--danger)',
+                }}
+              >
+                {pathCheck.exists && pathCheck.is_dir && pathCheck.readable
+                  ? `✓ ${pathCheck.document_count} indexable docs (${pathCheck.markdown_count} markdown)` +
+                    (pathCheck.inside_source ? ` · inside “${pathCheck.inside_source.name}”` : '')
+                  : `⚠ ${pathCheck.reason ?? 'path is not usable'}`}
+                {pathCheck.already_registered && pathCheck.exists
+                  ? ` — already registered as “${pathCheck.already_registered.name}”`
+                  : ''}
+              </p>
+            )}
             <div className="modal-actions">
               <button type="button" className="btn btn-ghost" onClick={() => setShowSource(false)}>Cancel</button>
-              <button type="button" className="btn btn-primary" disabled={busy === 'source'} onClick={() => void addSource()}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy === 'source' || (!!pathCheck && (!pathCheck.exists || !pathCheck.is_dir || !pathCheck.readable))}
+                onClick={() => void addSource()}
+              >
                 {busy === 'source' ? 'Adding…' : 'Add Source'}
               </button>
             </div>

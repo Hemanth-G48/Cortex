@@ -16,6 +16,7 @@ from app.database import get_db
 from app.models import KbConcept, KbDocument, KbEdge, User
 from app.services.kb import KbService
 from app.services.kb.graph import (
+    RELATION_VOCAB,
     add_edge,
     concepts_of,
     related_docs,
@@ -24,10 +25,10 @@ from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-edges"])
 
-ALLOWED_RELATIONS = {
-    "MENTIONS", "RELATED", "SHARES_CONCEPT", "WIKILINK", "BACKLINK", "CITES",
-    "SYNONYM_OF", "DEPENDS_ON", "DUPLICATE_OF",
-}
+# Single source of truth for the relation vocabulary lives in
+# ``app.services.kb.graph.RELATION_VOCAB`` (audit D6) — this alias keeps the
+# router-side validation readable.
+ALLOWED_RELATIONS = RELATION_VOCAB
 
 
 class EdgeCreate(BaseModel):

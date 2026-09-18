@@ -1,7 +1,30 @@
 """
 Pytest configuration for the Student Life OS backend.
 Creates an isolated in-memory SQLite database per test session.
+
+Hermetic by construction (audit M2): before anything imports the app, the
+environment is redirected away from the developer's real database and uploads
+directory — the FastAPI lifespan inside ``TestClient`` runs
+``create_all``/``migrate_schema``/``seed_database`` against the *app's* engine,
+so without this redirect every ``client`` test would read and mutate
+``backend/student_os.db``. The app engine is pointed at a throwaway temp file
+that is deleted at session exit.
 """
+
+import os
+import tempfile
+from pathlib import Path
+
+# ── Hermetic environment (MUST run before any ``app.*`` import) ──
+# ``app.database`` binds the engine at import time using
+# ``settings.DATABASE_URL``; ``main.py`` mounts ``settings.UPLOAD_DIR`` as a
+# static dir and lifespan mkdirs it. Redirect both to a per-session temp
+# location so tests never touch the real files.
+_TMPDIR = tempfile.mkdtemp(prefix="slos-test-")
+os.environ["DATABASE_URL"] = f"sqlite:///{_TMPDIR}/test.db"
+os.environ.setdefault("UPLOAD_DIR", os.path.join(_TMPDIR, "uploads"))
+os.environ.setdefault("KB_WATCH_ENABLED", "false")
+os.environ.setdefault("EMBEDDINGS_BACKEND", "hash")
 
 import pytest
 from fastapi import Depends
@@ -70,9 +93,30 @@ def _test_current_user(
 
 
 @pytest.fixture(scope="function")
+def kb_eval_fixture_dir() -> Path:
+    """Shared KB eval golden-set directory (audit T1).
+
+    Centralizes the fixture path so KB eval tests don't each reconstruct
+    ``Path(__file__).parent / "fixtures" / "kb_eval"``. Test files can
+    parametrize over the JSON files inside instead of duplicating setup.
+    """
+    return Path(__file__).parent / "fixtures" / "kb_eval"
+
+
+@pytest.fixture(scope="function")
 def client(db_session):
     """FastAPI TestClient with seeded in-memory database."""
     app.dependency_overrides[get_db] = lambda: db_session
     app.dependency_overrides[_tokenless_current_user] = _test_current_user
     with TestClient(app) as c:
         yield c
+    # Clean up overrides so no state leaks between tests (audit M2).
+    app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(_tokenless_current_user, None)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Delete the throwaway app-engine DB/uploads at session end."""
+    import shutil
+
+    shutil.rmtree(_TMPDIR, ignore_errors=True)

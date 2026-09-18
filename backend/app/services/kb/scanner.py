@@ -272,6 +272,123 @@ def scan_source(db: Session, source: KbSource, subpath: str | None = None) -> di
     return summary
 
 
+#: Cap on files walked by ``probe_root_path`` — a pre-flight check must stay
+#: fast even when pointed at a huge directory tree.
+PROBE_FILE_LIMIT = 20000
+PROBE_SAMPLE_LIMIT = 5
+
+
+def probe_root_path(db: Session, user_id: int, raw_path: str) -> dict:
+    """Pre-flight validation for a candidate source root (audit defect #20).
+
+    Powers ``GET /api/kb/sources/validate`` so the UI can confirm a folder is
+    a usable knowledge root *before* submitting it, instead of only surfacing
+    the server-side 400 from ``POST /api/kb/sources``. The path is resolved the
+    same way ``create_source`` resolves it (``os.path.abspath``, no tilde
+    expansion) so a path that validates here is accepted there.
+
+    Reports what the scan would actually see: extractable document count,
+    markdown count and a few sample relative paths, plus whether the folder is
+    already registered or already covered by a registered source.
+    """
+    candidate = (raw_path or "").strip()
+    result: dict = {
+        "path": candidate,
+        "absolute_path": None,
+        "valid": False,
+        "reason": None,
+        "exists": False,
+        "is_dir": False,
+        "readable": False,
+        "writable": False,
+        "markdown_count": 0,
+        "document_count": 0,
+        "sample_files": [],
+        "already_registered": None,
+        "inside_source": None,
+    }
+    if not candidate:
+        result["reason"] = "path is required"
+        return result
+
+    absolute = os.path.abspath(candidate)
+    result["absolute_path"] = absolute
+    result["exists"] = os.path.exists(absolute)
+    result["is_dir"] = os.path.isdir(absolute)
+    if not result["exists"]:
+        result["reason"] = "path does not exist on disk"
+        return result
+    if not result["is_dir"]:
+        result["reason"] = "path is not a directory"
+        return result
+
+    result["readable"] = os.access(absolute, os.R_OK)
+    result["writable"] = os.access(absolute, os.W_OK)
+    if not result["readable"]:
+        result["reason"] = "path is not readable"
+        return result
+
+    # What the scan would index, mirroring ``scan_source``'s filters: noise
+    # dirs are skipped and the vault's non-knowledge ``daily-life`` area is
+    # excluded at the root.
+    markdown_count = 0
+    document_count = 0
+    samples: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(absolute):
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in NOISE_DIRS
+            and not (dirpath == absolute and d.casefold() == "daily-life")
+        ]
+        for fname in filenames:
+            if _ext_of(fname) is None:
+                continue
+            document_count += 1
+            rel = os.path.relpath(os.path.join(dirpath, fname), absolute)
+            if fname.lower().endswith(".md"):
+                markdown_count += 1
+            if len(samples) < PROBE_SAMPLE_LIMIT:
+                samples.append(rel.replace(os.sep, "/"))
+            if document_count >= PROBE_FILE_LIMIT:
+                break
+        if document_count >= PROBE_FILE_LIMIT:
+            break
+    result["markdown_count"] = markdown_count
+    result["document_count"] = document_count
+    result["sample_files"] = samples
+
+    sources = db.query(KbSource).filter(KbSource.user_id == user_id).all()
+    for source in sources:
+        root = source.root_path or ""
+        if not root:
+            continue
+        if os.path.abspath(root) == absolute:
+            result["already_registered"] = {"id": source.id, "name": source.name}
+            break
+        try:
+            inside = os.path.commonpath([absolute, os.path.abspath(root)]) == os.path.abspath(root)
+        except ValueError:
+            inside = False
+        if inside:
+            result["inside_source"] = {
+                "id": source.id,
+                "name": source.name,
+                "root_path": source.root_path,
+            }
+            break
+
+    if result["already_registered"] is not None:
+        result["reason"] = "folder is already registered as a source"
+        return result
+    if document_count == 0:
+        result["reason"] = "no indexable documents found (md, pdf, docx or txt)"
+        return result
+
+    result["valid"] = True
+    return result
+
+
 def scan_and_ingest(db: Session, source_id: int, subpath: str | None = None) -> dict:
     """Scan a source (optionally one folder inside it), then run the ingest
     pipeline on new/changed/failed docs.

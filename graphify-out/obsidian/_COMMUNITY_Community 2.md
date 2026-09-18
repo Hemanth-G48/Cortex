@@ -1,0 +1,261 @@
+---
+type: community
+cohesion: 0.03
+members: 134
+---
+
+# Community 2
+
+**Cohesion:** 0.03 - loosely connected
+**Members:** 134 nodes
+
+## Members
+- [[(base_url, api_key) for embeddings — follows the active provider when it     exp]] - rationale - backend/app/services/embeddings.py
+- [[.test_ai_failure_falls_back()]] - code - backend/tests/test_kb_summarize.py
+- [[.test_budget_counts_provider_rows()]] - code - backend/tests/test_embeddings.py
+- [[.test_budget_empty_is_zero()]] - code - backend/tests/test_embeddings.py
+- [[.test_create_all_kb_models()]] - code - backend/tests/test_kb_models.py
+- [[.test_dedupe_unique_index_blocks_second_same_hash()]] - code - backend/tests/test_kb_models.py
+- [[.test_document_cascade_deletes_chunks_and_versions()]] - code - backend/tests/test_kb_models.py
+- [[.test_documents_are_scoped_to_user()]] - code - backend/tests/test_kb_models.py
+- [[.test_embeds_chunks_and_writes_rows()]] - code - backend/tests/test_vector_persistence.py
+- [[.test_empty_doc_has_no_embeddings()]] - code - backend/tests/test_vector_persistence.py
+- [[.test_idempotent_rerun_skips_already_embedded()]] - code - backend/tests/test_vector_persistence.py
+- [[.test_kb_edge_timestamps_and_defaults()]] - code - backend/tests/test_kb_models.py
+- [[.test_null_hashes_are_not_deduplicated()]] - code - backend/tests/test_kb_models.py
+- [[.test_processes_only_dirty_documents()]] - code - backend/tests/test_kb_reindex.py
+- [[.test_regenerate_on_hash_change()]] - code - backend/tests/test_kb_summarize.py
+- [[.test_source_cascade_deletes_documents()]] - code - backend/tests/test_kb_models.py
+- [[.test_source_scoped_reindex()]] - code - backend/tests/test_kb_reindex.py
+- [[.test_stats_counts_dirty_documents()]] - code - backend/tests/test_vector_persistence.py
+- [[.test_stats_returns_correct_counts()]] - code - backend/tests/test_vector_persistence.py
+- [[.test_sync_index_is_idempotent()]] - code - backend/tests/test_vector_persistence.py
+- [[.test_sync_index_rebuilds_store()]] - code - backend/tests/test_vector_persistence.py
+- [[.test_tag_name_unique_per_user()]] - code - backend/tests/test_kb_models.py
+- [[All of user_id's chunk embeddings, grouped by document id.      Single batched]] - rationale - backend/app/services/kb/neardup.py
+- [[Base_26]] - code
+- [[Base_30]] - code
+- [[Base_33]] - code
+- [[Base_61]] - code
+- [[Benchmark reindex with GPU fastembed.]] - rationale - backend/benchmark_gpu.py
+- [[Benchmark with SQLite-specific optimizations.]] - rationale - backend/benchmark_optimized.py
+- [[Calling sync_index twice produces the same result.]] - rationale - backend/tests/test_vector_persistence.py
+- [[Convenience embed one text through the provider (or None).]] - rationale - backend/app/services/embeddings.py
+- [[Create a user + source + document + 3 chunks.]] - rationale - backend/tests/test_vector_persistence.py
+- [[Dirty documents are counted when embedding_dirty=True.]] - rationale - backend/tests/test_vector_persistence.py
+- [[Document with no chunks returns zero counts.]] - rationale - backend/tests/test_vector_persistence.py
+- [[Embed a batch of texts through the provider.      Returns ``None`` when the prov]] - rationale - backend/app/services/embeddings.py
+- [[Embed a single search query through the active backend chain.      Uses the same]] - rationale - backend/app/services/embeddings.py
+- [[Embed all un-embedded chunks of a document in a single transaction.      Skips c]] - rationale - backend/app/services/kb/embedder.py
+- [[Embed every pending chunk of dirty documents in large GPU-friendly batches.]] - rationale - backend/app/services/kb/embedder.py
+- [[Embed through the active backend chain (provider → fastembed → hash).      Retur]] - rationale - backend/app/services/embeddings.py
+- [[Embed via the local fastembed ONNX model (never raises, no network).      Return]] - rationale - backend/app/services/embeddings.py
+- [[Embedding pipeline for the Knowledge Core (Second Brain Phase 2, Idea 11–12).  P]] - rationale - backend/app/services/kb/embedder.py
+- [[Hard-delete a knowledge source and all its index rows (leftover duplicates).  De]] - rationale - backend/scripts/purge_source.py
+- [[Hard-delete one source and every row that references its index.      Mirrors the]] - rationale - backend/app/services/kb/migrate.py
+- [[Idea 1 — Knowledge Core data model tests.  Creates every KB model, verifies per-]] - rationale - backend/tests/test_kb_models.py
+- [[Idea 11 — Embeddings service tests.  Verifies the OpenAI-compatible client, the]] - rationale - backend/tests/test_embeddings.py
+- [[Incremental re-index coordinator (Second Brain Phase 2, Idea 20, phrases 91-98).]] - rationale - backend/app/services/kb/reindex.py
+- [[Isolated engine with FK enforcement ON for cascade assertions.]] - rationale - backend/tests/test_kb_models.py
+- [[Isolated engine with FK enforcement ON.]] - rationale - backend/tests/test_vector_persistence.py
+- [[KbChunk]] - code - backend/app/models/kb/chunk.py
+- [[KbChunk model — a semantic chunk of a document (Idea 1  Idea 7).]] - rationale - backend/app/models/kb/chunk.py
+- [[KbDocument]] - code - backend/app/models/kb/document.py
+- [[KbDocument_48]] - code
+- [[KbDocument_50]] - code
+- [[KbDocument model — one indexed document in the Knowledge Core (Idea 1).]] - rationale - backend/app/models/kb/document.py
+- [[KbEmbedding]] - code - backend/app/models/kb/embedding.py
+- [[KbEmbedding model — persisted chunk embeddings (Phase 2, Idea 12).  The persiste]] - rationale - backend/app/models/kb/embedding.py
+- [[KbSource]] - code - backend/app/models/kb/source.py
+- [[KbSource model — a registered knowledge source (Second Brain, Idea 12).]] - rationale - backend/app/models/kb/source.py
+- [[Move knowledge foldersfiles into ``notes``; create ``daily-life``.      Only]] - rationale - backend/app/services/kb/migrate.py
+- [[One-time Second Brain vault migration — ``notes`` + ``daily-life`` separation.]] - rationale - backend/app/services/kb/migrate.py
+- [[OpenAI-compatible embedding client (Second Brain Phase 2, Idea 11).  Mirrors ``a]] - rationale - backend/app/services/embeddings.py
+- [[Ordered model candidates explicit override, then primary, then fallbacks.]] - rationale - backend/app/services/embeddings.py
+- [[Per-user Knowledge Core statistics (phrase 20).      Returns a dict matching ``K]] - rationale - backend/app/services/kb/embedder.py
+- [[Per-user daily embedding budget meter (cost guard, Idea 15  phrase 5).      Cou]] - rationale - backend/app/services/embeddings.py
+- [[Re-index tooling tests (Phase 2, Idea 20, phrase 98).  Covers the dirty-flag lif]] - rationale - backend/tests/test_kb_reindex.py
+- [[Re-running embed_document_chunks skips cached chunks.]] - rationale - backend/tests/test_vector_persistence.py
+- [[Rebuild the active vector store from kb_embeddings rows for a user.      Idempot]] - rationale - backend/app/services/kb/embedder.py
+- [[Session_148]] - code
+- [[Stable content hash for embedding de-dup  caching (Idea 11, phrase 6).]] - rationale - backend/app/services/embeddings.py
+- [[TestBudget]] - code - backend/tests/test_embeddings.py
+- [[TestEmbedDocumentChunks]] - code - backend/tests/test_vector_persistence.py
+- [[TestFkCascades]] - code - backend/tests/test_kb_models.py
+- [[TestIncrementalReindex]] - code - backend/tests/test_kb_reindex.py
+- [[TestModelCreation]] - code - backend/tests/test_kb_models.py
+- [[TestPerUserIsolation_2]] - code - backend/tests/test_kb_models.py
+- [[TestStats]] - code - backend/tests/test_vector_persistence.py
+- [[TestSummaryService]] - code - backend/tests/test_kb_summarize.py
+- [[TestSyncIndex]] - code - backend/tests/test_vector_persistence.py
+- [[True when ``amount`` more provider calls fit in the daily budget.]] - rationale - backend/app/services/embeddings.py
+- [[True when the AI provider is configured and enabled.]] - rationale - backend/app/services/embeddings.py
+- [[Truncatepad every vector to ``target`` (default EMBEDDINGS_DIM).]] - rationale - backend/app/services/embeddings.py
+- [[User_77]] - code
+- [[User_80]] - code
+- [[Vector persistence tests (Second Brain Phase 2, Idea 12, phrase 19).  Exercises]] - rationale - backend/tests/test_vector_persistence.py
+- [[_add_embeddings()_1]] - code - backend/tests/test_kb_reindex.py
+- [[_doc()_5]] - code - backend/tests/test_kb_models.py
+- [[_embeddings_by_document()]] - code - backend/app/services/kb/neardup.py
+- [[_endpoint()]] - code - backend/app/services/embeddings.py
+- [[_ext_of()_1]] - code - backend/app/services/kb/migrate.py
+- [[_normalize_dim()]] - code - backend/app/services/embeddings.py
+- [[_setup_user_doc()]] - code - backend/tests/test_vector_persistence.py
+- [[_user()_3]] - code - backend/tests/test_kb_models.py
+- [[backend_embed()]] - code - backend/app/services/embeddings.py
+- [[benchmark_gpu()]] - code - backend/benchmark_gpu.py
+- [[benchmark_gpu.py]] - code - backend/benchmark_gpu.py
+- [[benchmark_optimized.py]] - code - backend/benchmark_optimized.py
+- [[benchmark_sqlite_optimizations()]] - code - backend/benchmark_optimized.py
+- [[budget_allows()]] - code - backend/app/services/embeddings.py
+- [[chunk.py]] - code - backend/app/models/kb/chunk.py
+- [[document.py]] - code - backend/app/models/kb/document.py
+- [[embed_available()]] - code - backend/app/services/embeddings.py
+- [[embed_dirty_batch()]] - code - backend/app/services/kb/embedder.py
+- [[embed_document_chunks writes KbEmbedding rows with local model.]] - rationale - backend/tests/test_vector_persistence.py
+- [[embed_document_chunks()]] - code - backend/app/services/kb/embedder.py
+- [[embed_models()]] - code - backend/app/services/embeddings.py
+- [[embed_texts()]] - code - backend/app/services/embeddings.py
+- [[embedder.py]] - code - backend/app/services/kb/embedder.py
+- [[embedding.py]] - code - backend/app/models/kb/embedding.py
+- [[embedding_budget()]] - code - backend/app/services/embeddings.py
+- [[embedding_hash()]] - code - backend/app/services/embeddings.py
+- [[embeddings.py]] - code - backend/app/services/embeddings.py
+- [[get_embedding()]] - code - backend/app/services/embeddings.py
+- [[kb_engine()]] - code - backend/tests/test_kb_models.py
+- [[kb_session()]] - code - backend/tests/test_kb_models.py
+- [[kb_user()]] - code - backend/tests/test_embeddings.py
+- [[local_model_embed()]] - code - backend/app/services/embeddings.py
+- [[main()_2]] - code - backend/scripts/purge_source.py
+- [[migrate.py]] - code - backend/app/services/kb/migrate.py
+- [[purge_source()]] - code - backend/app/services/kb/migrate.py
+- [[purge_source.py]] - code - backend/scripts/purge_source.py
+- [[query_embed()]] - code - backend/app/services/embeddings.py
+- [[reindex.py]] - code - backend/app/services/kb/reindex.py
+- [[reorganize_vault()]] - code - backend/app/services/kb/migrate.py
+- [[source.py]] - code - backend/app/models/kb/source.py
+- [[stats()]] - code - backend/app/services/kb/embedder.py
+- [[stats() returns per-user counts matching the db.]] - rationale - backend/tests/test_vector_persistence.py
+- [[sync_index loads vectors from db into a file store.]] - rationale - backend/tests/test_vector_persistence.py
+- [[sync_index()]] - code - backend/app/services/kb/embedder.py
+- [[test_embeddings.py]] - code - backend/tests/test_embeddings.py
+- [[test_kb_models.py]] - code - backend/tests/test_kb_models.py
+- [[test_kb_reindex.py]] - code - backend/tests/test_kb_reindex.py
+- [[test_vector_persistence.py]] - code - backend/tests/test_vector_persistence.py
+- [[vp_engine()]] - code - backend/tests/test_vector_persistence.py
+- [[vp_session()]] - code - backend/tests/test_vector_persistence.py
+
+## Live Query (requires Dataview plugin)
+
+```dataview
+TABLE source_file, type FROM #community/Community_2
+SORT file.name ASC
+```
+
+## Connections to other communities
+- 40 edges to [[_COMMUNITY_Community 22]]
+- 35 edges to [[_COMMUNITY_Community 5]]
+- 28 edges to [[_COMMUNITY_Community 45]]
+- 25 edges to [[_COMMUNITY_Community 1]]
+- 23 edges to [[_COMMUNITY_Community 136]]
+- 21 edges to [[_COMMUNITY_Community 17]]
+- 20 edges to [[_COMMUNITY_Community 10]]
+- 19 edges to [[_COMMUNITY_Community 62]]
+- 19 edges to [[_COMMUNITY_Community 44]]
+- 17 edges to [[_COMMUNITY_Community 39]]
+- 16 edges to [[_COMMUNITY_Community 37]]
+- 13 edges to [[_COMMUNITY_Community 54]]
+- 13 edges to [[_COMMUNITY_Community 43]]
+- 13 edges to [[_COMMUNITY_Community 78]]
+- 12 edges to [[_COMMUNITY_Community 76]]
+- 12 edges to [[_COMMUNITY_Community 13]]
+- 12 edges to [[_COMMUNITY_Community 18]]
+- 10 edges to [[_COMMUNITY_Community 28]]
+- 10 edges to [[_COMMUNITY_Community 73]]
+- 10 edges to [[_COMMUNITY_Community 30]]
+- 10 edges to [[_COMMUNITY_Community 111]]
+- 9 edges to [[_COMMUNITY_Community 75]]
+- 8 edges to [[_COMMUNITY_Community 38]]
+- 8 edges to [[_COMMUNITY_Community 48]]
+- 8 edges to [[_COMMUNITY_Community 135]]
+- 8 edges to [[_COMMUNITY_Community 117]]
+- 8 edges to [[_COMMUNITY_Community 144]]
+- 7 edges to [[_COMMUNITY_Community 12]]
+- 7 edges to [[_COMMUNITY_Community 90]]
+- 7 edges to [[_COMMUNITY_Community 132]]
+- 7 edges to [[_COMMUNITY_Community 86]]
+- 7 edges to [[_COMMUNITY_Community 19]]
+- 6 edges to [[_COMMUNITY_Community 21]]
+- 6 edges to [[_COMMUNITY_Community 92]]
+- 6 edges to [[_COMMUNITY_Community 176]]
+- 6 edges to [[_COMMUNITY_Community 150]]
+- 6 edges to [[_COMMUNITY_Community 191]]
+- 6 edges to [[_COMMUNITY_Community 127]]
+- 5 edges to [[_COMMUNITY_Community 99]]
+- 5 edges to [[_COMMUNITY_Community 146]]
+- 5 edges to [[_COMMUNITY_Community 29]]
+- 5 edges to [[_COMMUNITY_Community 115]]
+- 5 edges to [[_COMMUNITY_Community 116]]
+- 5 edges to [[_COMMUNITY_Community 203]]
+- 5 edges to [[_COMMUNITY_Community 85]]
+- 4 edges to [[_COMMUNITY_Community 9]]
+- 4 edges to [[_COMMUNITY_Community 188]]
+- 4 edges to [[_COMMUNITY_Community 249]]
+- 4 edges to [[_COMMUNITY_Community 221]]
+- 4 edges to [[_COMMUNITY_Community 31]]
+- 4 edges to [[_COMMUNITY_Community 169]]
+- 4 edges to [[_COMMUNITY_Community 84]]
+- 4 edges to [[_COMMUNITY_Community 88]]
+- 4 edges to [[_COMMUNITY_Community 49]]
+- 4 edges to [[_COMMUNITY_Community 53]]
+- 3 edges to [[_COMMUNITY_Community 243]]
+- 3 edges to [[_COMMUNITY_Community 81]]
+- 3 edges to [[_COMMUNITY_Community 70]]
+- 3 edges to [[_COMMUNITY_Community 156]]
+- 3 edges to [[_COMMUNITY_Community 16]]
+- 3 edges to [[_COMMUNITY_Community 248]]
+- 3 edges to [[_COMMUNITY_Community 189]]
+- 3 edges to [[_COMMUNITY_Community 216]]
+- 3 edges to [[_COMMUNITY_Community 279]]
+- 3 edges to [[_COMMUNITY_Community 139]]
+- 2 edges to [[_COMMUNITY_Community 177]]
+- 2 edges to [[_COMMUNITY_Community 32]]
+- 2 edges to [[_COMMUNITY_Community 79]]
+- 2 edges to [[_COMMUNITY_Community 27]]
+- 2 edges to [[_COMMUNITY_Community 87]]
+- 2 edges to [[_COMMUNITY_Community 57]]
+- 2 edges to [[_COMMUNITY_Community 185]]
+- 2 edges to [[_COMMUNITY_Community 40]]
+- 2 edges to [[_COMMUNITY_Community 179]]
+- 2 edges to [[_COMMUNITY_Community 171]]
+- 2 edges to [[_COMMUNITY_Community 277]]
+- 2 edges to [[_COMMUNITY_Community 302]]
+- 2 edges to [[_COMMUNITY_Community 222]]
+- 2 edges to [[_COMMUNITY_Community 280]]
+- 2 edges to [[_COMMUNITY_Community 143]]
+- 2 edges to [[_COMMUNITY_Community 113]]
+- 2 edges to [[_COMMUNITY_Community 121]]
+- 2 edges to [[_COMMUNITY_Community 20]]
+- 2 edges to [[_COMMUNITY_Community 233]]
+- 2 edges to [[_COMMUNITY_Community 202]]
+- 2 edges to [[_COMMUNITY_Community 64]]
+- 1 edge to [[_COMMUNITY_Community 224]]
+- 1 edge to [[_COMMUNITY_Community 325]]
+- 1 edge to [[_COMMUNITY_Community 167]]
+- 1 edge to [[_COMMUNITY_Community 336]]
+- 1 edge to [[_COMMUNITY_Community 244]]
+- 1 edge to [[_COMMUNITY_Community 297]]
+- 1 edge to [[_COMMUNITY_Community 98]]
+- 1 edge to [[_COMMUNITY_Community 71]]
+- 1 edge to [[_COMMUNITY_Community 261]]
+- 1 edge to [[_COMMUNITY_Community 344]]
+- 1 edge to [[_COMMUNITY_Community 318]]
+- 1 edge to [[_COMMUNITY_Community 329]]
+- 1 edge to [[_COMMUNITY_Community 298]]
+
+## Top bridge nodes
+- [[KbDocument]] - degree 322, connects to 80 communities
+- [[KbChunk]] - degree 92, connects to 31 communities
+- [[KbSource]] - degree 78, connects to 23 communities
+- [[migrate.py]] - degree 34, connects to 15 communities
+- [[embeddings.py]] - degree 39, connects to 13 communities

@@ -21,6 +21,7 @@ from app.models import (
     CurriculumSubject,
     CurriculumUnit,
     Material,
+    Note,
     Task,
     User,
 )
@@ -39,6 +40,7 @@ DOMAIN_URLS = {
     "units": "/curriculum",
     "tasks": "/dashboard",
     "assignments": "/assignments",
+    "notes": "/notes",
 }
 
 
@@ -131,6 +133,26 @@ class _DomainSearcher:
             for u in rows
         ]
 
+    def notes(self) -> list[dict]:
+        """DB notes searchable alongside vault documents (audit defect #95)."""
+        rows = (
+            self.db.query(Note)
+            .filter(or_(_q(self.needle, Note.title), _q(self.needle, Note.content)))
+            .limit(PER_DOMAIN_CAP)
+            .all()
+        )
+        return [
+            {
+                "id": n.id,
+                "title": n.title,
+                "domain": "notes",
+                "snippet": (n.content or "")[:200],
+                "url": DOMAIN_URLS["notes"],
+                "score": 1.0,
+            }
+            for n in rows
+        ]
+
     def tasks(self) -> list[dict]:
         rows = (
             self.db.query(Task)
@@ -184,7 +206,7 @@ def global_search(
         return {"items": [], "groups": {}, "total": 0, "query": ""}
 
     wanted = body.get("domains") or ["vault", "materials", "subjects", "units",
-                                     "tasks", "assignments"]
+                                     "tasks", "assignments", "notes"]
     searcher = _DomainSearcher(db, current_user.id, query)
 
     # Per-domain fan-out with caps (phrase 93).

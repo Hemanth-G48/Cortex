@@ -25,12 +25,25 @@ export const QuickCapture = ({ open, onOpenChange }: Props) => {
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState('medium');
   const [courses, setCourses] = useState<Course[]>([]);
+  // Defect #53: assignment-name suggestions come from the real curriculum
+  // (enrollment summary) + the vault's auto-detected subjects.
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     endpoints.courses.list().then(setCourses).catch(() => {});
+    endpoints.enrollment
+      .summary()
+      .then((s) => setSubjects(s.subjects.map((sub) => sub.name)))
+      .catch(() => {});
+    endpoints.kb.autoSubjects
+      .preview()
+      .then((p) =>
+        setSubjects((cur) => [...new Set([...cur, ...p.top_subjects.map(([name]) => name)])]),
+      )
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -99,7 +112,14 @@ export const QuickCapture = ({ open, onOpenChange }: Props) => {
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={handleKey}
             placeholder="Assignment name…"
+            list="quick-capture-subjects"
           />
+          {/* Defect #53: curriculum + vault-detected subject suggestions. */}
+          <datalist id="quick-capture-subjects">
+            {subjects.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
 
           <div className="quick-capture-row">
             <select value={courseId} onChange={(e) => setCourseId(e.target.value ? Number(e.target.value) : '')}>

@@ -14,6 +14,8 @@ from app.schemas.mission import (
     MissionTaskResponse,
 )
 from app.schemas.quest import QuestResponse
+from app.services.kb.mission_tasks import vault_task_suggestions
+from app.services.users import current_user
 
 router = APIRouter(prefix="/api", tags=["missions"])
 
@@ -98,6 +100,25 @@ def mission_linked_quests(mission_id: int, db: Session = Depends(get_db)):
 
 
 # Mission Tasks
+@router.get("/missions/{mission_id}/vault-tasks")
+def list_vault_task_suggestions(
+    mission_id: int,
+    limit: int = Query(8, ge=1, le=25),
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    """Vault-derived subtask suggestions for a mission (audit defect #80).
+
+    Search the Second Brain for the mission title, then mine the matching
+    documents' checklist items / outline for actionable subtasks. Read-only —
+    the client creates a real ``MissionTask`` only when the user accepts one.
+    """
+    mission = db.query(Mission).filter(Mission.id == mission_id).first()
+    if not mission:
+        raise HTTPException(404, "Mission not found")
+    return vault_task_suggestions(db, user.id, mission.title, limit=limit)
+
+
 @router.get("/missions/{mission_id}/tasks", response_model=List[MissionTaskResponse])
 def list_mission_tasks(mission_id: int, db: Session = Depends(get_db)):
     return db.query(MissionTask).filter(MissionTask.mission_id == mission_id).all()

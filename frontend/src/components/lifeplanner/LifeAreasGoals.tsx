@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import type { Goal, LifeArea } from '../../services/api';
+import { useEffect, useMemo, useState } from 'react';
+import { endpoints } from '../../services/api';
+import type { Goal, KbMastery, LifeArea } from '../../services/api';
 
 interface LifeAreasGoalsProps {
   areas: LifeArea[];
@@ -33,9 +34,66 @@ function ProgressRing({ value, achieved }: { value: number; achieved: boolean })
   );
 }
 
+/**
+ * Vault mastery sparkline (defect #40): plots the subject's real daily mastery
+ * score from its LearningEvent practice logs. Renders nothing until the trend
+ * has at least two points, so the card layout is unchanged for new subjects.
+ */
+function MasterySparkline({ mastery }: { mastery: KbMastery }) {
+  const points = mastery.trend.slice(-20);
+  if (points.length < 2) return null;
+  const w = 120;
+  const h = 22;
+  const scores = points.map((p) => p.score_pct);
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  const span = max - min || 1;
+  const polyline = points
+    .map((p, i) => `${(i / (points.length - 1)) * w},${h - ((p.score_pct - min) / span) * h}`)
+    .join(' ');
+  return (
+    <div style={{ marginTop: 4 }}>
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-label="vault mastery trend">
+        <polyline points={polyline} fill="none" stroke="var(--accent)" strokeWidth={1.5} />
+      </svg>
+      <div className="g-sub">vault mastery {Math.round(mastery.score_pct)}%</div>
+    </div>
+  );
+}
+
 /** 4-column goals grid with Areas / Quarterly tabs + circular progress + mark achieved. */
 export const LifeAreasGoals = ({ areas, goals, onAchieve }: LifeAreasGoalsProps) => {
   const [tab, setTab] = useState<'areas' | 'quarterly'>('quarterly');
+  // Defect #40: vault mastery per linked subject, keyed by curriculum subject id.
+  const [masteryBySubject, setMasteryBySubject] = useState<Record<number, KbMastery>>({});
+
+  const subjectIds = useMemo(
+    () => [...new Set(goals.map((g) => g.subject_id).filter((id): id is number => typeof id === 'number'))],
+    [goals],
+  );
+
+  useEffect(() => {
+    if (subjectIds.length === 0) return;
+    let stale = false;
+    Promise.all(
+      subjectIds.map((id) =>
+        endpoints.kb
+          .mastery({ subject: id })
+          .then((m) => [id, m] as const)
+          .catch(() => null),
+      ),
+    ).then((rows) => {
+      if (stale) return;
+      const next: Record<number, KbMastery> = {};
+      for (const row of rows) {
+        if (row) next[row[0]] = row[1];
+      }
+      setMasteryBySubject(next);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [subjectIds]);
 
   return (
     <div>
@@ -85,6 +143,9 @@ export const LifeAreasGoals = ({ areas, goals, onAchieve }: LifeAreasGoalsProps)
                   <div className="g-sub">
                     {g.quarter} {g.year} · {g.is_completed ? 'Completed' : `${Math.round(g.progress_percentage)}%`}
                   </div>
+                  {g.subject_id != null && masteryBySubject[g.subject_id] && (
+                    <MasterySparkline mastery={masteryBySubject[g.subject_id]} />
+                  )}
                 </div>
               </div>
               <button

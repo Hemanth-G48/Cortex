@@ -4,6 +4,8 @@ interface Resource {
   id: string;
   title: string;
   type: string;
+  /** Authoritative vault document type (defect #26) — preferred for the icon. */
+  doc_type?: string | null;
   url: string;
   description?: string;
 }
@@ -24,7 +26,9 @@ export const ResourceCard = ({ resource }: ResourceCardProps) => {
       className="resource-card"
       style={{ background: bannerGradient(hue) }}
     >
-      <div className="resource-card-icon">{resourceIcon(resource.type)}</div>
+      {/* Defect #26: icon from the metadata-derived type when the resource
+          carries one (KB documents), falling back to the card kind. */}
+      <div className="resource-card-icon">{resourceIcon(resource.doc_type ?? resource.type)}</div>
       <div className="resource-card-body">
         <div className="resource-card-title">{resource.title}</div>
         {resource.description && (

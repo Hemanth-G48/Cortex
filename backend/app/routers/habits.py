@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Habit, HabitLog, User
 from app.schemas.habit import (
-    HabitCreate, HabitResponse,
+    HabitArchiveRequest, HabitCreate, HabitResponse,
     HabitLogCreate, HabitLogResponse, HabitLogReorder, HabitLogUpdate,
 )
 from app.services.habit_xp import GOOD, BAD, record_log
@@ -80,6 +80,13 @@ def habits_today(db: Session = Depends(get_db)):
     return result
 
 
+@router.get("/habits/heatmaps")
+def habit_heatmaps_batch(db: Session = Depends(get_db)):
+    """All habit heatmaps in one call (audit defect #51 — kills the N+1 loop)."""
+    habits = db.query(Habit).filter(Habit.is_archived == False).all()  # noqa: E712
+    return _heatmap_payload(db, habits)
+
+
 @router.get("/habits/{habit_id}", response_model=HabitResponse)
 def get_habit(habit_id: int, db: Session = Depends(get_db)):
     habit = db.query(Habit).filter(Habit.id == habit_id).first()
@@ -132,11 +139,23 @@ def delete_habit(habit_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/habits/{habit_id}/archive", response_model=HabitResponse)
-def archive_habit(habit_id: int, db: Session = Depends(get_db)):
+def archive_habit(
+    habit_id: int,
+    data: Optional[HabitArchiveRequest] = None,
+    db: Session = Depends(get_db),
+):
+    """Archive a habit, recording why (audit defect #49).
+
+    ``reason`` defaults to a plain manual archive; when a vault document drove
+    the archive, its id is stored too so the Archive page can link back to it.
+    """
     habit = db.query(Habit).filter(Habit.id == habit_id).first()
     if not habit:
         raise HTTPException(404, "Habit not found")
     habit.is_archived = True
+    habit.archived_reason = (data.reason if data and data.reason else "Archived manually")
+    if data and data.document_id is not None:
+        habit.archived_document_id = data.document_id
     db.commit()
     db.refresh(habit)
     return habit
@@ -148,6 +167,9 @@ def unarchive_habit(habit_id: int, db: Session = Depends(get_db)):
     if not habit:
         raise HTTPException(404, "Habit not found")
     habit.is_archived = False
+    # The provenance describes the archive, not the active habit — clear it.
+    habit.archived_reason = None
+    habit.archived_document_id = None
     db.commit()
     db.refresh(habit)
     return habit
@@ -304,26 +326,32 @@ def habit_heatmap(habit_id: int, db: Session = Depends(get_db)):
     habit = db.query(Habit).filter(Habit.id == habit_id).first()
     if not habit:
         raise HTTPException(404, "Habit not found")
+    return _heatmap_payload(db, [habit])[str(habit_id)]
 
+
+def _heatmap_payload(db: Session, habits: List[Habit]) -> dict:
+    """Build the 30-day heatmap payload for every habit in one query."""
     today = date.today()
     start = today - timedelta(days=29)
     logs = db.query(HabitLog).filter(
-        HabitLog.habit_id == habit_id,
         HabitLog.date >= start,
         HabitLog.date <= today,
     ).all()
+    by_habit_date: dict = {}
+    for log in logs:
+        by_habit_date[(log.habit_id, str(log.date))] = log
 
-    by_date = {str(l.date): l for l in logs}
-
-    days = []
-    day = start
-    for _ in range(30):
-        log = by_date.get(str(day))
-        days.append({
-            "date": str(day),
-            "completed": bool(log and log.completed),
-            "count": log.count if log else 0,
-        })
-        day = day + timedelta(days=1)
-
-    return {"month": today.strftime("%B %Y"), "days": days}
+    out = {}
+    for habit in habits:
+        days = []
+        day = start
+        for _ in range(30):
+            log = by_habit_date.get((habit.id, str(day)))
+            days.append({
+                "date": str(day),
+                "completed": bool(log and log.completed),
+                "count": log.count if log else 0,
+            })
+            day = day + timedelta(days=1)
+        out[str(habit.id)] = {"month": today.strftime("%B %Y"), "days": days}
+    return out

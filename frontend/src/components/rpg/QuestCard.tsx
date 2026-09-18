@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { RpgCard } from './RpgCard';
 import { RpgBadge } from './RpgBadge';
 import { RpgButton } from './RpgButton';
-import { endpoints } from '../../services/api';
+import { endpoints, kbCaptureXpApi } from '../../services/api';
 import { useToast } from '../../hooks/useToast';
+import { confirmDelete } from '../../utils/confirm';
 import type { Quest } from '../../services/api';
 
 interface QuestCardProps {
@@ -30,6 +31,9 @@ export const QuestCard = ({ quest, onComplete, onDelete, onEdit }: QuestCardProp
       const completedQuest = await endpoints.quests.complete(quest.id);
       setFlash(true);
       toast(`Quest Complete! +${completedQuest.xp_reward} XP`, 'success');
+      // Defect #79 fix: also award Second Brain capture XP so quest
+      // completion feeds the vault-side XP tracker, not just the quest wallet.
+      kbCaptureXpApi.award(completedQuest.xp_reward).catch(() => {});
       setTimeout(() => setFlash(false), 500);
       onComplete?.(completedQuest);
     } finally {
@@ -38,7 +42,7 @@ export const QuestCard = ({ quest, onComplete, onDelete, onEdit }: QuestCardProp
   };
 
   const handleDelete = () => {
-    if (!window.confirm('Delete this quest?')) return;
+    if (!confirmDelete('this quest')) return;
     endpoints.quests.delete(quest.id).then(() => onDelete?.(quest));
   };
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Header } from '../components/layout/Header';
 import { EmptyState } from '../components/shared/EmptyState';
-import { endpoints, type LeaderboardEntry, type LeaderboardResponse } from '../services/api';
+import { endpoints, type KbMastery, type LeaderboardEntry, type LeaderboardResponse } from '../services/api';
 
 const CLASS_ICONS: Record<string, string> = {
   Wizard: '🧙',
@@ -36,11 +36,18 @@ export const Leaderboard = () => {
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [limit, setLimit] = useState(20);
+  // Defect #76: XP alone hides vault work — show the mastery breakdown too.
+  const [mastery, setMastery] = useState<KbMastery | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setData(await endpoints.leaderboard.list(limit));
+      const [board, vault] = await Promise.all([
+        endpoints.leaderboard.list(limit),
+        endpoints.kb.mastery().catch(() => null),
+      ]);
+      setData(board);
+      setMastery(vault);
     } catch {
       setData(null);
     } finally {
@@ -69,6 +76,13 @@ export const Leaderboard = () => {
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                 Top {me.percentile}% · {me.total_xp.toLocaleString()} XP
               </div>
+              {/* Defect #76: vault mastery weighting beside the XP total. */}
+              {mastery && mastery.topics_total > 0 && (
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                  Vault mastery <strong style={{ color: 'var(--text-primary)' }}>{mastery.score_pct}%</strong>
+                  {' '}({mastery.topics_mastered}/{mastery.topics_total} topics strong · {mastery.hours_logged}h logged)
+                </div>
+              )}
             </div>
           </div>
         </div>

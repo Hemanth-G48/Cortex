@@ -13,6 +13,7 @@ from app.models import (
     Quiz,
     QuizAttempt,
 )
+from app.services.curriculum import semester_label
 
 
 def enrollment_summary(db: Session, user: User) -> dict:
@@ -57,6 +58,8 @@ def enrollment_summary(db: Session, user: User) -> dict:
                     "name": s.name,
                     "code": s.code,
                     "semester": s.semester,
+                    # Audit defect #9: display label resolved server-side.
+                    "semester_label": semester_label(s.semester, s.semester_label),
                     "credits": s.credits,
                     "unit_count": unit_count,
                 }

@@ -32,9 +32,16 @@ export const GoalsSetting = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [suggestedGoals, setSuggestedGoals] = useState<string[]>([]);
+
   const load = () => {
     endpoints.goals.list().then(setGoals).catch(() => setError('Failed to load goals'));
     endpoints.habits.list().then(setHabits).catch(() => {});
+    // Defect #51 fix: pre-fill goal suggestions from the weekly review engine
+    // so the page is not limited to direct goals/habits lists.
+    endpoints.kb.weeklyReview.overview().then((wr) => {
+      setSuggestedGoals(wr.derived_goals.map((g) => g.title));
+    }).catch(() => setSuggestedGoals([]));
   };
 
   useEffect(() => { load(); }, []);
@@ -151,7 +158,13 @@ export const GoalsSetting = () => {
 
         {showForm && (
           <div className="vault-card" style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input
+            {suggestedGoals.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--vault-text-muted)', marginBottom: 8 }}>
+              Suggestions from weekly review: {suggestedGoals.slice(0, 5).join(', ')}
+              {suggestedGoals.length > 5 && ` +${suggestedGoals.length - 5} more`}
+            </div>
+          )}
+          <input
               placeholder="Goal title"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}

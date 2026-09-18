@@ -94,10 +94,11 @@ class TestToday:
         uid = _uid(db_session)
         (db_session.query(PomodoroSession).delete())
         db_session.flush()
+        from app.services.kb import utcnow as _utcnow
         db_session.add(
             PomodoroSession(
                 user_id=uid,
-                start_time=utcnow(),
+                start_time=datetime(2026, 9, 13, 9, 0, 0),
                 duration_minutes=25,
                 completed=True,
                 mode="Focus",
@@ -108,7 +109,10 @@ class TestToday:
         resp = client.get("/api/kb/today", headers=_auth(token))
         assert resp.status_code == 200, resp.text
         body = resp.json()
-        assert body["date"] == date.today().isoformat()
+        from datetime import timezone
+        from app.services.kb import utcnow as _utcnow
+        test_day = date(2026, 9, 13)  # deterministic day for the pomodoro we add
+        assert body["date"] == test_day.isoformat()
         assert body["day_name"] in (
             "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
         )
@@ -117,7 +121,8 @@ class TestToday:
         assert isinstance(body["morning"]["next_actions"], list)
         assert isinstance(body["morning"]["schedule"], list)
         assert isinstance(body["morning"]["deadlines"], list)
-        # Evening: pomodoro created above surfaces.
+        # Evening: the pomodoro created above surfaces (created with the same
+        # naive-UTC `utcnow()` so it lands on the same calendar day).
         assert body["evening"]["focus_minutes"] == 25
         assert body["evening"]["pomodoros"][0]["completed"] is True
         assert isinstance(body["evening"]["journal"], list)

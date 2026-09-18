@@ -51,6 +51,8 @@ class PreferencesRequest(BaseModel):
     examples_vs_theory: float | None = None
     style: str | None = Field(default=None, max_length=20)
     session_length_mins: int | None = None
+    # Audit defect #58: pomodoro break length (clamped by the service).
+    pomodoro_break_mins: int | None = None
     explanation_style: str | None = Field(default=None, max_length=20)
     onboarding_completed: bool | None = None
 

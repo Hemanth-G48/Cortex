@@ -3,6 +3,7 @@ import { endpoints } from '../services/api';
 import type {
   DailyLogStats, EisenhowerMatrix, EisenhowerTask, Goal,
   LifeArea, LifePlannerEvent, LifePlannerSummary, Reminder, Task,
+  WeeklyReviewResponse,
 } from '../services/api';
 import { useToast } from '../hooks/useToast';
 import { DailyLogWidget } from '../components/lifeplanner/DailyLogWidget';
@@ -21,14 +22,6 @@ const EMPTY_MATRIX: EisenhowerMatrix = {
   not_important: [],
 };
 
-const DIMENSION_MAP: Record<string, string> = {
-  Work: 'Work',
-  Fitness: 'Physical Health',
-  'Self Development': 'Personal Life',
-  Health: 'Overall',
-  Finance: 'Finance',
-};
-
 export const LifePlannerDashboard = () => {
   const { toast } = useToast();
   const [summary, setSummary] = useState<LifePlannerSummary | null>(null);
@@ -39,6 +32,8 @@ export const LifePlannerDashboard = () => {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [todos, setTodos] = useState<Task[]>([]);
   const [events, setEvents] = useState<LifePlannerEvent[]>([]);
+  // Defect #39: the radar's axes are sourced from the vault's review engine.
+  const [weeklyReview, setWeeklyReview] = useState<WeeklyReviewResponse | null>(null);
   const [logBusy, setLogBusy] = useState(false);
 
   const load = useCallback(() => {
@@ -51,7 +46,8 @@ export const LifePlannerDashboard = () => {
       endpoints.reminders.list().catch(() => []),
       endpoints.tasks.list().catch(() => []),
       endpoints.events.today().catch(() => []),
-    ]).then(([s, st, m, g, a, r, t, e]) => {
+      endpoints.kb.weeklyReview.overview().catch(() => null),
+    ]).then(([s, st, m, g, a, r, t, e, wr]) => {
       setSummary(s);
       setStats(st);
       setMatrix(m);
@@ -60,6 +56,7 @@ export const LifePlannerDashboard = () => {
       setReminders(r);
       setTodos(t);
       setEvents(e);
+      setWeeklyReview(wr);
     });
   }, []);
 
@@ -67,19 +64,15 @@ export const LifePlannerDashboard = () => {
     load();
   }, [load]);
 
-  // Map life areas to the 5-axis radar (spec: Finance, Physical Health, Work,
-  // Personal Life, Overall); fall back to defaults when no areas exist and pad
-  // with Finance so the radar keeps all 5 axes with seeded data.
-  const dimensions: LifeDimension[] | undefined = areas.length
-    ? (() => {
-        const mapped = areas.map((a) => ({ label: DIMENSION_MAP[a.name] ?? a.name, value: a.progress_percent }));
-        const labels = new Set(mapped.map((d) => d.label));
-        if (!labels.has('Finance')) {
-          mapped.push({ label: 'Finance', value: 50 });
-        }
-        return mapped;
-      })()
-    : undefined;
+  // Radar axes are live data only (defect #39): each life area contributes its
+  // stored progress (GET /life-areas) and the weekly review contributes the
+  // vault mastery score of the topics it flagged weak this week
+  // (GET /api/kb/weekly-review → weak_topics[].score, a real 0–100 metric).
+  // No client-side label table and no synthetic padding axis.
+  const dimensions: LifeDimension[] = [
+    ...areas.map((a) => ({ label: a.name, value: a.progress_percent })),
+    ...(weeklyReview?.weak_topics ?? []).map((t) => ({ label: t.topic_name, value: t.score })),
+  ];
 
   const handleLogIn = () => {
     setLogBusy(true);
@@ -118,9 +111,18 @@ export const LifePlannerDashboard = () => {
       .catch(() => toast('Could not mark goal achieved', 'error'));
   };
 
+  // Defect #66: the Eisenhower quick-complete also writes the completion into
+  // today's vault daily note (POST /api/kb/daily-notes/complete-task),
+  // best-effort so a vault without a reachable daily-life folder still works.
   const completeMatrixTask = (t: EisenhowerTask) => {
     endpoints.eisenhower.completeTask(t.id)
-      .then(() => { toast(`Done: ${t.title}`, 'success'); load(); })
+      .then(() => {
+        endpoints.kb.dailyNotes
+          .completeTask({ title: t.title, task_id: t.id, source: 'eisenhower' })
+          .catch(() => {});
+        toast(`Done: ${t.title}`, 'success');
+        load();
+      })
       .catch(() => toast('Could not complete task', 'error'));
   };
 

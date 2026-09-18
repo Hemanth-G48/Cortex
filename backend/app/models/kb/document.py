@@ -1,4 +1,30 @@
-"""KbDocument model — one indexed document in the Knowledge Core (Idea 1)."""
+"""KbDocument model — one indexed document in the Knowledge Core (Idea 1).
+
+Deliberate design decision (arch review F1, remediation 2026-09): this model
+intentionally stays a *single-row aggregate* rather than being split into
+DocumentContent / DocumentMetadata / DocumentProcessingState tables. Reasons:
+
+- SQLite + ``Base.metadata.create_all`` (no alembic) — a table split would
+  need hand-written data migration for every existing install.
+- Every KB service reads a mix of facets (scanner needs status + hash,
+  pipeline needs text + flags, quality needs scores) — splitting would force
+  joins through the hottest query path in the subsystem.
+- 225+ service importers already depend on the flat attribute surface.
+
+Instead of a schema split, the facets below are *documented and grouped* so
+each concern has a visible home, and new columns must be added to the group
+they belong to. If the KB subsystem keeps growing, revisit the split with a
+real migration tool in place.
+
+Facet groups (searchable via the section comments below):
+- Identity/ownership: id, user_id, source_id, path_rel, file_path, doc_type
+- Content: extracted_text, char_count, ocr flags, content_hash
+- Metadata: frontmatter_json, outline_json, metadata_json, author,
+  source_url, language, reading_time_seconds, doc_date
+- Processing state: status, embedding/graph/tags/summary dirty flags,
+  indexed_at, quality_score, quality_detail
+- Versioning/dedupe: versions relationship, (user_id, content_hash) unique
+"""
 
 from __future__ import annotations
 

@@ -4,6 +4,7 @@ import { RewardCard } from './RewardCard';
 import { RewardCreateForm } from './RewardCreateForm';
 import { RpgButton } from './RpgButton';
 import { endpoints } from '../../services/api';
+import { confirmDelete } from '../../utils/confirm';
 import type { Reward, Character } from '../../services/api';
 
 const TABS = [
@@ -63,7 +64,7 @@ export const RewardCenter = () => {
   };
 
   const handleDelete = async (reward: Reward) => {
-    if (!window.confirm('Delete this reward?')) return;
+    if (!confirmDelete('this reward')) return;
     await endpoints.rewards.delete(reward.id);
     await fetchData();
   };

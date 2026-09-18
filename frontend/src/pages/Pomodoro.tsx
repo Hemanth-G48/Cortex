@@ -16,6 +16,22 @@ export const Pomodoro = () => {
 
   useEffect(() => { endpoints.pomodoro.list().then(setSessions).catch(() => {}); }, []);
 
+  // Defect #58: hydrate the timer from the user's stored preferences so the
+  // durations follow the user (and survive reloads) instead of living only in
+  // reducer state. Best-effort — an offline profile keeps the defaults.
+  useEffect(() => {
+    endpoints.kb.preferences
+      .get()
+      .then((p) => {
+        pom.updateSettings({
+          focusMinutes: p.session_length_mins,
+          breakMinutes: p.pomodoro_break_mins,
+        });
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate once on mount
+  }, []);
+
   const startFocus = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     pom.startFocus();
@@ -39,18 +55,25 @@ export const Pomodoro = () => {
     pom.stop();
   }, [pom]);
 
-  // Log completed session
+  // Log completed session + defect #56 fix: also open a KB micro-session so the
+  // pomodoro is tied to the vault session pipeline (mastery/xp), not just the
+  // local pomodoro table.
   useEffect(() => {
     if (!pom.running && pom.timer === 0 && pom.mode === 'focus') {
       playDing('break');
-      endpoints.pomodoro.create({
-        start_time: new Date().toISOString(),
-        duration_minutes: pom.settings.focusMinutes,
-        completed: true,
-        user_id: 1,
-      }).then(() => {
-        endpoints.pomodoro.list().then(setSessions);
-      });
+      Promise.all([
+        endpoints.pomodoro.create({
+          start_time: new Date().toISOString(),
+          duration_minutes: pom.settings.focusMinutes,
+          completed: true,
+          user_id: 1,
+        }),
+        // Best-effort KB session log — if the vault session pipeline is offline
+        // the pomodoro still completes locally.
+        endpoints.kb.sessions.start(1, pom.settings.focusMinutes)
+          .then((s) => endpoints.kb.sessions.complete(s.session.id).catch(() => {}))
+          .catch(() => {}),
+      ]).then(() => endpoints.pomodoro.list().then(setSessions)).catch(() => {});
     }
   }, [pom.running, pom.timer, pom.mode, pom.settings.focusMinutes]);
 
@@ -62,9 +85,14 @@ export const Pomodoro = () => {
 
   const timerColor = pom.mode === 'focus' ? 'var(--accent)' : 'var(--success)';
 
+  // Defect #58: persist the chosen durations server-side (kb/preferences.py) so
+  // they are the user's settings, not in-memory state.
   const handleSaveSettings = (s: { focusMinutes: number; breakMinutes: number }) => {
     pom.updateSettings(s);
     stopTimer();
+    endpoints.kb.preferences
+      .update({ session_length_mins: s.focusMinutes, pomodoro_break_mins: s.breakMinutes })
+      .catch(() => {});
   };
 
   return (

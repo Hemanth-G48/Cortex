@@ -21,6 +21,9 @@ export const HabitLogs = () => {
   const [editing, setEditing] = useState<EditingLog | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Defect #54: drag-and-drop row order, persisted via POST /habit-logs/reorder.
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
 
   const loadHabits = useCallback(() => {
     endpoints.habits.list().then((h) => {
@@ -34,7 +37,18 @@ export const HabitLogs = () => {
   const loadLogs = useCallback((habitId: number) => {
     setError(null);
     endpoints.habits.logs(habitId)
-      .then((l) => setLogs(l.sort((a, b) => b.date.localeCompare(a.date))))
+      .then((l) =>
+        setLogs(
+          // Newest day first; within a day the persisted visual order wins
+          // (sort_order), falling back to the log id.
+          [...l].sort(
+            (a, b) =>
+              b.date.localeCompare(a.date) ||
+              (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
+              a.id - b.id,
+          ),
+        ),
+      )
       .catch(() => setError('Failed to load logs'));
     endpoints.habits.stats(habitId).then(setStats).catch(() => {});
   }, []);
@@ -77,6 +91,36 @@ export const HabitLogs = () => {
         if (selectedId != null) loadLogs(selectedId);
       })
       .catch(() => { setError('Failed to delete log'); toast('Could not delete log', 'error'); });
+  };
+
+  /** Persist a within-day reorder (the backend stores one order per day). */
+  const persistOrder = (reordered: HabitLog[], day: string) => {
+    const ids = reordered.filter((l) => l.date === day).map((l) => l.id);
+    endpoints.habits.reorder(ids)
+      .then(() => {
+        setLogs(reordered.map((l) =>
+          l.date === day ? { ...l, sort_order: ids.indexOf(l.id) } : l,
+        ));
+      })
+      .catch(() => {
+        setError('Failed to save the new order');
+        if (selectedId != null) loadLogs(selectedId);
+      });
+  };
+
+  const handleDrop = (target: HabitLog) => {
+    const fromId = dragId;
+    setDragId(null);
+    setDragOverId(null);
+    if (fromId == null || fromId === target.id) return;
+    const from = logs.find((l) => l.id === fromId);
+    if (!from) return;
+    // The backend orders logs within a day column — reject cross-day moves.
+    if (from.date !== target.date) return;
+    const next = [...logs];
+    next.splice(next.indexOf(from), 1);
+    next.splice(next.indexOf(target), 0, from);
+    persistOrder(next, target.date);
   };
 
   const formatDate = (iso: string) => {
@@ -153,6 +197,7 @@ export const HabitLogs = () => {
             <table className="data-table" style={{ width: '100%' }}>
               <thead>
                 <tr>
+                  <th aria-label="Drag handle" />
                   <th>Date</th>
                   <th>Count</th>
                   <th>Completed</th>
@@ -163,7 +208,23 @@ export const HabitLogs = () => {
                 {logs.map((log) => {
                   const isEditingThis = editing?.id === log.id;
                   return (
-                    <tr key={log.id}>
+                    <tr
+                      key={log.id}
+                      draggable={!isEditingThis}
+                      onDragStart={() => setDragId(log.id)}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverId(log.id); }}
+                      onDragLeave={() => setDragOverId((cur) => (cur === log.id ? null : cur))}
+                      onDrop={(e) => { e.preventDefault(); handleDrop(log); }}
+                      onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                      style={{
+                        opacity: dragId === log.id ? 0.4 : 1,
+                        boxShadow: dragOverId === log.id && dragId !== log.id
+                          ? 'inset 0 2px 0 var(--habit-blue)'
+                          : undefined,
+                        cursor: isEditingThis ? 'default' : 'grab',
+                      }}
+                    >
+                      <td style={{ width: 24, color: 'var(--vault-text-muted)' }} aria-hidden="true">⠿</td>
                       <td>
                         {isEditingThis ? (
                           <input

@@ -5,10 +5,113 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Note, Goal
+from app.models import KbDocument, KbSource, Note, Goal, User
 from app.schemas.note import NoteCreate, NotePinResponse, NoteResponse, GoalCreate, GoalResponse
 
 router = APIRouter(prefix="/api", tags=["notes"])
+
+
+# ---------------------------------------------------------------------------
+# DB-notes → KB bridge (audit defects #15/#78/#94)
+#
+# Notes written in the app are mirrored as markdown files inside a dedicated
+# KB source ("App Notes") so they show up in vault search, the knowledge graph
+# and every other KB surface without a second editing system.
+# ---------------------------------------------------------------------------
+
+APP_NOTES_SOURCE_NAME = "App Notes (DB bridge)"
+APP_NOTES_REL = "app-notes"
+
+
+def _app_notes_source(db: Session) -> KbSource | None:
+    """The dedicated mirror source, created on first use."""
+    src = (
+        db.query(KbSource)
+        .filter(KbSource.name == APP_NOTES_SOURCE_NAME)
+        .first()
+    )
+    if src is None:
+        user = db.query(User).first()
+        if user is None:
+            return None
+        import os
+
+        root = os.path.join("second_brain", "app-notes")
+        os.makedirs(root, exist_ok=True)
+        src = KbSource(
+            user_id=user.id,
+            name=APP_NOTES_SOURCE_NAME,
+            source_type="vault_folder",
+            root_path=root,
+            enabled=True,
+        )
+        db.add(src)
+        db.commit()
+        db.refresh(src)
+    return src
+
+
+def _mirror_note_to_kb(db: Session, note: Note) -> None:
+    """Create/update the KB mirror document for a DB note. Never raises."""
+    try:
+        from app.services.kb import KbService
+        from app.services.kb.auto_sync import _stage
+        from app.services.kb.pipeline import ingest_document
+
+        src = _app_notes_source(db)
+        if src is None:
+            return
+        rel_path = f"{APP_NOTES_REL}/{note.id}.md"
+        body = f"# {note.title}\n\n{note.content or ''}\n"
+        digest = KbService.content_hash(body.encode("utf-8"))
+
+        doc = (
+            db.query(KbDocument)
+            .filter(
+                KbDocument.user_id == src.user_id,
+                KbDocument.source_id == src.id,
+                KbDocument.path_rel == rel_path,
+            )
+            .first()
+        )
+        if doc is not None and doc.content_hash == digest:
+            return  # unchanged
+        if doc is None:
+            doc = KbDocument(
+                user_id=src.user_id,
+                source_id=src.id,
+                path_rel=rel_path,
+                title=note.title,
+                doc_type="md",
+                status="new",
+            )
+        else:
+            doc.content_hash = digest
+            doc.status = "changed"
+            doc.title = note.title
+        doc.content_hash = digest
+        doc.file_path = _stage(src, rel_path, body)
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+        ingest_document(db, doc)
+    except Exception:  # noqa: BLE001 — mirroring must never break note CRUD
+        db.rollback()
+
+
+def _remove_note_mirror(db: Session, note_id: int) -> None:
+    """Drop the KB mirror document when the DB note is deleted."""
+    try:
+        doc = (
+            db.query(KbDocument)
+            .filter(KbDocument.path_rel == f"{APP_NOTES_REL}/{note_id}.md")
+            .first()
+        )
+        if doc is not None:
+            db.delete(doc)
+            db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
 
 
 # -- Notes --
@@ -34,6 +137,7 @@ def create_note(data: NoteCreate, db: Session = Depends(get_db)):
     db.add(note)
     db.commit()
     db.refresh(note)
+    _mirror_note_to_kb(db, note)
     return note
 
 
@@ -47,6 +151,7 @@ def update_note(note_id: int, data: NoteCreate, db: Session = Depends(get_db)):
     note.updated_at = datetime.now()
     db.commit()
     db.refresh(note)
+    _mirror_note_to_kb(db, note)
     return note
 
 
@@ -68,6 +173,7 @@ def delete_note(note_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Note not found")
     db.delete(note)
     db.commit()
+    _remove_note_mirror(db, note_id)
     return {"ok": True}
 
 

@@ -1,12 +1,15 @@
 import type { WeightGoal } from '../../services/api';
+import type { VaultNote } from '../../hooks/useFitnessHubData';
 
 interface Props {
   weightGoal: WeightGoal | null;
   onEdit?: () => void;
+  /** Vault notes about weight goals (defect #85). */
+  vaultNotes?: VaultNote[];
 }
 
 /** Sidebar Weight Goal widget (Phase 66): initial → current → target + bar. */
-export const FhWeightGoal = ({ weightGoal, onEdit }: Props) => {
+export const FhWeightGoal = ({ weightGoal, onEdit, vaultNotes = [] }: Props) => {
   if (!weightGoal || weightGoal.current === null) {
     return (
       <div className="fh-card">
@@ -42,6 +45,12 @@ export const FhWeightGoal = ({ weightGoal, onEdit }: Props) => {
         <div className="fh-weight-fill" style={{ width: `${percent}%` }} />
       </div>
       <div className="fh-percent">{percent}% to goal</div>
+      {vaultNotes.length > 0 && (
+        <div className="fh-weight-row" style={{ fontSize: '0.7rem', color: 'var(--fh-text-muted, #999)' }}>
+          <span>📚 Vault</span>
+          <b title={vaultNotes[0].snippet}>{vaultNotes[0].title}</b>
+        </div>
+      )}
       {onEdit && (
         <button type="button" className="fh-mark-btn" style={{ width: '100%' }} onClick={onEdit}>
           Update

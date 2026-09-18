@@ -1,14 +1,17 @@
 import { RpgCard } from './RpgCard';
 import { RpgBadge } from './RpgBadge';
 import { RpgButton } from './RpgButton';
-import type { LifeArea } from '../../services/api';
+import { areaDocCount } from '../../utils/vaultDomains';
+import type { LifeArea, KbDomainSummary } from '../../services/api';
 
 interface LifeAreasGridProps {
   areas: LifeArea[];
   onEdit: (area: LifeArea) => void;
+  /** Vault domains from `GET /api/kb/domains` (defect #83). */
+  domains?: KbDomainSummary[];
 }
 
-export const LifeAreasGrid = ({ areas, onEdit }: LifeAreasGridProps) => {
+export const LifeAreasGrid = ({ areas, onEdit, domains = [] }: LifeAreasGridProps) => {
   if (areas.length === 0) {
     return (
       <div className="rpg-empty">
@@ -25,6 +28,11 @@ export const LifeAreasGrid = ({ areas, onEdit }: LifeAreasGridProps) => {
             <h3>{area.name}</h3>
             <RpgBadge variant="orange">{area.progress_percent}%</RpgBadge>
           </div>
+          {areaDocCount(area.name, domains) !== null && (
+            <div className="rpg-card-desc" style={{ fontSize: '0.7rem' }}>
+              📚 {areaDocCount(area.name, domains)} vault documents
+            </div>
+          )}
           {area.description && <p className="rpg-card-desc">{area.description}</p>}
           <div className="rpg-progress-bar">
             <div

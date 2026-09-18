@@ -1,133 +1,162 @@
-"""Idea 58 — mastery engine + weak-topics endpoint tests.
+"""Audit defects #40/#71/#76/#82/#96 — ``GET /api/kb/mastery``.
 
-``log_event`` recomputes mastery on write; classification thresholds
-(unknown below MIN_EVIDENCE, weak < 0.4, strong ≥ 0.75); quiz accuracy moves
-the score; weak-topics endpoint ranks weak/unknown topics and excludes strong
-ones; per-user isolation.
+The mastery read model must report scores derived from real ``LearningEvent``
+practice logs (not configured numbers), scoped either to one curriculum subject
+or to the whole vault, together with a daily trend for sparklines.
 """
 from __future__ import annotations
 
-import pytest
+from datetime import datetime, timedelta, timezone
 
-from app.services.kb.mastery import _mastery_from_events, classify
+from app.models import CurriculumSubject, LearningEvent, Topic, User
 
-SYLLABUS = """\
-# Machine Learning
-
-Fall 2026
-
-## Unit 1: Foundations
-- Linear algebra review
-- Probability review
-
-## Unit 2: Regression
-- Linear regression
-- Gradient descent
-"""
+AUTH = "Authorization"
 
 
-@pytest.fixture(autouse=True)
-def _disable_ai(monkeypatch):
-    monkeypatch.setattr("app.config.settings.AI_ENABLED", False)
-
-
-def _signup(client, uname="mas-user", email="mas@test.com"):
+def _signup(client, uname="mastery-user", email="mastery@test.com"):
     resp = client.post(
         "/api/auth/signup",
-        json={"name": "Mas", "username": uname, "email": email,
+        json={"name": "Mastery", "username": uname, "email": email,
               "password": "pass123", "role": "student"},
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["token"]
 
 
-def _auth(token):
-    return {"Authorization": f"Bearer {token}"}
+def _uid(db, email="mastery@test.com"):
+    user = db.query(User).filter(User.email == email).first()
+    assert user is not None
+    return user.id
 
 
-def _confirmed(client, token):
-    r = client.post("/api/subjects/import", json={"text": SYLLABUS}, headers=_auth(token))
-    profile = r.json()["profile"]
-    confirmed = client.post(
-        f"/api/subjects/{profile['id']}/confirm", json={}, headers=_auth(token)
+def _subject(db, name="Operating Systems"):
+    subject = CurriculumSubject(
+        program_id=db.query(CurriculumSubject).first().program_id,
+        name=name,
+        code=name[:4].upper(),
+        semester=1,
     )
-    profile = confirmed.json()["profile"]  # now carries curriculum_subject_id
-    client.post(f"/api/subjects/{profile['id']}/topics/generate", headers=_auth(token))
-    topics = client.get(f"/api/subjects/{profile['id']}/topics", headers=_auth(token)).json()["items"]
-    return profile, topics
+    db.add(subject)
+    db.commit()
+    return subject
 
 
-class TestEngine:
-    def test_no_events_zero(self):
-        assert _mastery_from_events([]) == 0.0
+def _topic(db, uid, subject_id, name="Paging"):
+    topic = Topic(
+        user_id=uid,
+        subject_id=subject_id,
+        name=name,
+        normalized_name=name.lower(),
+        status="confirmed",
+    )
+    db.add(topic)
+    db.commit()
+    return topic
 
-    def test_classify_needs_min_evidence(self):
-        assert classify(0.9, 1) == "unknown"  # 1 event isn't enough evidence
 
-    def test_classify_thresholds(self):
-        assert classify(0.2, 5) == "weak"
-        assert classify(0.6, 5) == "medium"
-        assert classify(0.85, 5) == "strong"
+def _event(db, uid, topic_id, kind, value, days_ago=1):
+    db.add(LearningEvent(
+        user_id=uid,
+        topic_id=topic_id,
+        event_type=kind,
+        value=value,
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_ago),
+    ))
+    db.commit()
 
-    def test_quiz_accuracy_raises_score(self, client, db_session):
-        from app.models import Topic
-        from app.services.kb.mastery import log_event, recompute_mastery
-        from app.services.security import decode_bearer_token
 
+class TestMasteryEndpoint:
+    def test_empty_vault_returns_zeroed_payload(self, client, db_session):
         token = _signup(client)
-        _, topics = _confirmed(client, token)
-        user_id = decode_bearer_token(token)["user_id"]
-        log_event(db_session, user_id, event_type="quiz", topic_id=topics[0]["id"], value=0.9)
-        log_event(db_session, user_id, event_type="quiz", topic_id=topics[0]["id"], value=1.0)
-        db_session.commit()
-        # Recompute now that both events are committed (autoflush is off).
-        recompute_mastery(db_session, user_id, topics[0]["id"])
-        db_session.commit()
+        resp = client.get("/api/kb/mastery", headers={AUTH: f"Bearer {token}"})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["topics_total"] == 0
+        assert body["score_pct"] == 0.0
+        assert body["classification"] == "unknown"
+        assert body["trend"] == []
 
-        row = db_session.query(Topic).get(topics[0]["id"])
-        assert row.mastery_score > 0.5
-        assert row.mastery_classification in ("medium", "strong")
-
-
-class TestWeakTopics:
-    def test_all_unknown_when_no_evidence(self, client):
+    def test_scores_come_from_practice_events(self, client, db_session):
         token = _signup(client)
-        profile, topics = _confirmed(client, token)
-        r = client.get("/api/subjects-ai/weak-topics", headers=_auth(token))
-        assert r.status_code == 200, r.text
-        items = r.json()["items"]
-        # Every topic is unknown (no evidence) → all listed.
-        assert {i["topic_id"] for i in items} == {t["id"] for t in topics}
-        assert all(i["classification"] == "unknown" for i in items)
+        uid = _uid(db_session)
+        subject = _subject(db_session)
+        topic = _topic(db_session, uid, subject.id)
+        # Two strong quiz results → a real, non-zero mastery score.
+        _event(db_session, uid, topic.id, "quiz", 0.95)
+        _event(db_session, uid, topic.id, "quiz", 1.0, days_ago=0)
 
-    def test_strong_topics_excluded(self, client, db_session):
-        from app.services.kb.mastery import log_event
-        from app.services.security import decode_bearer_token
+        body = client.get("/api/kb/mastery", headers={AUTH: f"Bearer {token}"}).json()
+        assert body["topics_total"] == 1
+        assert body["evidence_events"] == 2
+        assert body["events"] == {"quiz": 2}
+        assert body["score_pct"] > 50
+        assert body["topics"][0]["score_pct"] > 50
 
+    def test_subject_filter_scopes_the_aggregate(self, client, db_session):
         token = _signup(client)
-        profile, topics = _confirmed(client, token)
-        user_id = decode_bearer_token(token)["user_id"]
-        # Make topic 0 strong: 6 perfect quiz scores.
-        for _ in range(6):
-            log_event(db_session, user_id, event_type="quiz", topic_id=topics[0]["id"], value=1.0)
-        db_session.commit()
-        items = client.get("/api/subjects-ai/weak-topics", headers=_auth(token)).json()["items"]
-        assert all(i["topic_id"] != topics[0]["id"] for i in items)
+        uid = _uid(db_session)
+        os_subject = _subject(db_session, "Operating Systems")
+        db_subject = _subject(db_session, "Databases")
+        os_topic = _topic(db_session, uid, os_subject.id, "Paging")
+        db_topic = _topic(db_session, uid, db_subject.id, "Indexes")
+        _event(db_session, uid, os_topic.id, "quiz", 1.0)
+        _event(db_session, uid, db_topic.id, "quiz", 0.1)
 
-    def test_filter_by_subject(self, client, db_session):
+        scoped = client.get(
+            "/api/kb/mastery", params={"subject": os_subject.id},
+            headers={AUTH: f"Bearer {token}"},
+        ).json()
+        assert scoped["topics_total"] == 1
+        assert scoped["subject_id"] == os_subject.id
+        assert scoped["subject_name"] == "Operating Systems"
+
+        whole = client.get("/api/kb/mastery", headers={AUTH: f"Bearer {token}"}).json()
+        assert whole["topics_total"] == 2
+
+    def test_subject_name_resolves_unknown_names_to_empty(self, client, db_session):
         token = _signup(client)
-        profile, topics = _confirmed(client, token)
-        r = client.get(
-            f"/api/subjects-ai/weak-topics?subject_id={profile['curriculum_subject_id']}",
-            headers=_auth(token),
+        body = client.get(
+            "/api/kb/mastery", params={"subject_name": "Nonexistent Subject"},
+            headers={AUTH: f"Bearer {token}"},
+        ).json()
+        assert body["subject_id"] is None
+        assert body["topics_total"] == 0
+        assert body["classification"] == "unknown"
+
+    def test_trend_has_one_point_per_active_day(self, client, db_session):
+        token = _signup(client)
+        uid = _uid(db_session)
+        subject = _subject(db_session)
+        topic = _topic(db_session, uid, subject.id)
+        _event(db_session, uid, topic.id, "quiz", 0.2, days_ago=3)
+        _event(db_session, uid, topic.id, "quiz", 0.9, days_ago=0)
+
+        body = client.get(
+            "/api/kb/mastery", params={"days": 30}, headers={AUTH: f"Bearer {token}"},
+        ).json()
+        trend = body["trend"]
+        assert len(trend) == 2
+        # Oldest → newest, and the later score must be the higher one.
+        assert trend[0]["date"] < trend[1]["date"]
+        assert trend[0]["score_pct"] < trend[1]["score_pct"]
+
+    def test_rejected_topics_are_excluded(self, client, db_session):
+        token = _signup(client)
+        uid = _uid(db_session)
+        subject = _subject(db_session)
+        kept = _topic(db_session, uid, subject.id, "Kept")
+        rejected = Topic(
+            user_id=uid, subject_id=subject.id, name="Rejected",
+            normalized_name="rejected", status="rejected",
         )
-        assert r.status_code == 200
-        assert len(r.json()["items"]) == len(topics)
+        db_session.add(rejected)
+        db_session.commit()
+        _event(db_session, uid, kept.id, "quiz", 1.0)
+        _event(db_session, uid, rejected.id, "quiz", 0.0)
 
-    def test_weak_topics_is_per_user(self, client):
-        token_a = _signup(client, "mas-a", "masa@test.com")
-        token_b = _signup(client, "mas-b", "masb@test.com")
-        _, topics = _confirmed(client, token_a)
-        # B has no topics → empty list.
-        assert client.get("/api/subjects-ai/weak-topics", headers=_auth(token_b)).json()["items"] == []
-        assert client.get("/api/subjects-ai/weak-topics", headers=_auth(token_a)).json()["total"] == len(topics)
+        body = client.get(
+            "/api/kb/mastery", params={"subject": subject.id},
+            headers={AUTH: f"Bearer {token}"},
+        ).json()
+        assert body["topics_total"] == 1
+        assert body["topics"][0]["name"] == "Kept"

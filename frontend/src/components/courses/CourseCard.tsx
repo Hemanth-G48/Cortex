@@ -52,7 +52,7 @@ export const CourseCard = ({ course }: CourseCardProps) => {
           {course.color && (
             <div className="course-card-accent" style={{ background: course.color }} />
           )}
-          <img src={courseThumbnail(course.title)} alt={course.title} />
+          <img src={course.image_url ?? courseThumbnail(course.title)} alt={course.title} />
         </div>
         <div className="course-card-body">
           <h3 className="course-card-title">

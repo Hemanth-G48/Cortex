@@ -11,4 +11,62 @@ dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "httpx>=0.27",
+    "import-linter>=2.0",
 ]
+
+# ---------------------------------------------------------------------------
+# Import-linter boundary enforcement (F9)
+# ---------------------------------------------------------------------------
+# Run from ``backend/``:  lint-imports --config ../pyproject.toml
+# These contracts enforce the architectural layering:
+#   models ← services ← routers  (correct direction, no reverse imports)
+# See: https://import-linter.readthedocs.io/
+
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "Models must not import services"
+type = "forbidden"
+source_modules = ["app.models"]
+forbidden_modules = ["app.services"]
+
+[[tool.importlinter.contracts]]
+name = "Models must not import routers"
+type = "forbidden"
+source_modules = ["app.models"]
+forbidden_modules = ["app.routers"]
+
+[[tool.importlinter.contracts]]
+name = "Routers must not import other routers"
+type = "forbidden"
+source_modules = ["app.routers"]
+forbidden_modules = ["app.routers.*"]
+# Same-package imports (e.g. app.routers.kb_graph importing app.routers.kb_edges)
+# would be flagged by the wildcard; overlapping pairs are skipped by design.
+
+[[tool.importlinter.contracts]]
+name = "Frontend pages must not import backend internals (documented; enforced via lint)"
+type = "forbidden"
+source_modules = ["app.routers"]
+forbidden_modules = ["app.main"]
+
+# ---------------------------------------------------------------------------
+# Pytest configuration
+# ---------------------------------------------------------------------------
+# From the repo root:      pytest              → fast suite (live tests deselected)
+#                          pytest -m live      → only live tests
+#                          pytest -m "not live" → same as default
+# From backend/:           pytest tests/       → same behavior (rootdir resolves here)
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]
+markers = [
+    "live: tests that need external services or network (spawn uvicorn, hit PortSwigger/real LLM providers). Run with: pytest -m live",
+]
+addopts = "-m 'not live'"
+
+[tool.importlinter.third-party]
+# Treat third-party packages as external — don't check their internals.
+ignore = ["fastapi", "sqlalchemy", "pydantic", "httpx", "uvicorn"]

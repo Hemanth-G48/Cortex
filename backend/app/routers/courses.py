@@ -58,6 +58,10 @@ def _attach_progress(db: Session, courses: list[Course]) -> list[Course]:
         total = total_by_course.get(course.id, 0)
         done = done_by_course.get(course.id, 0)
         course.progress_percentage = round(done / total * 100, 1) if total > 0 else 0.0
+        # Audit defect #79: counters are derived from the Assignment table on
+        # every read instead of trusting the stored (possibly stale) columns.
+        course.total_assignments = total
+        course.current_assignment = done
     return courses
 
 

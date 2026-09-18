@@ -23,6 +23,10 @@ export const Sidebar = () => {
   const [summary, setSummary] = useState<VaultSummary | null>(null);
   const [stats, setStats] = useState<HabitStat[]>([]);
   const [streakGraph, setStreakGraph] = useState<{ date: string; streak_length: number }[]>([]);
+  // Defect #97 fix: poll vault jobs + health audit so the sidebar bell
+  // reflects running/failed reindex jobs and new health flags without reload.
+  const [jobCount, setJobCount] = useState(0);
+  const [healthScore, setHealthScore] = useState<number | null>(null);
 
   useEffect(() => {
     endpoints.vault.summary().then(setSummary).catch(() => {});
@@ -43,6 +47,27 @@ export const Sidebar = () => {
         ),
       ).then(setStats).catch(() => {});
     }).catch(() => {});
+
+    // Initial load of jobs + health.
+    Promise.all([
+      endpoints.kb.jobs.list().then((j) => j.items.filter((x) => x.status === 'queued' || x.status === 'running').length),
+      endpoints.kb.health().then((h) => h.score).catch(() => null),
+    ]).then(([jobs, health]) => {
+      setJobCount(jobs);
+      setHealthScore(health);
+    }).catch(() => {});
+
+    // Poll every 60s so the bell stays live.
+    const t = window.setInterval(() => {
+      Promise.all([
+        endpoints.kb.jobs.list().then((j) => j.items.filter((x) => x.status === 'queued' || x.status === 'running').length).catch(() => 0),
+        endpoints.kb.health().then((h) => h.score).catch(() => null),
+      ]).then(([jobs, health]) => {
+        setJobCount(jobs);
+        setHealthScore(health);
+      }).catch(() => {});
+    }, 60_000);
+    return () => window.clearInterval(t);
   }, []);
 
   return (
@@ -65,6 +90,18 @@ export const Sidebar = () => {
           />
         )}
         {stats.length > 0 && <HabitStatistics stats={stats} />}
+        {jobCount > 0 && (
+          <div className="sidebar-widget" style={{ padding: '0.5rem 0.75rem', background: 'var(--warning-muted)', color: 'var(--warning)', borderRadius: 6, fontSize: '0.72rem', fontWeight: 600 }}
+            title="Active vault jobs (reindex / scan / health audit)">
+            ⚙️ {jobCount} vault job{jobCount !== 1 ? 's' : ''} running
+          </div>
+        )}
+        {healthScore != null && healthScore < 45 && (
+          <div className="sidebar-widget" style={{ padding: '0.5rem 0.75rem', background: 'var(--danger-muted)', color: 'var(--danger)', borderRadius: 6, fontSize: '0.72rem', fontWeight: 600 }}
+            title="Vault health audit score below 45 — consider running a rescan">
+            🩺 Vault health {Math.round(healthScore)}/100
+          </div>
+        )}
         <GoalTracker />
         <QuickActions />
         <ProgressBars />

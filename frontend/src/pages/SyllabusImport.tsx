@@ -28,6 +28,8 @@ export const SyllabusImport = () => {
   const [reviewCredits, setReviewCredits] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
+  // Defect #74: pending vault links proposed after the subject is confirmed.
+  const [linkedCount, setLinkedCount] = useState<number | null>(null);
 
   // Legacy assignment-extraction state
   const [extracted, setExtracted] = useState<AISyllabusAssignment[]>([]);
@@ -93,6 +95,13 @@ export const SyllabusImport = () => {
         credits,
       });
       setProfile(res.profile);
+      // Defect #74: straight after confirming, match the extracted topics
+      // against the vault (POST /api/kb/links/auto) and surface how many links
+      // are awaiting review. Best-effort — confirmation already succeeded.
+      endpoints.kb.links
+        .auto()
+        .then((r) => setLinkedCount(r.queue.length))
+        .catch(() => setLinkedCount(null));
     } catch (e) {
       setConfirmError(e instanceof Error ? e.message : 'Could not confirm the subject.');
     }
@@ -316,14 +325,23 @@ export const SyllabusImport = () => {
             )}
 
             {profile.status === 'confirmed' && (
-              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                <Link className="btn btn-primary btn-sm" to={`/subjects/profiles/${profile.id}`}>
-                  Open Subject Workspace →
-                </Link>
-                <Link className="btn btn-sm" to="/subjects">
-                  View All Subjects
-                </Link>
-              </div>
+              <>
+                {/* Defect #74: the auto-link pass ran against the vault. */}
+                {linkedCount !== null && (
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                    🔗 {linkedCount} vault link{linkedCount === 1 ? '' : 's'} proposed from this syllabus —
+                    review them in the Knowledge Base.
+                  </p>
+                )}
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <Link className="btn btn-primary btn-sm" to={`/subjects/profiles/${profile.id}`}>
+                    Open Subject Workspace →
+                  </Link>
+                  <Link className="btn btn-sm" to="/subjects">
+                    View All Subjects
+                  </Link>
+                </div>
+              </>
             )}
 
             {profile.status === 'rejected' && (

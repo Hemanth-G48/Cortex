@@ -5,6 +5,7 @@ import { GapCard, GapPathPhaseView, LevelBadge } from '../components/kb/GapAnaly
 import { useGapNote } from '../hooks/useGapNote';
 import { endpoints } from '../services/api';
 import type { KbDomainDetail, KbDomainGapsResponse, KbDomainNode } from '../services/api';
+import type { KbHealth } from '../services/api';
 
 const formatTime = (iso?: string | null) => {
   if (!iso) return 'never';
@@ -52,6 +53,7 @@ export const DomainDetail = () => {
   const [gapsLoading, setGapsLoading] = useState(false);
   const [gapsError, setGapsError] = useState<string | null>(null);
   const [openGap, setOpenGap] = useState<string | null>(null);
+  const [staleIds, setStaleIds] = useState<number[]>([]);
   const { noteBusy, noteError, createNote, clearNoteError } = useGapNote();
 
   const folderId = Number(domainId);
@@ -64,6 +66,11 @@ export const DomainDetail = () => {
     try {
       const data = await endpoints.kb.folders.get(folderId);
       setDomain(data);
+      // Health: badge stale/outdated documents in the list (defect #95).
+      try {
+        const h = await endpoints.kb.health() as KbHealth;
+        setStaleIds(h.signals.stale_notes.document_ids);
+      } catch { /* health endpoint optional */ }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -359,6 +366,9 @@ export const DomainDetail = () => {
                           {doc.char_count > 0 && <span>{doc.char_count.toLocaleString()} chars</span>}
                           {doc.reading_time_seconds && <span>⏱ {formatDuration(doc.reading_time_seconds)}</span>}
                           {doc.quality_score != null && <span>⭐ {Math.round(doc.quality_score * 100)}%</span>}
+                          {staleIds.includes(doc.id) && (
+                            <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }}>⚠ stale</span>
+                          )}
                         </div>
                       </div>
                       <div className="document-expand-icon">↗</div>

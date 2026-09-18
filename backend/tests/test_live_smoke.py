@@ -43,10 +43,16 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 _SKIP = os.environ.get("SKIP_LIVE_SMOKE", "").lower() in ("1", "true", "yes")
 _HEALTH_TIMEOUT = float(os.environ.get("LIVE_SMOKE_TIMEOUT", "120"))
 
-pytestmark = pytest.mark.skipif(
-    _SKIP,
-    reason="set SKIP_LIVE_SMOKE=1 to skip the live uvicorn smoke test",
-)
+# Live marker: spawns a real uvicorn subprocess (audit T2). Excluded from the
+# default fast suite via ``-m "not live"`` in pyproject.toml; run explicitly
+# with ``pytest -m live``.
+pytestmark = [
+    pytest.mark.live,
+    pytest.mark.skipif(
+        _SKIP,
+        reason="set SKIP_LIVE_SMOKE=1 to skip the live uvicorn smoke test",
+    ),
+]
 
 
 class _PortBusy(RuntimeError):

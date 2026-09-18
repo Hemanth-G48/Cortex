@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { endpoints } from '../../services/api';
 import type { Task } from '../../services/api';
 import { relativeDate, getPriorityColor } from '../../utils/formatters';
+import { confirmDelete } from '../../utils/confirm';
 
 interface TaskListProps {
   tasks: Task[];
@@ -40,6 +41,14 @@ export const TaskList = ({ tasks, onRefresh }: TaskListProps) => {
     const newStatus = task.status === 'Completed' ? 'Not started' : 'Completed';
     try {
       await endpoints.tasks.update(task.id, { status: newStatus });
+      // Defect #66: completing a task is echoed into today's vault daily note
+      // (POST /api/kb/daily-notes/complete-task). Best-effort — a vault with no
+      // reachable daily-life folder must not block the toggle.
+      if (newStatus === 'Completed') {
+        endpoints.kb.dailyNotes
+          .completeTask({ title: task.title, task_id: task.id, source: 'task-list' })
+          .catch(() => {});
+      }
       onRefresh();
     } catch { /* ignore */ }
   };
@@ -154,7 +163,7 @@ const TaskRow = ({ task, onToggle, onRefresh }: TaskRowProps) => (
       </span>
     )}
     <button
-      onClick={(e) => { e.preventDefault(); endpoints.tasks.delete(task.id).then(onRefresh); }}
+      onClick={(e) => { e.preventDefault(); if (confirmDelete('this task')) endpoints.tasks.delete(task.id).then(onRefresh); }}
       style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.75rem', opacity: 0.6 }}
       title="Delete"
     >✕</button>

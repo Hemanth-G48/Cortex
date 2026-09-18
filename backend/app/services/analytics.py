@@ -9,12 +9,46 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models import Assignment, Course, CourseWeight, Grade, PomodoroSession, User
+from app.models import (
+    Assignment,
+    Course,
+    CourseWeight,
+    Grade,
+    MicroSession,
+    PomodoroSession,
+    User,
+)
 from app.services import grade_calc
 
 
 def _completed_focus(pomos: list[PomodoroSession]) -> list[PomodoroSession]:
     return [p for p in pomos if p.completed]
+
+
+def focus_minutes_by_day(db: Session) -> dict[str, int]:
+    """Completed focus minutes per ISO date from EVERY focus source.
+
+    Pomodoro timers and the vault's own micro-sessions (``POST
+    /api/kb/sessions/start`` → ``/complete``) both count as focused work, so the
+    analytics bars/heatmap reflect real study time instead of only the pomodoro
+    table (audit defect #69).
+    """
+    by_date: dict[str, int] = {}
+    for p in _completed_focus(db.query(PomodoroSession).all()):
+        if p.start_time is None:
+            continue
+        key = p.start_time.date().isoformat()
+        by_date[key] = by_date.get(key, 0) + (p.duration_minutes or 0)
+
+    sessions = (
+        db.query(MicroSession)
+        .filter(MicroSession.status == "done", MicroSession.completed_at.isnot(None))
+        .all()
+    )
+    for s in sessions:
+        key = s.completed_at.date().isoformat()
+        by_date[key] = by_date.get(key, 0) + (s.duration_mins or 0)
+    return by_date
 
 
 def analytics_summary(db: Session) -> dict:
@@ -30,6 +64,20 @@ def analytics_summary(db: Session) -> dict:
         for p in pomos
         if p.start_time is not None and p.start_time >= week_ago
     )
+    # Audit defect #69: vault micro-sessions are focused work too.
+    micro_sessions = (
+        db.query(MicroSession)
+        .filter(MicroSession.status == "done", MicroSession.completed_at.isnot(None))
+        .all()
+    )
+    micro_total = sum((s.duration_mins or 0) for s in micro_sessions)
+    micro_week = sum(
+        (s.duration_mins or 0)
+        for s in micro_sessions
+        if s.completed_at is not None and s.completed_at >= week_ago
+    )
+    total_focus_minutes += micro_total
+    weekly_focus_minutes += micro_week
 
     completed_count = sum(1 for a in assignments if a.status == "Completed")
     completion_rate = round(completed_count / len(assignments) * 100, 1) if assignments else 0.0
@@ -51,9 +99,8 @@ def analytics_summary(db: Session) -> dict:
 
 def weekly_focus(db: Session, weeks: int = 8) -> list[dict]:
     """Focus minutes per ISO week for the last ``weeks`` weeks (for the bars)."""
-    pomos = _completed_focus(db.query(PomodoroSession).all())
+    by_date = focus_minutes_by_day(db)
     today = date.today()
-    start_iso = today.isocalendar()
 
     buckets: list[dict] = []
     for offset in range(weeks - 1, -1, -1):
@@ -62,27 +109,19 @@ def weekly_focus(db: Session, weeks: int = 8) -> list[dict]:
         label = f"{monday.isoformat()}"
         buckets.append({"week": monday.isoformat(), "label": label, "minutes": 0})
 
-    for p in pomos:
-        if p.start_time is None:
-            continue
-        d = p.start_time.date()
-        monday = d - timedelta(days=d.weekday())
-        for bucket in buckets:
-            if bucket["week"] == monday.isoformat():
-                bucket["minutes"] += p.duration_minutes or 0
-                break
+    index = {bucket["week"]: bucket for bucket in buckets}
+    for key, minutes in by_date.items():
+        d = date.fromisoformat(key)
+        monday = (d - timedelta(days=d.weekday())).isoformat()
+        bucket = index.get(monday)
+        if bucket is not None:
+            bucket["minutes"] += minutes
     return buckets
 
 
 def focus_heatmap(db: Session, weeks: int = 52) -> list[dict]:
     """Per-day focus minutes for the last ``weeks``*7 days (GitHub-style)."""
-    pomos = _completed_focus(db.query(PomodoroSession).all())
-    by_date: dict[str, int] = {}
-    for p in pomos:
-        if p.start_time is None:
-            continue
-        key = p.start_time.date().isoformat()
-        by_date[key] = by_date.get(key, 0) + (p.duration_minutes or 0)
+    by_date = focus_minutes_by_day(db)
 
     today = date.today()
     days: list[dict] = []

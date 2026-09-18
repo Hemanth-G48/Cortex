@@ -18,6 +18,7 @@ from app.schemas.curriculum import (
     CurriculumCreate,
     CurriculumResponse,
 )
+from app.services.curriculum import semester_label
 from app.services.users import current_user
 
 router = APIRouter(prefix="/api/curriculum", tags=["curriculum"])
@@ -72,6 +73,17 @@ def get_program(program_id: int, db: Session = Depends(get_db)):
 # Public: Subjects under a program
 # ---------------------------------------------------------------------------
 
+def _with_semester_label(subject: CurriculumSubject) -> SubjectResponse:
+    """Serialize a subject with its display-ready semester label (defect #9).
+
+    The label is resolved here so every consumer (Browse, Dashboard curriculum)
+    renders exactly what the backend computed instead of building the string
+    from the raw integer.
+    """
+    payload = SubjectResponse.model_validate(subject)
+    payload.semester_label = semester_label(subject.semester, subject.semester_label)
+    return payload
+
 @router.get("/programs/{program_id}/subjects", response_model=List[SubjectResponse])
 def list_program_subjects(program_id: int, db: Session = Depends(get_db)):
     program = db.query(CurriculumCourse).filter(CurriculumCourse.id == program_id).first()
@@ -91,7 +103,7 @@ def list_program_subjects(program_id: int, db: Session = Depends(get_db)):
             .count()
         )
         subj.unit_count = unit_count
-        result.append(subj)
+        result.append(_with_semester_label(subj))
     return result
 
 
@@ -105,7 +117,7 @@ def get_subject(subject_id: int, db: Session = Depends(get_db)):
         .filter(CurriculumUnit.subject_id == subject_id)
         .count()
     )
-    return subject
+    return _with_semester_label(subject)
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +228,7 @@ def create_program_subject(
     db.commit()
     db.refresh(subject)
     subject.unit_count = 0
-    return subject
+    return _with_semester_label(subject)
 
 
 # ---------------------------------------------------------------------------

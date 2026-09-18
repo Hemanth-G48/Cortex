@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -33,13 +33,28 @@ from app.models import (
     KbTag,
 )
 
+# ---------------------------------------------------------------------------
+# Imported from ``kb/metadata/frontmatter.py`` (extracted — F4).
+# Keep the originals here as fallbacks during the migration; they delegate.
+# ---------------------------------------------------------------------------
+from app.services.kb.metadata.frontmatter import (
+    _normalize_status as _normalize_status,
+    _normalize_color as _normalize_color,
+    _meta_description as _meta_description,
+    _STATUS_MAP as _STATUS_MAP,
+    _NAMED_COLORS as _NAMED_COLORS,
+    _DESCRIPTION_KEYS as _DESCRIPTION_KEYS,
+    _STATUS_KEYS as _STATUS_KEYS,
+    _COLOR_KEYS as _COLOR_KEYS,
+)
+
 # Fallback resource cards (mirrors frontend AcademicResourcesGrid defaults) used
 # when there is nothing to derive yet, so the grid never renders empty.
 _DEFAULT_RESOURCES: list[dict[str, str]] = [
-    {"id": "lib", "title": "Library Portal", "type": "link", "url": "#", "description": "Access journals and books"},
-    {"id": "scholar", "title": "Google Scholar", "type": "link", "url": "#", "description": "Research papers & citations"},
-    {"id": "drive", "title": "Course Drive", "type": "link", "url": "#", "description": "Shared lecture materials"},
-    {"id": "github", "title": "Code Repos", "type": "code", "url": "#", "description": "Project templates & examples"},
+    {"id": "lib", "title": "Library Portal", "type": "link", "doc_type": "link", "url": "#", "description": "Access journals and books"},
+    {"id": "scholar", "title": "Google Scholar", "type": "link", "doc_type": "link", "url": "#", "description": "Research papers & citations"},
+    {"id": "drive", "title": "Course Drive", "type": "link", "doc_type": "link", "url": "#", "description": "Shared lecture materials"},
+    {"id": "github", "title": "Code Repos", "type": "code", "doc_type": "code", "url": "#", "description": "Project templates & examples"},
 ]
 
 
@@ -128,80 +143,8 @@ def _folder_title(folder: str) -> str:
     return title[:200] or folder
 
 
-# Folder-level metadata: a folder may carry an ``index.md`` (or ``_index.md``)
-# whose YAML frontmatter drives the *derived subject's* description, status and
-# color. Anything not recognised falls back to the folder-derivation defaults
-# (status ``In progress``, no description/color).
-_STATUS_MAP = {
-    "not started": "Not started",
-    "todo": "Not started",
-    "planned": "Not started",
-    "planning": "Not started",
-    "backlog": "Not started",
-    "in progress": "In progress",
-    "active": "In progress",
-    "ongoing": "In progress",
-    "wip": "In progress",
-    "doing": "In progress",
-    "completed": "Completed",
-    "complete": "Completed",
-    "done": "Completed",
-    "finished": "Completed",
-    "archive": "Completed",
-    "archived": "Completed",
-}
-
-# Named colors the frontend can consume directly as CSS color values (the
-# Tailwind-ish palette used across the app's badges/chips).
-_NAMED_COLORS = {
-    "red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal",
-    "cyan", "sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink",
-    "rose", "slate", "gray", "grey", "zinc", "neutral", "stone",
-}
-
-# Optional keys tried (in order) when looking up a metadata field, so common
-# Obsidian frontmatter naming variants all work.
-_DESCRIPTION_KEYS = ("description", "summary", "subtitle", "about")
-_STATUS_KEYS = ("status", "state")
-_COLOR_KEYS = ("color", "colour", "accent")
-
-
-def _normalize_status(value: Any) -> str:
-    """Map arbitrary frontmatter status text onto the app's three statuses.
-
-    Unknown values (and missing frontmatter) fall back to the folder
-    derivation default (``In progress``).
-    """
-    if isinstance(value, str):
-        key = value.strip().lower()
-        if key in _STATUS_MAP:
-            return _STATUS_MAP[key]
-    return "In progress"
-
-
-def _normalize_color(value: Any) -> str | None:
-    """Accept a hex color (``#abc`` / ``#aabbcc`` / ``#aabbccdd``) or a named
-    CSS color; anything else is ignored so junk frontmatter can't leak into the
-    UI as an invalid inline style."""
-    if not isinstance(value, str):
-        return None
-    color = value.strip()
-    if not color:
-        return None
-    if color.lower() in _NAMED_COLORS:
-        return color.lower()
-    if re.fullmatch(r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?(?:[0-9a-fA-F]{2})?", color):
-        return color.lower()
-    return None
-
-
-def _meta_description(meta: dict[str, Any]) -> str | None:
-    """First non-empty string among the description-ish frontmatter keys."""
-    for key in _DESCRIPTION_KEYS:
-        value = meta.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()[:2000]
-    return None
+# (Frontmatter helpers moved to ``app/services/kb/metadata/frontmatter.py``
+# — imported above. This file no longer defines them inline.)
 
 
 def _like_escape(text: str) -> str:
@@ -597,6 +540,31 @@ def list_course_resources(db: Session, user_id: int) -> list[dict[str, Any]]:
     """
     resources: list[dict[str, Any]] = []
 
+    # Audit defect #26: the card icon is driven by the authoritative document
+    # type (``KbDocument.doc_type``, set from the real file at scan time)
+    # instead of a synthetic card kind. Each source reports the doc_type most
+    # of its indexable documents actually have.
+    dominant_types: dict[int, str] = {}
+    type_rows = (
+        db.query(
+            KbDocument.source_id,
+            KbDocument.doc_type,
+            func.count(KbDocument.id),
+        )
+        .filter(
+            KbDocument.user_id == user_id,
+            KbDocument.source_id.isnot(None),
+            KbDocument.status != "deleted",
+        )
+        .group_by(KbDocument.source_id, KbDocument.doc_type)
+        .all()
+    )
+    counts_by_source: dict[int, Counter[str]] = {}
+    for source_id, doc_type, count in type_rows:
+        counts_by_source.setdefault(source_id, Counter())[doc_type or "md"] += count
+    for source_id, counter in counts_by_source.items():
+        dominant_types[source_id] = counter.most_common(1)[0][0]
+
     for src in (
         db.query(KbSource)
         .filter(KbSource.user_id == user_id, KbSource.enabled.is_(True))
@@ -607,6 +575,9 @@ def list_course_resources(db: Session, user_id: int) -> list[dict[str, Any]]:
             "id": f"sb-{src.id}",
             "title": src.name,
             "type": "folder",
+            # Authoritative type of what the source holds (falls back to
+            # "folder" when it has no indexed documents yet).
+            "doc_type": dominant_types.get(src.id) or "folder",
             "url": src.root_path,
             "description": f"{src.source_type} source",
         })
@@ -625,6 +596,7 @@ def list_course_resources(db: Session, user_id: int) -> list[dict[str, Any]]:
             "id": f"gc-{course.google_id}",
             "title": course.title,
             "type": "classroom",
+            "doc_type": "classroom",
             "url": course.classroom_url,
             "description": "Google Classroom",
         })

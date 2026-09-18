@@ -99,7 +99,33 @@ def get_or_compute(db: Session, doc: KbDocument, force: bool = False) -> dict:
 
 
 def recompute_for_document(db: Session, doc: KbDocument) -> int:
-    """Ingest-stage recompute (content changed → cache is stale). Best-effort."""
+    """Ingest-stage recompute (content changed → cache is stale). Best-effort.
+
+    Also self-registers as a post-ingest hook so pipeline.py doesn't hardcode
+    this module.
+    """
+    register_hook_once()
+    return _quality_hook(db, doc)
+
+
+_hook_registered = False
+
+
+def register_hook_once() -> None:
+    """Self-register as a post-ingest hook (idempotent, best-effort)."""
+    global _hook_registered
+    if _hook_registered:
+        return
+    try:
+        from app.services.kb.pipeline import register_post_ingest
+        register_post_ingest("quality.recompute_for_document", _quality_hook)
+        _hook_registered = True
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _quality_hook(db: Session, doc: KbDocument) -> int:
+    """Post-ingest hook: recompute quality score for the document."""
     try:
         result = compute_quality(db, doc)
         doc.quality_score = result["score"]

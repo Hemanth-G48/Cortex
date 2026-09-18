@@ -22,6 +22,8 @@ VALID_EXPLANATION_STYLE = ("plain", "analogy", "formal")
 
 # Maximum reasonable session length (minutes) — beyond this clamps.
 MAX_SESSION_MINS = 480
+# Pomodoro break length ceiling (minutes).
+MAX_BREAK_MINS = 60
 
 
 def defaults() -> dict:
@@ -30,6 +32,7 @@ def defaults() -> dict:
         "examples_vs_theory": 0.5,
         "style": "concise",
         "session_length_mins": 30,
+        "pomodoro_break_mins": 5,
         "explanation_style": "plain",
         "onboarding_completed": False,
     }
@@ -41,6 +44,7 @@ def _row_to_dict(row: UserPreference) -> dict:
         "examples_vs_theory": round(row.examples_vs_theory if row.examples_vs_theory is not None else 0.5, 4),
         "style": row.style or "concise",
         "session_length_mins": row.session_length_mins or 30,
+        "pomodoro_break_mins": row.pomodoro_break_mins or 5,
         "explanation_style": row.explanation_style or "plain",
         "onboarding_completed": bool(row.onboarding_completed),
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
@@ -68,6 +72,9 @@ def _sanitize(data: dict) -> dict:
     mins = data.get("session_length_mins")
     if mins is not None:
         out["session_length_mins"] = max(1, min(MAX_SESSION_MINS, int(mins)))
+    brk = data.get("pomodoro_break_mins")
+    if brk is not None:
+        out["pomodoro_break_mins"] = max(1, min(MAX_BREAK_MINS, int(brk)))
     ob = data.get("onboarding_completed")
     if ob is not None:
         out["onboarding_completed"] = bool(ob)
@@ -90,6 +97,7 @@ def upsert_preferences(db: Session, user_id: int, data: dict) -> dict:
     row.examples_vs_theory = clean["examples_vs_theory"]
     row.style = clean["style"]
     row.session_length_mins = clean["session_length_mins"]
+    row.pomodoro_break_mins = clean["pomodoro_break_mins"]
     row.explanation_style = clean["explanation_style"]
     row.onboarding_completed = clean["onboarding_completed"]
     row.updated_at = utcnow()

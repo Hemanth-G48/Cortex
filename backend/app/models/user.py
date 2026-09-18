@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Float, Date
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Float, Date, Text
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -36,6 +36,10 @@ class User(Base):
     # Enrollment binding (Phase 13)
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
     program_id = Column(Integer, ForeignKey("curriculum_courses.id"), nullable=True)
+
+    # Audit defect #96: JSON client preferences (AI model choice, etc.)
+    # persisted server-side; single source of truth across devices.
+    prefs_json = Column(Text, nullable=True)
 
     # Phase 5 (Idea 49, phrase 83): per-user pacing multiplier for time
     # estimates (default 1.0; learning_events will tune it later).

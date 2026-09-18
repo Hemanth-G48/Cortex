@@ -17,6 +17,12 @@ class Habit(Base):
     is_archived = Column(Boolean, default=False)
     user_id = Column(Integer, ForeignKey("users.id"))
 
+    # Audit defect #49: why the habit was archived + (optionally) the vault
+    # document that triggered an automatic archive, so the Archive page can
+    # explain the state instead of showing a bare "Archived" chip.
+    archived_reason = Column(String(300), nullable=True)
+    archived_document_id = Column(Integer, ForeignKey("kb_documents.id"), nullable=True)
+
     # Gamified Habit Tracker fields (99-phase plan, Phases 1-3)
     habit_type = Column(String(20), default="good")  # good / bad
     xp_reward = Column(Integer, default=30)

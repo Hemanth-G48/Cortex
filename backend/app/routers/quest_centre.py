@@ -9,9 +9,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from sqlalchemy import func
+
 from app.database import get_db
-from app.models import LifeArea, ScheduleEvent, User
+from app.models import Character, LifeArea, Mission, Quest, ScheduleEvent, User
 from app.services.quest_centre import (
+    DONE_STATUSES as QUEST_DONE_STATUSES,
     group_by_priority,
     progress_report,
     quests_by_date,
@@ -108,6 +111,57 @@ def get_quest_centre_calendar(db: Session = Depends(get_db)):
             }
             for e in events
         ],
+    }
+
+
+@router.get("/quest-centre/board")
+def get_board(db: Session = Depends(get_db)):
+    """Authoritative quest/mission counts for the Quests & Missions pages.
+
+    Audit defects #87, #88: the tabs and stat tiles count rows in the database
+    (per status, plus XP totals from the same character wallet the rest of the
+    app uses) instead of re-deriving them client-side from a partial list.
+    """
+    quest_counts = dict(
+        db.query(Quest.status, func.count(Quest.id)).group_by(Quest.status).all()
+    )
+    mission_counts = dict(
+        db.query(Mission.status, func.count(Mission.id)).group_by(Mission.status).all()
+    )
+    done = ", ".join(sorted(QUEST_DONE_STATUSES))
+    quests_total = sum(quest_counts.values())
+    missions_total = sum(mission_counts.values())
+    return {
+        "quests": {
+            "total": quests_total,
+            "by_status": quest_counts,
+            "completed": sum(v for k, v in quest_counts.items() if k in QUEST_DONE_STATUSES),
+            "open": quests_total - sum(v for k, v in quest_counts.items() if k in QUEST_DONE_STATUSES),
+            "done_statuses": done,
+        },
+        "missions": {
+            "total": missions_total,
+            "by_status": mission_counts,
+            "completed": sum(v for k, v in mission_counts.items() if k in QUEST_DONE_STATUSES),
+            "open": missions_total - sum(v for k, v in mission_counts.items() if k in QUEST_DONE_STATUSES),
+            "done_statuses": done,
+        },
+        "characters": _character_xp_totals(db),
+    }
+
+
+def _character_xp_totals(db: Session) -> dict:
+    """Shared XP wallet (character row, else the user row) — defect #87."""
+    character = db.query(Character).order_by(Character.id).first()
+    user = db.query(User)
+    if character is not None:
+        user = user.filter(User.id == character.user_id)
+    else:
+        user = user.order_by(User.id)
+    user = user.first()
+    return {
+        "total_xp": character.xp if character is not None else (user.total_xp if user else 0),
+        "level": character.level if character is not None else (user.current_level if user else 1),
     }
 
 

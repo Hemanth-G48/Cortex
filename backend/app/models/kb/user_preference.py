@@ -26,6 +26,9 @@ class UserPreference(Base):
     # concise | detailed
     style = Column(String(20), default="concise")
     session_length_mins = Column(Integer, default=30)
+    # Audit defect #58: the pomodoro timer's break length, persisted per user so
+    # the Focus page hydrates the user's own durations instead of defaults.
+    pomodoro_break_mins = Column(Integer, default=5)
     # plain | analogy | formal
     explanation_style = Column(String(20), default="plain")
     onboarding_completed = Column(Boolean, default=False)

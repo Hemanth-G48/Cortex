@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models import LearningEvent, Topic
+from app.models import CurriculumSubject, LearningEvent, Topic
 from app.services.kb import utcnow
 
 # Classification thresholds (phrase 73).
@@ -177,6 +177,178 @@ def quiz_trend(db: Session, user_id: int, topic_ids: list[int]) -> list[dict]:
         {"date": day, "accuracy": round(sum(v) / len(v), 3)}
         for day, v in sorted(acc.items())
     ]
+
+
+# ---------------------------------------------------------------------------
+# Mastery read model (audit defects #40, #71, #76, #82, #96)
+# ---------------------------------------------------------------------------
+
+#: Default window for the mastery sparkline.
+TREND_DAYS = 90
+
+
+def _topic_query(db: Session, user_id: int):
+    """Confirmed/merged topics only — rejected rows are not study surface."""
+    return db.query(Topic).filter(
+        Topic.user_id == user_id,
+        Topic.status != "rejected",
+    )
+
+
+def resolve_subject_id(
+    db: Session, user_id: int, subject: int | None, subject_name: str | None
+) -> int | None:
+    """Resolve the optional subject filter to a curriculum subject id.
+
+    ``subject`` is a ``curriculum_subjects.id``. ``subject_name`` matches the
+    subject's name (case-insensitive) so callers that only know a course title
+    (e.g. a gap-analysis domain or a book's topic) can still aggregate.
+    """
+    if subject is not None:
+        return subject
+    name = (subject_name or "").strip()
+    if not name:
+        return None
+    row = (
+        db.query(CurriculumSubject)
+        .filter(CurriculumSubject.name.ilike(name))
+        .first()
+    )
+    return row.id if row is not None else None
+
+
+def mastery_trend(db: Session, user_id: int, topic_ids: list[int], days: int = TREND_DAYS) -> list[dict]:
+    """Daily running mastery score for a sparkline (defect #40).
+
+    Replays each topic's learning events up to the end of every day in the
+    window, so the trend reflects how the vault's practice actually moved the
+    score — no synthetic series.
+    """
+    if not topic_ids:
+        return []
+    events = subject_events(db, user_id, topic_ids)
+    if not events:
+        return []
+    start = utcnow().date() - timedelta(days=max(1, days))
+    by_topic: dict[int, list[LearningEvent]] = {}
+    for e in events:
+        if e.topic_id is not None:
+            by_topic.setdefault(e.topic_id, []).append(e)
+
+    # One point per *active* day (a day with at least one practice event),
+    # oldest → newest. Idle days add no information to a running score and
+    # would just pad the payload with repeated values.
+    active_days = sorted({
+        (e.created_at or utcnow()).date()
+        for e in events
+        if (e.created_at or utcnow()).date() >= start
+    })
+    trend: list[dict] = []
+    for day in active_days:
+        cutoff = datetime.combine(day, datetime.max.time())
+        scores = []
+        for topic_events_all in by_topic.values():
+            upto = [e for e in topic_events_all if (e.created_at or utcnow()) <= cutoff]
+            if upto:
+                scores.append(_mastery_from_events(upto))
+        if scores:
+            avg = sum(scores) / len(scores)
+            trend.append({
+                "date": day.isoformat(),
+                "score": round(avg, 4),
+                "score_pct": round(avg * 100, 1),
+            })
+    return trend
+
+
+def _overall_classification(score: float, evidence: int) -> str:
+    """Aggregate label for a set of topics (``unknown`` with no evidence)."""
+    if evidence <= 0:
+        return "unknown"
+    return classify(score, evidence)
+
+
+def mastery_payload(
+    db: Session,
+    user_id: int,
+    *,
+    subject: int | None = None,
+    subject_name: str | None = None,
+    days: int = TREND_DAYS,
+) -> dict:
+    """Vault-derived competency for one subject (or the whole vault).
+
+    Scores come from ``LearningEvent`` rows written by every study surface
+    (reviews, sessions, labs, quizzes), so this is the practice-log view of
+    mastery rather than a configured number. Consumed by the Life Planner goal
+    sparkline, the GPA/analytics panels and the RPG stat radar.
+    """
+    resolved = resolve_subject_id(db, user_id, subject, subject_name)
+    query = _topic_query(db, user_id)
+    if subject is not None or (subject_name or "").strip():
+        if resolved is None:
+            # A named subject that does not exist has no vault coverage yet.
+            return {
+                "subject_id": None,
+                "subject_name": subject_name,
+                "topics_total": 0,
+                "topics_mastered": 0,
+                "topics_weak": 0,
+                "topics_unknown": 0,
+                "avg_score": 0.0,
+                "score_pct": 0.0,
+                "classification": "unknown",
+                "coverage_pct": 0.0,
+                "hours_logged": 0.0,
+                "evidence_events": 0,
+                "events": {},
+                "trend": [],
+                "topics": [],
+            }
+        query = query.filter(Topic.subject_id == resolved)
+
+    topics = query.order_by(Topic.id).all()
+    topic_ids = [t.id for t in topics]
+    per_topic = mastery_by_topic(db, user_id, topic_ids)
+    events = subject_events(db, user_id, topic_ids)
+    evidence = len(events)
+    scores = [per_topic[t.id]["score"] for t in topics]
+    avg = round(sum(scores) / len(scores), 4) if scores else 0.0
+    by_type: dict[str, int] = {}
+    for e in events:
+        by_type[e.event_type] = by_type.get(e.event_type, 0) + 1
+
+    subject_row = db.get(CurriculumSubject, resolved) if resolved is not None else None
+
+    return {
+        "subject_id": resolved,
+        "subject_name": subject_row.name if subject_row is not None else subject_name,
+        "topics_total": len(topics),
+        "topics_mastered": sum(1 for m in per_topic.values() if m["classification"] == "strong"),
+        "topics_weak": sum(1 for m in per_topic.values() if m["classification"] == "weak"),
+        "topics_unknown": sum(1 for m in per_topic.values() if m["classification"] == "unknown"),
+        "avg_score": avg,
+        "score_pct": round(avg * 100, 1),
+        "classification": _overall_classification(avg, evidence),
+        "coverage_pct": (
+            round(sum(1 for s in scores if s >= 0.5) / len(scores) * 100, 1) if scores else 0.0
+        ),
+        "hours_logged": hours_logged(db, user_id, topic_ids),
+        "evidence_events": evidence,
+        "events": by_type,
+        "trend": mastery_trend(db, user_id, topic_ids, days=days),
+        "topics": [
+            {
+                "topic_id": t.id,
+                "name": t.name,
+                "score": per_topic[t.id]["score"],
+                "score_pct": round(per_topic[t.id]["score"] * 100, 1),
+                "classification": per_topic[t.id]["classification"],
+                "evidence": per_topic[t.id]["evidence"],
+            }
+            for t in topics
+        ],
+    }
 
 
 def progress_payload(db: Session, user_id: int, topic_ids: list[int]) -> dict:

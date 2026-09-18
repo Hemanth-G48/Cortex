@@ -6,7 +6,9 @@ import { RpgBadge } from '../components/rpg/RpgBadge';
 import { RpgButton } from '../components/rpg/RpgButton';
 import { WeeklyCalendar } from '../components/rpg/WeeklyCalendar';
 import { endpoints } from '../services/api';
-import type { Character, Quest, Mission, Reward, LifeArea, ScheduleEvent } from '../services/api';
+import { useProfile } from '../hooks/useProfile';
+import { areaDocCount } from '../utils/vaultDomains';
+import type { Character, KbDomainSummary, Quest, Mission, Reward, LifeArea, ScheduleEvent } from '../services/api';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -100,10 +102,13 @@ interface Activity {
 // ── Component ──
 
 export const RPGDashboard = () => {
+  const { profile } = useProfile();
   const [char, setChar] = useState<Character | null>(null);
   const [quests, setQuests] = useState<Quest[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [areas, setAreas] = useState<LifeArea[]>([]);
+  // Defect #83 fix: vault domains so each life area can show a doc-count spark.
+  const [domains, setDomains] = useState<KbDomainSummary[]>([]);
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [claimedRewards, setClaimedRewards] = useState<Reward[]>([]);
 
@@ -124,11 +129,14 @@ export const RPGDashboard = () => {
       }
     };
 
+    // Defect #25 fix: character scoped to the owner profile, not hardcoded 1.
+    const userId = profile?.id ?? 1;
     const results = await Promise.all([
-      safe(endpoints.characters.get(1), 'character'),
+      safe(endpoints.characters.get(userId), 'character'),
       safe(endpoints.quests.list(), 'quests'),
       safe(endpoints.missions.list(), 'missions'),
       safe(endpoints.lifeAreas.list(), 'life areas'),
+      safe(endpoints.kb.domains().then((r) => r.domains), 'vault domains'),
       safe(endpoints.schedule.list(), 'schedule'),
       safe(endpoints.rewards.claimed(), 'claimed rewards'),
     ]);
@@ -137,15 +145,16 @@ export const RPGDashboard = () => {
     setQuests(results[1] || []);
     setMissions(results[2] || []);
     setAreas(results[3] || []);
-    setEvents(results[4] || []);
-    setClaimedRewards(results[5] || []);
+    setDomains(results[4] || []);
+    setEvents(results[5] || []);
+    setClaimedRewards(results[6] || []);
     if (errs.length) setErrors(errs);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchAll();
-  }, [fetchAll]);
+  }, [fetchAll, profile?.id]);
 
   // ── Stats ──
   const xpPct = char ? Math.min(100, ((char.xp % 1000) / 1000) * 100) : 0;
@@ -314,17 +323,27 @@ export const RPGDashboard = () => {
                   Set up life areas
                 </Link>
               </div>
-            ) : areas.map((a) => (
+            ) : areas.map((a) => {
+              const docs = areaDocCount(a.name, domains);
+              return (
               <div key={a.id} style={{ marginBottom: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
-                  <span>{a.name}</span>
+                  <span>
+                    {a.name}
+                    {docs !== null && (
+                      <span style={{ color: 'var(--rpg-text-muted)', marginLeft: 6, fontSize: '0.65rem' }} title="Vault documents backing this area">
+                        📚 {docs}
+                      </span>
+                    )}
+                  </span>
                   <span style={{ color: 'var(--rpg-text-muted)' }}>{Math.round(a.progress_percent || 0)}%</span>
                 </div>
                 <div className="rpg-progress-bar">
                   <div className="rpg-progress-fill-green" style={{ width: `${a.progress_percent || 0}%` }} />
                 </div>
               </div>
-            ))}
+              );
+            })}
           </RpgCard>
 
           {/* Weekly Schedule Mini */}

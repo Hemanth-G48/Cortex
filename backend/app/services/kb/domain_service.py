@@ -288,6 +288,29 @@ def domain_tree(db: Session, user_id: int, course_id: int) -> list[dict[str, Any
     return [_node(r) for r in by_parent.get(None, [])]
 
 
+def list_domains(db: Session, user_id: int) -> list[dict[str, Any]]:
+    """Every top-level domain across all courses, with its live document count.
+
+    Audit defect #83: non-study surfaces (the RPG Life-Areas grid, the habit
+    tracker) need one flat domain list they can match by name against their own
+    areas — no course id required. Only ``depth == 1`` folders (top-level
+    domains) are returned so counts stay meaningful.
+    """
+    rows = (
+        db.query(KbFolder)
+        .filter(KbFolder.user_id == user_id, KbFolder.depth == 1)
+        .order_by(KbFolder.name)
+        .all()
+    )
+    return [
+        {
+            **_folder_payload(r),
+            "course_id": r.course_id,
+        }
+        for r in rows
+    ]
+
+
 def domain_detail(db: Session, user_id: int, folder_id: int) -> dict[str, Any] | None:
     """A single domain: folder, breadcrumb, documents, subfolders."""
     folder = (

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Header } from '../components/layout/Header';
+import { confirmDelete } from '../utils/confirm';
 import { endpoints } from '../services/api';
 import type { Course, Note } from '../services/api';
 
@@ -142,6 +143,7 @@ export const Notes = () => {
 
   const remove = async () => {
     if (selectedId === null) return;
+    if (!confirmDelete('this note')) return;
     try {
       await endpoints.notes.delete(selectedId);
       setSelectedId(null);

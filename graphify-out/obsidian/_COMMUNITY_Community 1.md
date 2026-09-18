@@ -1,0 +1,332 @@
+---
+type: community
+cohesion: 0.02
+members: 175
+---
+
+# Community 1
+
+**Cohesion:** 0.02 - loosely connected
+**Members:** 175 nodes
+
+## Members
+- [[AI client facade — provider-agnostic, local-first.  The rest of the application]] - rationale - backend/app/services/ai_client.py
+- [[Assemble a mock paper from the grading scheme + bank (phrases 34–35).]] - rationale - backend/app/services/kb/mocks.py
+- [[Attach document metadata to citation refs for the UI.]] - rationale - backend/app/services/kb/explain.py
+- [[Base_40]] - code
+- [[Base_53]] - code
+- [[Budget-capped contribution extraction (phrase 53) + fallback.]] - rationale - backend/app/services/kb/research.py
+- [[Budget-gated generation + citation verification + deterministic fallback.      `]] - rationale - backend/app/services/kb/explain.py
+- [[Call the active provider and parse the response as JSON. None on failure.]] - rationale - backend/app/services/ai_client.py
+- [[Coerce the LLM output into the strict schema (phrase 12).]] - rationale - backend/app/services/kb/syllabus.py
+- [[Deterministic AI fallback generators.  Every AI feature falls back to these loca]] - rationale - backend/app/services/ai_fallback.py
+- [[Deterministic card candidates (Idea 34, phrase 37).      ``concepts`` is a list]] - rationale - backend/app/services/ai_fallback.py
+- [[Deterministic explanation fallback (Idea 32, phrase 17).      Definition comes f]] - rationale - backend/app/services/ai_fallback.py
+- [[Deterministic fallback reuse the summary's key points (phrase 53).]] - rationale - backend/app/services/kb/research.py
+- [[Deterministic note-quality suggestions (Idea 39, phrase 85 fallback).]] - rationale - backend/app/services/ai_fallback.py
+- [[Deterministic question-bank fallback (Idea 63, phrase 27).      Template MCQs pe]] - rationale - backend/app/services/ai_fallback.py
+- [[Deterministic structured summary fallback (Idea 31, phrase 8).      TL;DR = firs]] - rationale - backend/app/services/ai_fallback.py
+- [[Deterministic subtask fallback (Idea 54, phrase 36) equal split.]] - rationale - backend/app/services/ai_fallback.py
+- [[Deterministic syllabus parser fallback (Idea 42, phrase 15).      Title from the]] - rationale - backend/app/services/ai_fallback.py
+- [[Deterministic topic-grounded weeks fallback (Idea 51, phrase 6).      Equal week]] - rationale - backend/app/services/ai_fallback.py
+- [[Deterministic topic→skill fallback (Idea 70, phrase 94).      Keyword match agai]] - rationale - backend/app/services/ai_fallback.py
+- [[Document summaries (Phase 4, Idea 31).  Cache-then-generate mirroring ``app.serv]] - rationale - backend/app/services/kb/summarize.py
+- [[Expose the Phase 5 parse budget for the UI (phrases 18).]] - rationale - backend/app/services/kb/syllabus.py
+- [[Flashcard candidates from notes (Phase 4, Idea 34).  Candidates are generated fr]] - rationale - backend/app/services/kb/flashcards.py
+- [[Generate 4–6 interview questions (phrases 42, 44).]] - rationale - backend/app/services/kb/interview.py
+- [[Generate a quiz from a vault document and record the provenance link.]] - rationale - backend/app/services/kb/note_quizzes.py
+- [[Generate candidate questions for a topic (phrases 23–24).      Candidates are pe]] - rationale - backend/app/services/kb/questions.py
+- [[Generate pending flashcard candidates for a document (phrase 32).      ``source`]] - rationale - backend/app/services/kb/flashcards.py
+- [[Ground, generate, and verify an explanation of ``concept``.]] - rationale - backend/app/services/kb/explain.py
+- [[Grounded AI explanations (Phase 4 Idea 32, Phase 8 Idea 73).  Pipeline retrieve]] - rationale - backend/app/services/kb/explain.py
+- [[Grounded explanation anchored on known memory + styledepth preferences.      ``]] - rationale - backend/app/services/kb/explain.py
+- [[Grounded explanation that builds on the user's known concepts (Idea 73).      ``]] - rationale - backend/app/services/prompts.py
+- [[Idea 84 — nightly duplicate scan (Phase 9 Automation).  Reuses the Phase 2 near-]] - rationale - backend/app/services/kb/auto_duplicates.py
+- [[Idea 86 — auto-create summaries, scheduled (Phase 9 Automation).  The nightly jo]] - rationale - backend/app/services/kb/auto_summary.py
+- [[Idea 87 — auto-generate mind maps, scheduled (Phase 9 Automation).  The batch jo]] - rationale - backend/app/services/kb/auto_mindmap.py
+- [[Joined, heading-prefixed chunk text — the content source (phrase 6).]] - rationale - backend/app/services/kb/summarize.py
+- [[KbDocument_15]] - code
+- [[KbDocument_26]] - code
+- [[KbGenerationLog]] - code - backend/app/models/kb/generation_log.py
+- [[KbService]] - code - backend/app/services/kb/__init__.py
+- [[LLM (or heuristic) improvement suggestions stored status=pending.]] - rationale - backend/app/services/kb/quality.py
+- [[LLM concept extraction for one chapter (budget-gated). Returns     ``{concept,]] - rationale - backend/app/services/kb/book_gaps.py
+- [[LLM-assisted weekly assignment (phrase 4), budget-capped.]] - rationale - backend/app/services/kb/plans.py
+- [[Lowercase, strip punctuationwhitespace — the dedupe key (phrase 34).]] - rationale - backend/app/services/kb/flashcards.py
+- [[MENTIONS concepts with definitions — used by the fallback generator.]] - rationale - backend/app/services/kb/flashcards.py
+- [[Merge per-chunk parses, deduping units by title and topics by name.]] - rationale - backend/app/services/kb/syllabus.py
+- [[Normalize the LLM response into {summary, key_points, definitions, open_question]] - rationale - backend/app/services/kb/summarize.py
+- [[Normalized question-text hash — the dedupe key (phrase 25).]] - rationale - backend/app/services/kb/questions.py
+- [[Note-generated quizzes (Phase 4, Idea 33).  A content adapter over the existing]] - rationale - backend/app/services/kb/note_quizzes.py
+- [[Note-quality scoring (Phase 4, Idea 39).  A pure, testable composite 0–100 score]] - rationale - backend/app/services/kb/quality.py
+- [[Number the retrieved chunks and return (context_text, titles, chunk refs).]] - rationale - backend/app/services/kb/explain.py
+- [[Parse syllabus text into the strict schema.      Returns ``{parsed {...}, fa]] - rationale - backend/app/services/kb/syllabus.py
+- [[Per-user daily generation meter for Phase 4 features.]] - rationale - backend/app/services/kb/budget.py
+- [[Phase 4 shared generation budget (``KB_DAILY_GEN_LIMIT``).  Every real LLM gener]] - rationale - backend/app/services/kb/budget.py
+- [[Phase 5 syllabus parsing pipeline (Idea 42, phrases 11–20).  Extract → chunk → L]] - rationale - backend/app/services/kb/syllabus.py
+- [[Phase 7 advanced answer grading (Idea 66, phrases 51–60).  Extends the existing]] - rationale - backend/app/services/kb/grading.py
+- [[Phase 7 explain-my-mistake analysis (Idea 68, phrases 71–80).  ``analyze`` compa]] - rationale - backend/app/services/kb/mistakes.py
+- [[Phase 7 interview preparation (Idea 65, phrases 41–50).  ``start`` generates con]] - rationale - backend/app/services/kb/interview.py
+- [[Phase 7 mock tests & exam simulations (Idea 64, phrases 31–40).  ``build_paper``]] - rationale - backend/app/services/kb/mocks.py
+- [[Phase 7 practice-question bank (Idea 63, phrases 21–30).  ``generate_for_topic``]] - rationale - backend/app/services/kb/questions.py
+- [[Phase 7 skill mapping (Idea 70, phrases 91–99).  A versioned taxonomy (``appdat]] - rationale - backend/app/services/kb/skills.py
+- [[PracticeQuestion]] - code - backend/app/models/kb/practice_question.py
+- [[Prompt for a grounded explanation at one of five depths (Idea 32).      The cont]] - rationale - backend/app/services/prompts.py
+- [[Prompt for a reviewable practice-question bank (Idea 63, phrase 23).]] - rationale - backend/app/services/prompts.py
+- [[Prompt for a structured document summary (Idea 31, phrase 5).      Returns stric]] - rationale - backend/app/services/prompts.py
+- [[Prompt for actionable note-improvement suggestions (Idea 39, phrase 85).]] - rationale - backend/app/services/prompts.py
+- [[Prompt for candidate QA pairs from concept-rich chunks (Idea 34).]] - rationale - backend/app/services/prompts.py
+- [[Prompt for deep syllabus parsing (Idea 42, phrase 12).      Strict schema ``{ti]] - rationale - backend/app/services/prompts.py
+- [[Query aggregation helpers shared by the quest-centre router.]] - rationale - backend/app/services/__init__.py
+- [[Questions already covered by candidates or committed cards for this doc.]] - rationale - backend/app/services/kb/flashcards.py
+- [[Quiz_1]] - code
+- [[Record one real LLM generation against the daily cap (best-effort).]] - rationale - backend/app/services/kb/budget.py
+- [[Register a Phase 9 automation job under ``name``.      ``toggle`` and ``cap`` na]] - rationale - backend/app/services/kb/automation.py
+- [[Retrieved vault context for the topic (used by LLM + fallback alike).]] - rationale - backend/app/services/kb/questions.py
+- [[Return a structured summary, generating only on misscontent change.]] - rationale - backend/app/services/kb/summarize.py
+- [[Review queue for the current user (phrase 39).]] - rationale - backend/app/services/kb/flashcards.py
+- [[Rule-based fallback taxonomy keyword hits in topic name + outcomes.]] - rationale - backend/app/services/kb/skills.py
+- [[Section titles from the subject's units (Phase 5 parsed structure).]] - rationale - backend/app/services/kb/mocks.py
+- [[Sectionquestion weight from topic difficulty (E=1, M=2, H=3).]] - rationale - backend/app/services/kb/mocks.py
+- [[Session_138]] - code
+- [[Session_150]] - code
+- [[Session_151]] - code
+- [[Session_183]] - code
+- [[Session_201]] - code
+- [[Split long syllabi at paragraph boundaries near ``size`` characters.]] - rationale - backend/app/services/kb/syllabus.py
+- [[Template questions from outcomes (phrase 27).]] - rationale - backend/app/services/kb/questions.py
+- [[Tests for the AI client contract (Phase 5, Group 1).]] - rationale - backend/tests/test_ai_contract.py
+- [[True when ``amount`` more real generations fit in today's cap.]] - rationale - backend/app/services/kb/budget.py
+- [[User-scoped helper queries for the Knowledge Core.]] - rationale - backend/app/services/kb/__init__.py
+- [[Validate + normalize LLM output into candidate dicts.]] - rationale - backend/app/services/kb/questions.py
+- [[_build_context()]] - code - backend/app/services/kb/explain.py
+- [[_build_questions()]] - code - backend/app/services/kb/interview.py
+- [[_concept_definition()]] - code - backend/app/services/kb/explain.py
+- [[_concepts_for_document()]] - code - backend/app/services/kb/flashcards.py
+- [[_content_hash()]] - code - backend/app/services/kb/summarize.py
+- [[_day_start()]] - code - backend/app/services/kb/budget.py
+- [[_existing_questions()]] - code - backend/app/services/kb/flashcards.py
+- [[_expand_citations()]] - code - backend/app/services/kb/explain.py
+- [[_fallback_candidates()_1]] - code - backend/app/services/kb/questions.py
+- [[_fallback_contributions()]] - code - backend/app/services/kb/research.py
+- [[_generate()]] - code - backend/app/services/kb/explain.py
+- [[_keyword_match()]] - code - backend/app/services/kb/skills.py
+- [[_llm_concepts()]] - code - backend/app/services/kb/book_gaps.py
+- [[_llm_plan()]] - code - backend/app/services/kb/plans.py
+- [[_merge_parses()]] - code - backend/app/services/kb/syllabus.py
+- [[_normalise_parse()]] - code - backend/app/services/kb/syllabus.py
+- [[_normalize_candidates()]] - code - backend/app/services/kb/questions.py
+- [[_normalize_question()]] - code - backend/app/services/kb/flashcards.py
+- [[_owned()_1]] - code - backend/app/services/kb/questions.py
+- [[_parse_summary()]] - code - backend/app/services/kb/summarize.py
+- [[_retrieve()]] - code - backend/app/services/kb/explain.py
+- [[_slice_text()]] - code - backend/app/services/kb/syllabus.py
+- [[_subject_topics()]] - code - backend/app/services/kb/mocks.py
+- [[_topic_chunks()]] - code - backend/app/services/kb/questions.py
+- [[_topic_weight()]] - code - backend/app/services/kb/mocks.py
+- [[_unit_sections()]] - code - backend/app/services/kb/mocks.py
+- [[ai_client.py]] - code - backend/app/services/ai_client.py
+- [[ai_fallback.py]] - code - backend/app/services/ai_fallback.py
+- [[approve_question()_1]] - code - backend/app/services/kb/questions.py
+- [[approved_for_topic()]] - code - backend/app/services/kb/questions.py
+- [[auto_duplicates.py]] - code - backend/app/services/kb/auto_duplicates.py
+- [[auto_job()]] - code - backend/app/services/kb/automation.py
+- [[auto_mindmap.py]] - code - backend/app/services/kb/auto_mindmap.py
+- [[auto_summary.py]] - code - backend/app/services/kb/auto_summary.py
+- [[budget.py]] - code - backend/app/services/kb/budget.py
+- [[budget_allows()_1]] - code - backend/app/services/kb/budget.py
+- [[build_paper()]] - code - backend/app/services/kb/mocks.py
+- [[config.py]] - code - backend/app/config.py
+- [[demo_assignment_subtasks()]] - code - backend/app/services/ai_fallback.py
+- [[demo_explain()]] - code - backend/app/services/ai_fallback.py
+- [[demo_kb_flashcards()]] - code - backend/app/services/ai_fallback.py
+- [[demo_kb_summary()]] - code - backend/app/services/ai_fallback.py
+- [[demo_practice_questions()]] - code - backend/app/services/ai_fallback.py
+- [[demo_quality_suggestions()]] - code - backend/app/services/ai_fallback.py
+- [[demo_skill_mapping()]] - code - backend/app/services/ai_fallback.py
+- [[demo_study_plan_grounded()]] - code - backend/app/services/ai_fallback.py
+- [[demo_syllabus_parse()]] - code - backend/app/services/ai_fallback.py
+- [[document_content()]] - code - backend/app/services/kb/summarize.py
+- [[explain()]] - code - backend/app/services/kb/explain.py
+- [[explain.py]] - code - backend/app/services/kb/explain.py
+- [[explain_personalized()_1]] - code - backend/app/services/kb/explain.py
+- [[explain_prompt()]] - code - backend/app/services/prompts.py
+- [[explain_prompt_personalized()]] - code - backend/app/services/prompts.py
+- [[extract_contributions()]] - code - backend/app/services/kb/research.py
+- [[generate_candidates()]] - code - backend/app/services/kb/flashcards.py
+- [[generate_for_topic()]] - code - backend/app/services/kb/questions.py
+- [[generate_json()]] - code - backend/app/services/ai_client.py
+- [[generate_note_quiz()]] - code - backend/app/services/kb/note_quizzes.py
+- [[generate_suggestions()]] - code - backend/app/services/kb/quality.py
+- [[generation_budget()]] - code - backend/app/services/kb/budget.py
+- [[get_or_generate_summary()]] - code - backend/app/services/kb/summarize.py
+- [[grading.py]] - code - backend/app/services/kb/grading.py
+- [[interview.py]] - code - backend/app/services/kb/interview.py
+- [[kbflashcards.py]] - code - backend/app/services/kb/flashcards.py
+- [[kb_flashcards_prompt()]] - code - backend/app/services/prompts.py
+- [[kb_summary_prompt()]] - code - backend/app/services/prompts.py
+- [[list_candidates()]] - code - backend/app/services/kb/flashcards.py
+- [[list_questions()_1]] - code - backend/app/services/kb/questions.py
+- [[mistakes.py]] - code - backend/app/services/kb/mistakes.py
+- [[mocks.py]] - code - backend/app/services/kb/mocks.py
+- [[note_quizzes.py]] - code - backend/app/services/kb/note_quizzes.py
+- [[parse_syllabus()]] - code - backend/app/services/kb/syllabus.py
+- [[practice_questions_prompt()]] - code - backend/app/services/prompts.py
+- [[quality.py]] - code - backend/app/services/kb/quality.py
+- [[quality_suggestions_prompt()]] - code - backend/app/services/prompts.py
+- [[question_hash()]] - code - backend/app/services/kb/questions.py
+- [[questions.py]] - code - backend/app/services/kb/questions.py
+- [[record_generation()]] - code - backend/app/services/kb/budget.py
+- [[reject_question()_1]] - code - backend/app/services/kb/questions.py
+- [[services__init__.py]] - code - backend/app/services/__init__.py
+- [[skills.py]] - code - backend/app/services/kb/skills.py
+- [[summarize.py]] - code - backend/app/services/kb/summarize.py
+- [[syllabus.py]] - code - backend/app/services/kb/syllabus.py
+- [[syllabus_ai_budget()]] - code - backend/app/services/kb/syllabus.py
+- [[syllabus_parse_prompt()]] - code - backend/app/services/prompts.py
+- [[test_ai_contract.py]] - code - backend/tests/test_ai_contract.py
+
+## Live Query (requires Dataview plugin)
+
+```dataview
+TABLE source_file, type FROM #community/Community_1
+SORT file.name ASC
+```
+
+## Connections to other communities
+- 46 edges to [[_COMMUNITY_Community 20]]
+- 43 edges to [[_COMMUNITY_Community 12]]
+- 37 edges to [[_COMMUNITY_Community 5]]
+- 27 edges to [[_COMMUNITY_Community 52]]
+- 25 edges to [[_COMMUNITY_Community 2]]
+- 24 edges to [[_COMMUNITY_Community 38]]
+- 21 edges to [[_COMMUNITY_Community 103]]
+- 20 edges to [[_COMMUNITY_Community 10]]
+- 20 edges to [[_COMMUNITY_Community 64]]
+- 16 edges to [[_COMMUNITY_Community 73]]
+- 14 edges to [[_COMMUNITY_Community 81]]
+- 13 edges to [[_COMMUNITY_Community 16]]
+- 13 edges to [[_COMMUNITY_Community 40]]
+- 11 edges to [[_COMMUNITY_Community 185]]
+- 11 edges to [[_COMMUNITY_Community 109]]
+- 11 edges to [[_COMMUNITY_Community 134]]
+- 10 edges to [[_COMMUNITY_Community 29]]
+- 10 edges to [[_COMMUNITY_Community 79]]
+- 10 edges to [[_COMMUNITY_Community 74]]
+- 10 edges to [[_COMMUNITY_Community 56]]
+- 10 edges to [[_COMMUNITY_Community 108]]
+- 10 edges to [[_COMMUNITY_Community 203]]
+- 9 edges to [[_COMMUNITY_Community 90]]
+- 9 edges to [[_COMMUNITY_Community 150]]
+- 9 edges to [[_COMMUNITY_Community 273]]
+- 9 edges to [[_COMMUNITY_Community 204]]
+- 7 edges to [[_COMMUNITY_Community 127]]
+- 6 edges to [[_COMMUNITY_Community 17]]
+- 6 edges to [[_COMMUNITY_Community 19]]
+- 6 edges to [[_COMMUNITY_Community 156]]
+- 6 edges to [[_COMMUNITY_Community 132]]
+- 6 edges to [[_COMMUNITY_Community 77]]
+- 6 edges to [[_COMMUNITY_Community 57]]
+- 5 edges to [[_COMMUNITY_Community 116]]
+- 5 edges to [[_COMMUNITY_Community 45]]
+- 5 edges to [[_COMMUNITY_Community 62]]
+- 5 edges to [[_COMMUNITY_Community 135]]
+- 5 edges to [[_COMMUNITY_Community 92]]
+- 5 edges to [[_COMMUNITY_Community 178]]
+- 5 edges to [[_COMMUNITY_Community 37]]
+- 4 edges to [[_COMMUNITY_Community 47]]
+- 4 edges to [[_COMMUNITY_Community 28]]
+- 4 edges to [[_COMMUNITY_Community 48]]
+- 4 edges to [[_COMMUNITY_Community 189]]
+- 4 edges to [[_COMMUNITY_Community 54]]
+- 3 edges to [[_COMMUNITY_Community 21]]
+- 3 edges to [[_COMMUNITY_Community 198]]
+- 3 edges to [[_COMMUNITY_Community 117]]
+- 3 edges to [[_COMMUNITY_Community 13]]
+- 3 edges to [[_COMMUNITY_Community 39]]
+- 3 edges to [[_COMMUNITY_Community 280]]
+- 3 edges to [[_COMMUNITY_Community 107]]
+- 3 edges to [[_COMMUNITY_Community 63]]
+- 3 edges to [[_COMMUNITY_Community 187]]
+- 3 edges to [[_COMMUNITY_Community 87]]
+- 3 edges to [[_COMMUNITY_Community 98]]
+- 3 edges to [[_COMMUNITY_Community 86]]
+- 3 edges to [[_COMMUNITY_Community 99]]
+- 3 edges to [[_COMMUNITY_Community 159]]
+- 3 edges to [[_COMMUNITY_Community 151]]
+- 2 edges to [[_COMMUNITY_Community 9]]
+- 2 edges to [[_COMMUNITY_Community 42]]
+- 2 edges to [[_COMMUNITY_Community 201]]
+- 2 edges to [[_COMMUNITY_Community 125]]
+- 2 edges to [[_COMMUNITY_Community 233]]
+- 2 edges to [[_COMMUNITY_Community 50]]
+- 2 edges to [[_COMMUNITY_Community 76]]
+- 2 edges to [[_COMMUNITY_Community 33]]
+- 2 edges to [[_COMMUNITY_Community 144]]
+- 2 edges to [[_COMMUNITY_Community 169]]
+- 2 edges to [[_COMMUNITY_Community 222]]
+- 2 edges to [[_COMMUNITY_Community 228]]
+- 2 edges to [[_COMMUNITY_Community 165]]
+- 2 edges to [[_COMMUNITY_Community 35]]
+- 2 edges to [[_COMMUNITY_Community 244]]
+- 2 edges to [[_COMMUNITY_Community 115]]
+- 2 edges to [[_COMMUNITY_Community 274]]
+- 2 edges to [[_COMMUNITY_Community 128]]
+- 2 edges to [[_COMMUNITY_Community 286]]
+- 2 edges to [[_COMMUNITY_Community 333]]
+- 2 edges to [[_COMMUNITY_Community 85]]
+- 2 edges to [[_COMMUNITY_Community 176]]
+- 2 edges to [[_COMMUNITY_Community 118]]
+- 1 edge to [[_COMMUNITY_Community 93]]
+- 1 edge to [[_COMMUNITY_Community 83]]
+- 1 edge to [[_COMMUNITY_Community 161]]
+- 1 edge to [[_COMMUNITY_Community 154]]
+- 1 edge to [[_COMMUNITY_Community 51]]
+- 1 edge to [[_COMMUNITY_Community 163]]
+- 1 edge to [[_COMMUNITY_Community 75]]
+- 1 edge to [[_COMMUNITY_Community 100]]
+- 1 edge to [[_COMMUNITY_Community 71]]
+- 1 edge to [[_COMMUNITY_Community 139]]
+- 1 edge to [[_COMMUNITY_Community 102]]
+- 1 edge to [[_COMMUNITY_Community 133]]
+- 1 edge to [[_COMMUNITY_Community 124]]
+- 1 edge to [[_COMMUNITY_Community 72]]
+- 1 edge to [[_COMMUNITY_Community 188]]
+- 1 edge to [[_COMMUNITY_Community 43]]
+- 1 edge to [[_COMMUNITY_Community 111]]
+- 1 edge to [[_COMMUNITY_Community 218]]
+- 1 edge to [[_COMMUNITY_Community 249]]
+- 1 edge to [[_COMMUNITY_Community 22]]
+- 1 edge to [[_COMMUNITY_Community 196]]
+- 1 edge to [[_COMMUNITY_Community 300]]
+- 1 edge to [[_COMMUNITY_Community 231]]
+- 1 edge to [[_COMMUNITY_Community 254]]
+- 1 edge to [[_COMMUNITY_Community 131]]
+- 1 edge to [[_COMMUNITY_Community 307]]
+- 1 edge to [[_COMMUNITY_Community 60]]
+- 1 edge to [[_COMMUNITY_Community 309]]
+- 1 edge to [[_COMMUNITY_Community 162]]
+- 1 edge to [[_COMMUNITY_Community 61]]
+- 1 edge to [[_COMMUNITY_Community 313]]
+- 1 edge to [[_COMMUNITY_Community 32]]
+- 1 edge to [[_COMMUNITY_Community 110]]
+- 1 edge to [[_COMMUNITY_Community 112]]
+- 1 edge to [[_COMMUNITY_Community 27]]
+- 1 edge to [[_COMMUNITY_Community 152]]
+- 1 edge to [[_COMMUNITY_Community 44]]
+- 1 edge to [[_COMMUNITY_Community 70]]
+- 1 edge to [[_COMMUNITY_Community 89]]
+- 1 edge to [[_COMMUNITY_Community 105]]
+- 1 edge to [[_COMMUNITY_Community 18]]
+- 1 edge to [[_COMMUNITY_Community 31]]
+- 1 edge to [[_COMMUNITY_Community 202]]
+- 1 edge to [[_COMMUNITY_Community 336]]
+- 1 edge to [[_COMMUNITY_Community 327]]
+- 1 edge to [[_COMMUNITY_Community 337]]
+
+## Top bridge nodes
+- [[config.py]] - degree 98, connects to 68 communities
+- [[KbService]] - degree 91, connects to 48 communities
+- [[services__init__.py]] - degree 47, connects to 32 communities
+- [[ai_client.py]] - degree 38, connects to 23 communities
+- [[generate_json()]] - degree 56, connects to 19 communities

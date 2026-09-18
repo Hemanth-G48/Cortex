@@ -12,14 +12,19 @@ export const courseThumbnail = (title: string, hue?: number): string => {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 
-/** Simple emoji-based resource icon (no SVG needed for these) */
+/**
+ * Emoji resource icon. The value is the *authoritative* document type served by
+ * the API (`KbDocument.doc_type` — md/pdf/docx/txt) when available, so the icon
+ * reflects real vault content instead of a hardcoded card kind (defect #26).
+ * Card kinds (folder/link/classroom/code) stay supported as the fallback.
+ */
 export const resourceIcon = (type: string): string => {
   switch (type.toLowerCase()) {
-    case 'pdf': case 'document': return '📄';
+    case 'md': case 'markdown': case 'txt': case 'quiz': return '📝';
+    case 'pdf': case 'docx': case 'doc': case 'document': return '📄';
     case 'video': return '🎬';
     case 'link': case 'url': return '🔗';
     case 'code': case 'github': return '💻';
-    case 'quiz': return '📝';
     case 'folder': case 'drive': return '📁';
     case 'classroom': return '🏫';
     default: return '📎';

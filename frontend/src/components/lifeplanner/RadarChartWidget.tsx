@@ -1,21 +1,21 @@
 import { StudentRadarChart } from '../visualization/RadarChart';
+import { EmptyState } from '../shared/EmptyState';
 
 export interface LifeDimension {
   label: string;
   value: number;
 }
 
-const DEFAULT_DIMENSIONS: LifeDimension[] = [
-  { label: 'Finance', value: 55 },
-  { label: 'Physical Health', value: 65 },
-  { label: 'Work', value: 70 },
-  { label: 'Personal Life', value: 75 },
-  { label: 'Overall', value: 60 },
-];
-
-/** Life dimensions radar (5 axes) in the Life Planner magenta accent. */
+/**
+ * Life dimensions radar in the Life Planner magenta accent.
+ *
+ * Defect #39: the axes are whatever the live sources return — the parent maps
+ * life-area progress and this week's vault mastery into ``dimensions``. There is
+ * no hardcoded default series, so an empty result shows the shared empty state
+ * instead of invented numbers.
+ */
 export const RadarChartWidget = ({ dimensions }: { dimensions?: LifeDimension[] }) => {
-  const data = (dimensions ?? DEFAULT_DIMENSIONS).map((d) => ({
+  const data = (dimensions ?? []).map((d) => ({
     subject: d.label,
     score: d.value,
     fullMark: 100,
@@ -24,7 +24,15 @@ export const RadarChartWidget = ({ dimensions }: { dimensions?: LifeDimension[] 
   return (
     <div>
       <div className="lp-section-title">Life Dimensions</div>
-      <StudentRadarChart data={data} color="#e8496d" />
+      {data.length === 0 ? (
+        <EmptyState
+          icon="📊"
+          title="No life dimensions yet"
+          message="Create life areas or study in the vault to populate this radar."
+        />
+      ) : (
+        <StudentRadarChart data={data} color="#e8496d" />
+      )}
     </div>
   );
 };

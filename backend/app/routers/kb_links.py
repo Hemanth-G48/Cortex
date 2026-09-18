@@ -33,6 +33,28 @@ def get_queue(
     return {"items": auto_link.queue(db, current_user.id)}
 
 
+class AutoLinkRequest(BaseModel):
+    """Audit defect #74: run the similarity pass on demand."""
+
+    limit: int | None = Field(default=None, ge=1, le=5000)
+
+
+@router.post("/auto")
+def run_auto_link(
+    body: AutoLinkRequest | None = None,
+    current_user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Trigger the auto-link pass and return the pending review queue.
+
+    Called after a syllabus/curriculum import so the extracted topics are
+    matched against the vault's existing documents straight away, instead of
+    waiting for the next scheduled automation run.
+    """
+    summary = auto_link.run(db, current_user.id, limit=body.limit if body else None)
+    return {"ok": True, "summary": summary, "queue": auto_link.queue(db, current_user.id)}
+
+
 @router.post("/accept")
 def accept(
     body: LinkAction,

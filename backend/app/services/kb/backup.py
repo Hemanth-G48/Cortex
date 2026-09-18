@@ -125,11 +125,28 @@ class RestoreResult:
 
 
 def _safe_member(path: str) -> str | None:
-    """Normalise a zip member to a safe relative path, or None if unsafe."""
-    norm = Path(path).as_posix()
-    if norm.startswith("/") or ".." in norm.split("/"):
+    """Normalise a zip member to a safe relative path, or None if unsafe.
+
+    Unlike ``path_utils.safe_path`` (which strips to a *basename* for upload
+    filenames), zip members are multi-segment relative paths
+    (``vault/<source-id>/<relpath>``) whose structure must be preserved. Here
+    we drop unsafe segments (``..``, absolute roots, drive letters) while
+    keeping the directory hierarchy, then rely on the caller's
+    resolve()-under-root containment check as defense in depth.
+    """
+    parts = path.replace("\\", "/").split("/")
+    # Drop empty segments, current-dir markers, traversal markers, absolute
+    # roots, and Windows drive letters (e.g. "C:").
+    safe_parts = [
+        p
+        for p in parts
+        if p and p not in (".", "..") and not p.endswith(":") and not p.startswith("/")
+    ]
+    if not safe_parts or safe_parts != parts:
+        # Any dropped segment means the path was malformed or tried to escape
+        # — reject the whole member rather than guess the intent.
         return None
-    return norm
+    return "/".join(safe_parts)
 
 
 def restore_zip(db: Session, user_id: int, data: bytes, *, replace_db: bool = False) -> dict:

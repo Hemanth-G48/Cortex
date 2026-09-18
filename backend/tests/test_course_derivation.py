@@ -198,6 +198,63 @@ def test_resources_endpoint_combines_sources(client: TestClient, db_session: Ses
     assert classroom["url"] == "https://classroom.google.com/c/123"
     assert classroom["id"] == "gc-gc-bio"
 
+    # Defect #26: every card carries a metadata-derived doc_type for its icon.
+    assert classroom["doc_type"] == "classroom"
+    # This source has no indexed documents yet → neutral folder type.
+    assert folder["doc_type"] == "folder"
+
+
+def test_resources_doc_type_comes_from_authoritative_document_type(
+    client: TestClient, db_session: Session
+):
+    """Defect #26: the card icon follows ``KbDocument.doc_type`` (the real file
+    type), not the synthetic card kind."""
+    token = _signup(client)
+    uid = _uid(db_session)
+    headers = {AUTH: f"Bearer {token}"}
+
+    src = _make_source(db_session, uid, name="Papers", enabled=True)
+    # Two PDFs vs one markdown → the source's dominant type is "pdf".
+    for i in range(2):
+        db_session.add(KbDocument(
+            user_id=uid, source_id=src.id, path_rel=f"p{i}.pdf",
+            title=f"Paper {i}", doc_type="pdf", status="unchanged",
+        ))
+    db_session.add(KbDocument(
+        user_id=uid, source_id=src.id, path_rel="note.md",
+        title="Note", doc_type="md", status="unchanged",
+    ))
+    db_session.commit()
+
+    data = client.get("/api/courses/resources", headers=headers).json()
+    folder = next(r for r in data if r["type"] == "folder")
+    assert folder["doc_type"] == "pdf"
+
+
+def test_resources_ignores_deleted_documents_for_doc_type(
+    client: TestClient, db_session: Session
+):
+    """Deleted documents must not drive the card's icon type (defect #26)."""
+    token = _signup(client)
+    uid = _uid(db_session)
+    headers = {AUTH: f"Bearer {token}"}
+
+    src = _make_source(db_session, uid, name="Mixed", enabled=True)
+    for i in range(3):
+        db_session.add(KbDocument(
+            user_id=uid, source_id=src.id, path_rel=f"old{i}.pdf",
+            title=f"Old {i}", doc_type="pdf", status="deleted",
+        ))
+    db_session.add(KbDocument(
+        user_id=uid, source_id=src.id, path_rel="live.md",
+        title="Live", doc_type="md", status="unchanged",
+    ))
+    db_session.commit()
+
+    data = client.get("/api/courses/resources", headers=headers).json()
+    folder = next(r for r in data if r["type"] == "folder")
+    assert folder["doc_type"] == "md"
+
 
 def test_resources_fallback_defaults_when_nothing_derived(client: TestClient, db_session: Session):
     token = _signup(client)

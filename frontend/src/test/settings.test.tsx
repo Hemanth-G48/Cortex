@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Settings } from '../pages/Settings';
+import { profileApi } from '../services/api';
 
 const { user } = vi.hoisted(() => {
   const user = {
@@ -31,6 +32,11 @@ vi.mock('../hooks/useProfile', () => ({
 
 vi.mock('../services/api', () => {
   return {
+    profileApi: {
+      get: vi.fn().mockResolvedValue({ user }),
+      getPrefs: vi.fn().mockResolvedValue({ prefs: { ai_model: '' } }),
+      updatePrefs: vi.fn().mockResolvedValue({ prefs: { ai_model: '' } }),
+    },
     endpoints: {
       kb: {
         preferences: {
@@ -122,8 +128,14 @@ describe('Settings', () => {
     expect(screen.queryByText(/^oc\/deepseek-v4-flash-free$/)).not.toBeInTheDocument();
     expect(screen.getByText(/^oc\/gpt-4o-free$/)).toBeInTheDocument();
 
-    // Selecting an option persists the override locally.
+    // Selecting an option stages the draft (defect #65 — explicit save).
     fireEvent.mouseDown(screen.getByText(/^oc\/gpt-4o-free$/));
-    expect(localStorage.getItem('slos-ai-model')).toBe('oc/gpt-4o-free');
+    expect(screen.getByRole('button', { name: /Save model/ })).toBeInTheDocument();
+    expect(localStorage.getItem('slos-ai-model')).toBe(null);
+
+    // Clicking Save persists the override locally and on the server.
+    fireEvent.click(screen.getByRole('button', { name: /Save model/ }));
+    await waitFor(() => expect(localStorage.getItem('slos-ai-model')).toBe('oc/gpt-4o-free'));
+    expect(profileApi.updatePrefs).toHaveBeenCalledWith({ ai_model: 'oc/gpt-4o-free' });
   });
 });

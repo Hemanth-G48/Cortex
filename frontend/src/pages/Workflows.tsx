@@ -119,6 +119,9 @@ export const Workflows = () => {
       setFocusNotice(
         `⏱ Started a ${res.session.duration_mins}-minute session: ${res.session.practice_task}. Finish it in the Pomodoro view to log it.`,
       );
+      // Defect #64 fix: re-fetch the focus board after starting so the
+      // active-state toggle reflects without a page reload.
+      void loadFocus();
     } catch (e) {
       setFocusNotice(e instanceof Error ? e.message : 'Could not start session');
     } finally {

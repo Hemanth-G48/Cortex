@@ -6,9 +6,6 @@ persist into ``kb_eval_runs``.
 """
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 from app.models import KbEvalRun
 from app.services.kb import eval_metrics as m
 from app.services.kb.eval_harness import load_golden_set
@@ -47,8 +44,8 @@ class TestMetricsMath:
 
 
 class TestGoldenSet:
-    def test_load_golden_set(self):
-        fixture = Path(__file__).parent / "fixtures" / "kb_eval" / "sample.json"
+    def test_load_golden_set(self, kb_eval_fixture_dir):
+        fixture = kb_eval_fixture_dir / "sample.json"
         items = load_golden_set(fixture)
         assert len(items) == 3
         assert items[0]["query"] == "machine learning"
@@ -56,11 +53,10 @@ class TestGoldenSet:
 
 
 class TestHarnessPersist:
-    def test_run_eval_persists_rows(self, db_session):
+    def test_run_eval_persists_rows(self, db_session, kb_eval_fixture_dir):
         from app.services.kb.eval_harness import run_eval
 
-        fixture_dir = Path(__file__).parent / "fixtures" / "kb_eval"
-        runs = run_eval(db_session, user_id=1, mode="keyword", fixture_dir=fixture_dir)
+        runs = run_eval(db_session, user_id=1, mode="keyword", fixture_dir=kb_eval_fixture_dir)
         assert len(runs) >= 1
         rows = db_session.query(KbEvalRun).all()
         assert len(rows) == len(runs)

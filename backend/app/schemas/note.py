@@ -35,6 +35,10 @@ class GoalBase(BaseModel):
     habit_id: Optional[int] = None
     target_date: Optional[date] = None
     is_completed: bool = False
+    # Phase 10 (Idea 98) linkage. Surfaced so the Life Planner can show vault
+    # mastery for the goal's subject (audit defect #40).
+    subject_id: Optional[int] = None
+    roadmap_id: Optional[int] = None
 
 
 class GoalCreate(GoalBase):

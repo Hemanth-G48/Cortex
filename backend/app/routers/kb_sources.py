@@ -14,7 +14,7 @@ from app.database import get_db
 from app.models import KbDocument, KbEdge, KbSource, User
 from app.schemas.kb import KbScanResult, KbSourceCreate, KbSourceResponse, KbSourceUpdate
 from app.services.kb import KbService
-from app.services.kb import auto_sync, jobs
+from app.services.kb import auto_sync, jobs, scanner
 from app.services.users import current_user
 
 router = APIRouter(prefix="/api/kb", tags=["kb-sources"])
@@ -95,6 +95,25 @@ def list_sources(
     )
     items = _with_counts(db, current_user.id, sources)
     return {"items": items, "total": len(items)}
+
+
+@router.get("/sources/validate", response_model=dict)
+def validate_source_path(
+    path: str = Query(
+        ...,
+        description="Candidate source root on disk (absolute path, or relative to the server's working directory).",
+    ),
+    current_user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Pre-flight check for a candidate source root (audit defect #20).
+
+    Declared before ``/sources/{source_id}`` so "validate" is not parsed as a
+    source id. Returns whether the folder is a usable knowledge root, what a
+    scan would index, and whether it is already registered (or nested inside a
+    registered source) so the UI can hint before submitting.
+    """
+    return scanner.probe_root_path(db, current_user.id, path)
 
 
 @router.get("/sources/{source_id}", response_model=KbSourceResponse)

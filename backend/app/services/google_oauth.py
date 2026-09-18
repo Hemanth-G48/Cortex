@@ -74,6 +74,11 @@ def auth_url() -> str:
 
 
 def _save_tokens(db: Session, token_data: dict, email: str | None = None) -> GoogleToken:
+    # NOTE (audit M4): the link between the ``User`` row and this ``GoogleToken``
+    # row is *email match*, not a foreign key. This is intentional for the
+    # single-owner local app (exactly one token row, id=1). If a multi-account
+    # use case ever grows, add a ``GoogleAccount.user_id`` FK and migrate this
+    # lookup to it — see docs/SECURITY.md for the identity model.
     row = db.query(GoogleToken).filter(GoogleToken.id == 1).first()
     if not row:
         row = GoogleToken(id=1)

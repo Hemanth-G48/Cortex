@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Header } from '../components/layout/Header';
-import { endpoints } from '../services/api';
+import { endpoints, profileApi } from '../services/api';
 import type { AIHealth } from '../services/api';
 import GoogleSyncCard from '../components/settings/GoogleSyncCard';
 import AIProviderSettings from '../components/settings/AIProviderSettings';
@@ -25,6 +25,9 @@ export const Settings = () => {
   const [aiHealth, setAiHealth] = useState<AIHealth | null>(null);
   const [aiModels, setAiModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem(AI_MODEL_KEY) ?? '');
+  // Defect #65 fix: explicit save instead of instant silent writes.
+  const [draftModel, setDraftModel] = useState<string>(selectedModel);
+  const [modelNotice, setModelNotice] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -35,12 +38,37 @@ export const Settings = () => {
   useEffect(() => {
     endpoints.ai.health().then(setAiHealth).catch(() => setAiHealth(null));
     endpoints.ai.models().then((r) => setAiModels(r.models)).catch(() => setAiModels([]));
+    // Defect #96 fix: load the server-persisted model preference.
+    profileApi.getPrefs()
+      .then((r) => {
+        const serverModel = typeof r.prefs?.ai_model === 'string' ? r.prefs.ai_model : '';
+        if (serverModel) {
+          localStorage.setItem(AI_MODEL_KEY, serverModel);
+          setSelectedModel(serverModel);
+          setDraftModel(serverModel);
+        }
+      })
+      .catch(() => { /* offline: keep the localStorage value */ });
   }, []);
 
-  const saveModel = (model: string) => {
-    setSelectedModel(model);
-    if (model) localStorage.setItem(AI_MODEL_KEY, model);
-    else localStorage.removeItem(AI_MODEL_KEY);
+  // Defect #65 fix: model changes are staged until "Save" is clicked.
+  const saveModel = async (model: string = draftModel) => {
+    try {
+      // Defect #96 fix: persist to the backend profile, not just localStorage.
+      await profileApi.updatePrefs({ ai_model: model });
+      if (model) localStorage.setItem(AI_MODEL_KEY, model);
+      else localStorage.removeItem(AI_MODEL_KEY);
+      setSelectedModel(model);
+      setDraftModel(model);
+      setModelNotice('✅ Model preference saved.');
+    } catch (e) {
+      setModelNotice(`⚠ Could not save preference: ${e instanceof Error ? e.message : 'backend unreachable'}`);
+    }
+  };
+
+  const revertModel = () => {
+    setDraftModel(selectedModel);
+    setModelNotice('Reverted to the saved preference.');
   };
 
   const exportData = async () => {
@@ -64,6 +92,9 @@ export const Settings = () => {
       ['pomodoro-sessions', () => endpoints.pomodoro.list()],
       ['schedule', () => endpoints.schedule.list()],
       ['google-status', () => endpoints.google.status()],
+      // Defect #66 fix: KB data (documents + sources) included in the export.
+      ['kb-documents', () => endpoints.kb.documents.list({}).then((r) => r.items ?? r).catch(() => null)],
+      ['kb-sources', () => endpoints.kb.sources.list().then((r) => r.items ?? r).catch(() => null)],
     ];
     const out: Record<string, unknown> = { exported_at: new Date().toISOString() };
     const results = await Promise.allSettled(keys.map(([k, fn]) => fn().then((v) => [k, v] as const)));
@@ -151,21 +182,37 @@ export const Settings = () => {
                 </label>
                 <ModelPicker
                   models={aiModels}
-                  value={selectedModel}
+                  value={draftModel}
                   defaultModel={aiHealth?.model ?? null}
                   placeholder={`Search ${aiModels.length} models… (e.g. auto/best-free)`}
-                  onSelect={saveModel}
+                  onSelect={(m) => setDraftModel(m)}
                 />
-                {selectedModel && (
+                {(draftModel !== selectedModel || draftModel) && (
+                  <span style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button type="button" className="btn btn-sm btn-primary" onClick={() => void saveModel()}>
+                      💾 Save model
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost"
+                      onClick={revertModel}
+                      title="Discard the staged change"
+                    >
+                      ↩ Undo
+                    </button>
+                  </span>
+                )}
+                {selectedModel && draftModel === selectedModel && (
                   <button
                     type="button"
                     className="btn btn-sm btn-ghost"
                     title="Reset to the backend default model"
-                    onClick={() => saveModel('')}
+                    onClick={() => { void saveModel(''); }}
                   >
                     ✕ Reset to default
                   </button>
                 )}
+                {modelNotice && <span className="muted">{modelNotice}</span>}
               </div>
             )}
             <p className="muted settings-hint">
